@@ -204,10 +204,10 @@ class ServerReconciler:
 
     async def reconcile(self) -> ReconcileReport:
         report = ReconcileReport()
-        roles = await self._ensure_roles(report)
         bot_member = self.guild.me
         if bot_member is None:
             raise RuntimeError("The bot member is not available in the target guild.")
+        roles = await self._ensure_roles(report, bot_member)
 
         for category_name, channel_specs in CATEGORY_CHANNELS.items():
             category = discord.utils.get(self.guild.categories, name=category_name)
@@ -263,14 +263,40 @@ class ServerReconciler:
             )
         return report
 
-    async def _ensure_roles(self, report: ReconcileReport) -> dict[str, discord.Role]:
+    async def _ensure_roles(
+        self,
+        report: ReconcileReport,
+        bot_member: discord.Member,
+    ) -> dict[str, discord.Role]:
         roles: dict[str, discord.Role] = {}
         for spec in ROLE_SPECS:
             role = discord.utils.get(self.guild.roles, name=spec.name)
+            if role is not None and role.position >= bot_member.top_role.position:
+                report.warnings.append(
+                    f"{spec.name} is at or above the RWI Bot role, so its protected "
+                    "permissions and display settings were left unchanged."
+                )
+                roles[spec.name] = role
+                continue
+
+            permissions, missing_permissions = self._grantable_permissions(
+                spec.permissions,
+                bot_member.guild_permissions,
+            )
+            if missing_permissions:
+                readable = ", ".join(
+                    permission.replace("_", " ").title() for permission in missing_permissions
+                )
+                report.warnings.append(
+                    f"Enable {readable} manually on {spec.name} after moving that role "
+                    "above RWI Bot. The bot intentionally cannot grant permissions it "
+                    "does not possess."
+                )
+
             if role is None:
                 role = await self.guild.create_role(
                     name=spec.name,
-                    permissions=spec.permissions,
+                    permissions=permissions,
                     colour=spec.colour,
                     hoist=spec.hoist,
                     mentionable=spec.mentionable,
@@ -279,7 +305,7 @@ class ServerReconciler:
                 report.created_roles.append(spec.name)
             else:
                 await role.edit(
-                    permissions=spec.permissions,
+                    permissions=permissions,
                     colour=spec.colour,
                     hoist=spec.hoist,
                     mentionable=spec.mentionable,
@@ -287,6 +313,24 @@ class ServerReconciler:
                 )
             roles[spec.name] = role
         return roles
+
+    @staticmethod
+    def _grantable_permissions(
+        desired: discord.Permissions,
+        bot_permissions: discord.Permissions,
+    ) -> tuple[discord.Permissions, tuple[str, ...]]:
+        """Return the desired permissions the bot can safely grant to a role."""
+
+        grantable = discord.Permissions.none()
+        missing: list[str] = []
+        for name, enabled in desired:
+            if not enabled:
+                continue
+            if getattr(bot_permissions, name):
+                setattr(grantable, name, True)
+            else:
+                missing.append(name)
+        return grantable, tuple(sorted(missing))
 
     def _channel_overwrites(
         self,

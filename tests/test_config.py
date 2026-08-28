@@ -50,3 +50,25 @@ def test_settings_repr_does_not_reveal_secrets() -> None:
     assert "discord-placeholder" not in rendered
     assert "openai-placeholder" not in rendered
     assert "user:password" not in rendered
+
+
+def test_settings_parse_comma_separated_domains_from_dotenv(tmp_path: Path) -> None:
+    env_file = tmp_path / ".env"
+    env_file.write_text(
+        "\n".join(
+            (
+                "RWI_DISCORD_TOKEN=discord-placeholder",
+                "RWI_DISCORD_APPLICATION_ID=1",
+                "RWI_DISCORD_GUILD_ID=2",
+                "RWI_OWNER_USER_ID=3",
+                "RWI_DATABASE_URL=postgresql+asyncpg://user:password@localhost/database",
+                "OPENAI_API_KEY=openai-placeholder",
+                "RWI_OFFICIAL_SEARCH_DOMAINS=ubisoft.com, example.com",
+            )
+        ),
+        encoding="utf-8",
+    )
+
+    settings = Settings(_env_file=env_file)
+
+    assert settings.official_search_domains == ("ubisoft.com", "example.com")

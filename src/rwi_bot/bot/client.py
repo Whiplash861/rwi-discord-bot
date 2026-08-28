@@ -10,6 +10,7 @@ from sqlalchemy import text
 
 from rwi_bot.application import AppServices
 from rwi_bot.bot import names
+from rwi_bot.bot.server_blueprint import ServerReconciler
 from rwi_bot.bot.views import PlatformRoleView
 from rwi_bot.domain.schemas import AuditRecord
 from rwi_bot.services.maintenance import ResumeCheck
@@ -34,6 +35,7 @@ class RwiBot(commands.Bot):
         )
         self.services = services
         self.log = structlog.get_logger("discord")
+        self._auto_bootstrap_complete = False
 
     async def setup_hook(self) -> None:
         from rwi_bot.cogs.admin import AdminCog
@@ -56,6 +58,37 @@ class RwiBot(commands.Bot):
             self.log.error("target_guild_missing", guild_id=self.services.settings.discord_guild_id)
             return
         await self.set_operating_presence()
+        if self.services.settings.auto_bootstrap_server and not self._auto_bootstrap_complete:
+            try:
+                report = await ServerReconciler(guild).reconcile()
+            except Exception:
+                self.log.exception("automatic_server_bootstrap_failed")
+            else:
+                self._auto_bootstrap_complete = True
+                commander = discord.utils.get(guild.roles, name=names.DIVISION_COMMANDER)
+                owner = guild.get_member(self.services.settings.owner_user_id)
+                if (
+                    commander is not None
+                    and owner is not None
+                    and guild.me is not None
+                    and commander.position < guild.me.top_role.position
+                    and commander not in owner.roles
+                ):
+                    try:
+                        await owner.add_roles(commander, reason="RWI owner bootstrap")
+                    except discord.Forbidden:
+                        report.warnings.append(
+                            "The bot could not assign Division Commander to the owner; "
+                            "assign it manually after role ordering."
+                        )
+                self.log.info(
+                    "automatic_server_bootstrap_complete",
+                    created_roles=len(report.created_roles),
+                    created_categories=len(report.created_categories),
+                    created_channels=len(report.created_channels),
+                    updated_channels=len(report.updated_channels),
+                    warnings=report.warnings,
+                )
         self.log.info(
             "bot_ready",
             user_id=self.user.id if self.user else None,

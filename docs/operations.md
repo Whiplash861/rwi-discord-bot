@@ -10,6 +10,26 @@ with the database service settings.
 The bot requires Python 3.12. Docker provides that runtime even when the Windows host
 uses another Python version.
 
+Set `RWI_AUTO_BOOTSTRAP_SERVER=true` only for a new or deliberately reconciled server.
+On its first successful Discord connection, the bot creates or updates the canonical
+roles, categories, channels, permission overwrites, and onboarding panel without
+deleting unrelated spaces. Later reconnects in the same process do not repeat the full
+bootstrap.
+
+The bot intentionally does not hold Administrator, View Audit Log, or Manage Nicknames.
+Consequently, the initial bootstrap leaves those ungrantable staff permissions for the
+server owner to finish manually:
+
+1. Move Division Commander, Division Coordinator, and Technician above the managed RWI
+   Bot role, preserving that order.
+2. Enable Administrator on Division Commander.
+3. Enable View Audit Log and Manage Nicknames on Division Coordinator.
+4. Keep Agent, platform roles, and Rogue Agent below RWI Bot; Rogue Agent remains the
+   lowest custom role.
+
+Once a protected staff role is at or above the bot, later reconciliations leave its
+permissions and display settings unchanged.
+
 ## Startup and health
 
 Build and start the private stack:

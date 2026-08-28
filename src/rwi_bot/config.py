@@ -2,9 +2,10 @@ from __future__ import annotations
 
 from functools import lru_cache
 from pathlib import Path
+from typing import Annotated
 
 from pydantic import Field, SecretStr, field_validator, model_validator
-from pydantic_settings import BaseSettings, SettingsConfigDict
+from pydantic_settings import BaseSettings, NoDecode, SettingsConfigDict
 
 
 class Settings(BaseSettings):
@@ -32,7 +33,7 @@ class Settings(BaseSettings):
     openai_hard_budget_usd: float = 25.0
     member_reserve_usd: float = 5.0
     web_search_enabled: bool = True
-    official_search_domains: tuple[str, ...] = ("ubisoft.com",)
+    official_search_domains: Annotated[tuple[str, ...], NoDecode] = ("ubisoft.com",)
 
     log_level: str = "INFO"
     runtime_dir: Path = Path("/data/runtime")
