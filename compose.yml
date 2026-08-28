@@ -1,0 +1,40 @@
+name: rwi-bot
+
+services:
+  db:
+    image: pgvector/pgvector:pg17
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: ${RWI_DB_NAME:-rwi}
+      POSTGRES_USER: ${RWI_DB_USER:-rwi}
+      POSTGRES_PASSWORD: ${RWI_DB_PASSWORD:?Set RWI_DB_PASSWORD in .env}
+    volumes:
+      - rwi_postgres:/var/lib/postgresql/data
+      - ./scripts/initdb.sql:/docker-entrypoint-initdb.d/001-rwi-extensions.sql:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${RWI_DB_USER:-rwi} -d ${RWI_DB_NAME:-rwi}"]
+      interval: 5s
+      timeout: 5s
+      retries: 12
+    networks: [rwi_internal]
+
+  bot:
+    build: .
+    restart: unless-stopped
+    env_file: .env
+    depends_on:
+      db:
+        condition: service_healthy
+    volumes:
+      - rwi_runtime:/data/runtime
+    networks: [rwi_internal]
+    stop_grace_period: 30s
+    command: ["sh", "-c", "alembic upgrade head && exec python -m rwi_bot.main"]
+
+volumes:
+  rwi_postgres:
+  rwi_runtime:
+
+networks:
+  rwi_internal:
+    driver: bridge

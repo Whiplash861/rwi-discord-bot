@@ -1,0 +1,59 @@
+[build-system]
+requires = ["hatchling>=1.27"]
+build-backend = "hatchling.build"
+
+[project]
+name = "rwi-discord-bot"
+version = "0.1.0"
+description = "The Redwing Initiative Discord knowledge and build-advice bot"
+readme = "README.md"
+requires-python = ">=3.12,<3.14"
+dependencies = [
+  "alembic>=1.16,<2",
+  "asyncpg>=0.30,<1",
+  "discord.py>=2.5,<3",
+  "openai>=2,<3",
+  "orjson>=3.10,<4",
+  "pgvector>=0.4,<1",
+  "pydantic>=2.11,<3",
+  "pydantic-settings>=2.10,<3",
+  "rapidfuzz>=3.13,<4",
+  "sqlalchemy[asyncio]>=2.0,<3",
+  "structlog>=25,<27",
+  "tenacity>=9,<10",
+]
+
+[project.optional-dependencies]
+dev = [
+  "mypy>=1.16,<2",
+  "pytest>=8.4,<10",
+  "pytest-asyncio>=1.0,<2",
+  "pytest-cov>=6,<8",
+  "ruff>=0.12,<1",
+]
+
+[project.scripts]
+rwi-bot = "rwi_bot.main:cli"
+rwi-preflight = "rwi_bot.preflight:cli"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/rwi_bot"]
+
+[tool.pytest.ini_options]
+addopts = "-ra --strict-markers --strict-config"
+asyncio_mode = "auto"
+testpaths = ["tests"]
+
+[tool.ruff]
+line-length = 100
+target-version = "py312"
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "N", "UP", "B", "A", "ASYNC", "S", "RUF"]
+ignore = ["S101"]
+
+[tool.mypy]
+python_version = "3.12"
+strict = true
+plugins = ["pydantic.mypy", "sqlalchemy.ext.mypy.plugin"]
+
