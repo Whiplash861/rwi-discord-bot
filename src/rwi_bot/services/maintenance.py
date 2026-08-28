@@ -90,10 +90,20 @@ class MaintenanceManager:
         checks: ResumeChecks,
         force: bool = False,
     ) -> tuple[MaintenanceState, list[ResumeCheck]]:
+        starting_event_id = self._state.event_id
         results = await checks()
         if any(not check.passed for check in results) and not force:
             return self.state, results
         async with self._lock:
+            if self._state.event_id != starting_event_id:
+                results.append(
+                    ResumeCheck(
+                        name="maintenance_revision",
+                        passed=False,
+                        detail="Maintenance state changed while health checks were running.",
+                    )
+                )
+                return self.state, results
             self._state = MaintenanceState(
                 halted=False,
                 actor_id=actor_id,

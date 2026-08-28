@@ -26,8 +26,8 @@ class ConversationCog(commands.Cog):
     def __init__(self, bot: RwiBot) -> None:
         self.bot = bot
         self.rate_limiter = MemberRateLimiter()
-        self._locks: defaultdict[int, asyncio.Lock] = defaultdict(asyncio.Lock)
-        self._memory: defaultdict[int, deque[ConversationTurn]] = defaultdict(
+        self._locks: defaultdict[tuple[int, int], asyncio.Lock] = defaultdict(asyncio.Lock)
+        self._memory: defaultdict[tuple[int, int], deque[ConversationTurn]] = defaultdict(
             lambda: deque(maxlen=4)
         )
 
@@ -62,8 +62,9 @@ class ConversationCog(commands.Cog):
             return
 
         destination = await self._destination(message)
-        async with self._locks[message.author.id]:
-            summary = self._conversation_summary(message.author.id)
+        session_key = (message.author.id, destination.id)
+        async with self._locks[session_key]:
+            summary = self._conversation_summary(session_key)
             request = AnswerRequest(
                 user_id=message.author.id,
                 guild_id=self.bot.services.settings.discord_guild_id,
@@ -76,7 +77,7 @@ class ConversationCog(commands.Cog):
             async with destination.typing():
                 result = await self.bot.services.qa.answer(request)
             await self._send_answer(destination, request, result)
-            self._memory[message.author.id].append(
+            self._memory[session_key].append(
                 ConversationTurn(member=message.content[:1200], assistant=result.text[:1800])
             )
 
@@ -102,6 +103,8 @@ class ConversationCog(commands.Cog):
     ) -> discord.DMChannel | discord.TextChannel | discord.Thread:
         if isinstance(message.channel, (discord.DMChannel, discord.Thread)):
             return message.channel
+        if not isinstance(message.channel, discord.TextChannel):
+            raise TypeError("RWI conversation destination must be a text channel or thread.")
         title = f"{message.author.display_name}: {message.content.strip()}"
         title = " ".join(title.split())[:90]
         try:
@@ -113,8 +116,8 @@ class ConversationCog(commands.Cog):
         except (discord.Forbidden, discord.HTTPException):
             return message.channel
 
-    def _conversation_summary(self, user_id: int) -> str | None:
-        turns = self._memory[user_id]
+    def _conversation_summary(self, session_key: tuple[int, int]) -> str | None:
+        turns = self._memory[session_key]
         if not turns:
             return None
         parts: list[str] = []
@@ -194,7 +197,10 @@ class ConversationCog(commands.Cog):
             view = FeedbackView(user_id=request.user_id, helpful=helpful, incorrect=incorrect)
 
         for index, chunk in enumerate(chunks):
-            await destination.send(chunk, view=view if index == len(chunks) - 1 else None)
+            if view is not None and index == len(chunks) - 1:
+                await destination.send(chunk, view=view)
+            else:
+                await destination.send(chunk)
 
 
 def split_discord_message(text: str, *, limit: int = 1950) -> list[str]:

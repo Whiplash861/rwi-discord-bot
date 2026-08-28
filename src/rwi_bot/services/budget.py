@@ -1,5 +1,8 @@
 from __future__ import annotations
 
+import asyncio
+from collections.abc import AsyncIterator
+from contextlib import asynccontextmanager
 from dataclasses import dataclass
 from decimal import Decimal
 from enum import StrEnum
@@ -68,18 +71,49 @@ class BudgetGuard:
         self.repository = repository
         self.hard_limit = hard_limit
         self.member_reserve = member_reserve
+        self._reserved = Decimal("0")
+        self._lock = asyncio.Lock()
 
     async def authorize(self, spending_class: SpendingClass, maximum_cost: Decimal) -> Decimal:
-        spent = await self.repository.total_cost()
-        effective_limit = self.hard_limit
-        if spending_class == SpendingClass.AUTONOMOUS_RESEARCH:
-            effective_limit -= self.member_reserve
-        if spent + maximum_cost > effective_limit:
-            raise BudgetDeniedError(
-                f"Budget guard denied {spending_class}: ${spent:.2f} spent of "
-                f"${effective_limit:.2f} available for this operation class."
-            )
-        return effective_limit - spent
+        async with self._lock:
+            spent = await self.repository.total_cost()
+            effective_limit = self._effective_limit(spending_class)
+            if spent + self._reserved + maximum_cost > effective_limit:
+                raise BudgetDeniedError(
+                    f"Budget guard denied {spending_class}: ${spent:.2f} recorded and "
+                    f"${self._reserved:.2f} reserved of ${effective_limit:.2f} available "
+                    "for this operation class."
+                )
+            return effective_limit - spent - self._reserved
+
+    @asynccontextmanager
+    async def reserve(
+        self,
+        spending_class: SpendingClass,
+        maximum_cost: Decimal,
+    ) -> AsyncIterator[None]:
+        if maximum_cost < 0:
+            raise ValueError("maximum cost cannot be negative")
+        async with self._lock:
+            spent = await self.repository.total_cost()
+            effective_limit = self._effective_limit(spending_class)
+            if spent + self._reserved + maximum_cost > effective_limit:
+                raise BudgetDeniedError(
+                    f"Budget guard denied {spending_class}: ${spent:.2f} recorded and "
+                    f"${self._reserved:.2f} reserved of ${effective_limit:.2f} available "
+                    "for this operation class."
+                )
+            self._reserved += maximum_cost
+        try:
+            yield
+        finally:
+            async with self._lock:
+                self._reserved -= maximum_cost
 
     async def utilization(self) -> tuple[Decimal, Decimal]:
         return await self.repository.total_cost(), self.hard_limit
+
+    def _effective_limit(self, spending_class: SpendingClass) -> Decimal:
+        if spending_class == SpendingClass.AUTONOMOUS_RESEARCH:
+            return self.hard_limit - self.member_reserve
+        return self.hard_limit

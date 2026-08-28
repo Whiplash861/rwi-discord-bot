@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from collections.abc import Mapping
 from dataclasses import dataclass, field
 from enum import StrEnum
 
@@ -222,20 +223,30 @@ class ServerReconciler:
 
             for spec in channel_specs:
                 overwrites = self._channel_overwrites(spec, roles, bot_member)
-                channel = discord.utils.get(category.channels, name=spec.name)
+                channel: discord.abc.GuildChannel | None = discord.utils.get(
+                    category.channels, name=spec.name
+                )
                 if channel is None:
                     channel = await self._create_channel(category, spec, overwrites)
                     report.created_channels.append(f"{category_name}/{spec.name}")
-                else:
-                    edit_kwargs: dict[str, object] = {"overwrites": overwrites}
-                    if isinstance(channel, (discord.TextChannel, discord.ForumChannel)):
-                        edit_kwargs["topic"] = spec.topic
-                        edit_kwargs["nsfw"] = spec.nsfw
+                elif isinstance(channel, (discord.TextChannel, discord.ForumChannel)):
                     await channel.edit(
-                        **edit_kwargs,
+                        overwrites=overwrites,
+                        topic=spec.topic or "",
+                        nsfw=spec.nsfw,
                         reason="Reconcile canonical RWI permissions",
                     )
                     report.updated_channels.append(f"{category_name}/{spec.name}")
+                elif isinstance(channel, discord.VoiceChannel):
+                    await channel.edit(
+                        overwrites=overwrites,
+                        reason="Reconcile canonical RWI permissions",
+                    )
+                    report.updated_channels.append(f"{category_name}/{spec.name}")
+                else:
+                    report.warnings.append(
+                        f"{category_name}/{spec.name} exists with an incompatible channel type."
+                    )
 
         rogue = roles[names.ROGUE_AGENT]
         custom_roles = [role for role in self.guild.roles if not role.is_default()]
@@ -282,10 +293,10 @@ class ServerReconciler:
         spec: ChannelSpec,
         roles: dict[str, discord.Role],
         bot_member: discord.Member,
-    ) -> dict[discord.Role | discord.Member, discord.PermissionOverwrite]:
-        overwrites: dict[discord.Role | discord.Member, discord.PermissionOverwrite] = {
-            self.guild.default_role: discord.PermissionOverwrite(view_channel=False)
-        }
+    ) -> Mapping[discord.Role | discord.Member | discord.Object, discord.PermissionOverwrite]:
+        overwrites: dict[
+            discord.Role | discord.Member | discord.Object, discord.PermissionOverwrite
+        ] = {self.guild.default_role: discord.PermissionOverwrite(view_channel=False)}
         if spec.name == names.WELCOME:
             overwrites[self.guild.default_role] = discord.PermissionOverwrite(
                 view_channel=True,
@@ -326,13 +337,15 @@ class ServerReconciler:
         self,
         category: discord.CategoryChannel,
         spec: ChannelSpec,
-        overwrites: dict[discord.Role | discord.Member, discord.PermissionOverwrite],
+        overwrites: Mapping[
+            discord.Role | discord.Member | discord.Object, discord.PermissionOverwrite
+        ],
     ) -> discord.abc.GuildChannel:
         reason = "RWI canonical server bootstrap"
         if spec.kind == ChannelKind.TEXT:
             return await category.create_text_channel(
                 spec.name,
-                topic=spec.topic,
+                topic=spec.topic or "",
                 nsfw=spec.nsfw,
                 overwrites=overwrites,
                 reason=reason,
@@ -346,7 +359,7 @@ class ServerReconciler:
         try:
             return await category.create_forum(
                 spec.name,
-                topic=spec.topic,
+                topic=spec.topic or "",
                 nsfw=spec.nsfw,
                 overwrites=overwrites,
                 reason=reason,

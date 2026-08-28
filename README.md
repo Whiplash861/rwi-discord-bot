@@ -36,8 +36,16 @@ Do not paste secrets into Discord, ChatGPT, GitHub issues, screenshots, or logs.
 ```powershell
 uv sync --extra dev
 uv run ruff check .
+uv run ruff format --check .
+uv run mypy src
 uv run pytest
 ```
 
-Architecture and operations documentation live under `docs/`.
+`rwi-preflight --healthcheck` validates configuration, the durable maintenance state,
+and database connectivity without contacting Discord or OpenAI. It never prints secret
+values.
+
+See [`docs/architecture.md`](docs/architecture.md) for trust boundaries and
+[`docs/operations.md`](docs/operations.md) for startup, health, backup, restore, and
+maintenance procedures.
 

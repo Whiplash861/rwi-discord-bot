@@ -4,7 +4,7 @@ import discord
 from discord import app_commands
 from discord.ext import commands
 
-from rwi_bot.bot.checks import is_commander, is_owner_or_technician
+from rwi_bot.bot.checks import is_commander, is_maintenance_operator
 from rwi_bot.bot.client import RwiBot
 from rwi_bot.bot.server_blueprint import ServerReconciler
 from rwi_bot.bot.views import ConfirmationView
@@ -20,7 +20,7 @@ class AdminCog(commands.Cog):
     @rwi.command(name="halt", description="Enter durable emergency maintenance mode")
     @app_commands.describe(reason="Why RWI must stop answering and running checks")
     async def halt(self, interaction: discord.Interaction, reason: str) -> None:
-        if not self._owner_or_technician(interaction):
+        if not self._maintenance_operator(interaction):
             await self._deny(interaction)
             return
         view = ConfirmationView(interaction.user.id)
@@ -56,7 +56,7 @@ class AdminCog(commands.Cog):
 
     @rwi.command(name="status", description="Show maintenance, health, and budget state")
     async def status(self, interaction: discord.Interaction) -> None:
-        if not self._owner_or_technician(interaction):
+        if not self._maintenance_operator(interaction):
             await self._deny(interaction)
             return
         state = self.bot.services.maintenance.state
@@ -74,7 +74,7 @@ class AdminCog(commands.Cog):
     @rwi.command(name="resume", description="Run health checks and leave maintenance mode")
     @app_commands.describe(force="Owner-only override when a critical health check fails")
     async def resume(self, interaction: discord.Interaction, force: bool = False) -> None:
-        if not self._owner_or_technician(interaction):
+        if not self._maintenance_operator(interaction):
             await self._deny(interaction)
             return
         if force and interaction.user.id != self.bot.services.settings.owner_user_id:
@@ -166,8 +166,8 @@ class AdminCog(commands.Cog):
         )
         await interaction.edit_original_response(content=summary)
 
-    def _owner_or_technician(self, interaction: discord.Interaction) -> bool:
-        return isinstance(interaction.user, discord.Member) and is_owner_or_technician(
+    def _maintenance_operator(self, interaction: discord.Interaction) -> bool:
+        return isinstance(interaction.user, discord.Member) and is_maintenance_operator(
             interaction.user, self.bot.services.settings.owner_user_id
         )
 

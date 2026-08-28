@@ -6,7 +6,7 @@ import re
 from dataclasses import dataclass
 from datetime import UTC, datetime, timedelta
 from decimal import Decimal
-from typing import Any
+from typing import Any, cast
 from uuid import UUID, uuid4
 
 from sqlalchemy import desc, func, select, update
@@ -70,7 +70,7 @@ class KnowledgeRepository:
             )
         )
         async with self.database.session() as session:
-            return await session.scalar(statement)
+            return cast(KnowledgeEntry | None, await session.scalar(statement))
 
     async def add_candidate(
         self,
@@ -257,7 +257,7 @@ class CacheRepository:
         )
         async with self.database.session() as session:
             result = await session.execute(statement)
-            return int(result.rowcount or 0)
+            return int(cast(Any, result).rowcount or 0)
 
 
 class TicketRepository:
@@ -336,7 +336,7 @@ def knowledge_context(hits: list[KnowledgeHit]) -> tuple[str, list[UUID], list[S
             citations.append(
                 SourceCitation(
                     title=source.title,
-                    url=source.url,  # type: ignore[arg-type]
+                    url=source.url,
                     source_type=source.source_type,
                     verified_at=source.retrieved_at,
                     official=source.source_type == "official",

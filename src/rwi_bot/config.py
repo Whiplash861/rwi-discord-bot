@@ -3,7 +3,7 @@ from __future__ import annotations
 from functools import lru_cache
 from pathlib import Path
 
-from pydantic import Field, SecretStr, field_validator
+from pydantic import Field, SecretStr, field_validator, model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
@@ -18,9 +18,9 @@ class Settings(BaseSettings):
     )
 
     discord_token: SecretStr
-    discord_application_id: int = 1542744928160063528
-    discord_guild_id: int = 1542743503115649167
-    owner_user_id: int = 377531816581791754
+    discord_application_id: int = Field(gt=0)
+    discord_guild_id: int = Field(gt=0)
+    owner_user_id: int = Field(gt=0)
     database_url: SecretStr
     openai_api_key: SecretStr = Field(validation_alias="OPENAI_API_KEY")
 
@@ -53,6 +53,19 @@ class Settings(BaseSettings):
             raise ValueError("budget values cannot be negative")
         return value
 
+    @field_validator("discord_token", "database_url", "openai_api_key")
+    @classmethod
+    def nonempty_secret(cls, value: SecretStr) -> SecretStr:
+        if not value.get_secret_value().strip():
+            raise ValueError("required secret values cannot be blank")
+        return value
+
+    @model_validator(mode="after")
+    def reserve_fits_budget(self) -> Settings:
+        if self.member_reserve_usd > self.openai_hard_budget_usd:
+            raise ValueError("member reserve cannot exceed the hard budget")
+        return self
+
     @field_validator("runtime_dir")
     @classmethod
     def absolute_runtime_path(cls, value: Path) -> Path:
@@ -61,4 +74,4 @@ class Settings(BaseSettings):
 
 @lru_cache(maxsize=1)
 def get_settings() -> Settings:
-    return Settings()  # type: ignore[call-arg]
+    return Settings()

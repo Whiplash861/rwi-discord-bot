@@ -81,8 +81,6 @@ class RwiOpenAIClient:
 
         model = self._select_model(complexity)
         maximum = Decimal("0.25") if web_search else Decimal("0.10")
-        await self.budget.authorize(spending_class, maximum)
-
         tools: list[dict[str, Any]] = []
         include: list[str] = []
         if web_search:
@@ -108,36 +106,41 @@ class RwiOpenAIClient:
                 raise OpenAIUnavailableError(
                     "RWI entered maintenance mode before the request began."
                 )
-            try:
-                response = await self._create_response(kwargs)
-            except Exception as exc:
-                snapshot = await self.breaker.failure()
-                self.log.warning(
-                    "openai_request_failed",
-                    error_type=type(exc).__name__,
-                    breaker_state=snapshot.state,
-                    correlation_id=str(correlation_id),
-                )
-                raise OpenAIUnavailableError(
-                    "The language service is temporarily unavailable."
-                ) from exc
+            async with self.budget.reserve(spending_class, maximum):
+                if self.maintenance.halted:
+                    raise OpenAIUnavailableError(
+                        "RWI entered maintenance mode before the request began."
+                    )
+                try:
+                    response = await self._create_response(kwargs)
+                except Exception as exc:
+                    snapshot = await self.breaker.failure()
+                    self.log.warning(
+                        "openai_request_failed",
+                        error_type=type(exc).__name__,
+                        breaker_state=snapshot.state,
+                        correlation_id=str(correlation_id),
+                    )
+                    raise OpenAIUnavailableError(
+                        "The language service is temporarily unavailable."
+                    ) from exc
 
-        await self.breaker.success()
-        text, citations, search_calls = _extract_output(response)
-        usage = _extract_usage(response, search_calls)
-        cost = estimate_cost(model, usage)
-        await self.usage_repository.append(
-            operation="web_answer" if web_search else "answer",
-            model=model,
-            input_tokens=usage.input_tokens,
-            cached_input_tokens=usage.cached_input_tokens,
-            cache_write_tokens=usage.cache_write_tokens,
-            output_tokens=usage.output_tokens,
-            tool_calls=usage.web_search_calls,
-            estimated_cost=cost,
-            user_id=user_id,
-            correlation_id=correlation_id,
-        )
+                await self.breaker.success()
+                text, citations, search_calls = _extract_output(response)
+                usage = _extract_usage(response, search_calls)
+                cost = estimate_cost(model, usage)
+                await self.usage_repository.append(
+                    operation="web_answer" if web_search else "answer",
+                    model=model,
+                    input_tokens=usage.input_tokens,
+                    cached_input_tokens=usage.cached_input_tokens,
+                    cache_write_tokens=usage.cache_write_tokens,
+                    output_tokens=usage.output_tokens,
+                    tool_calls=usage.web_search_calls,
+                    estimated_cost=cost,
+                    user_id=user_id,
+                    correlation_id=correlation_id,
+                )
         return OpenAIAnswer(
             text=text,
             citations=citations,

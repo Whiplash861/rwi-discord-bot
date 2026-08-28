@@ -22,6 +22,9 @@ class StatBlock:
     weapon_damage: float = 0.0
     skill_tier: int = 0
 
+    def armor_regen(self) -> float:
+        return self.armor_regen_flat + self.armor * self.armor_regen_pct
+
     def __add__(self, other: StatBlock) -> StatBlock:
         return StatBlock(
             armor=self.armor + other.armor,
@@ -52,6 +55,7 @@ class BuildConstraints:
     maximum_exotics: int = 1
     required_tags: frozenset[str] = frozenset()
     excluded_item_ids: frozenset[str] = frozenset()
+    optimize_for: tuple[str, ...] = ()
 
 
 @dataclass(slots=True)
@@ -91,7 +95,7 @@ def validate_build(items: tuple[ItemOption, ...], constraints: BuildConstraints)
         ("hazard protection", totals.hazard_protection, constraints.minimum_hazard_protection),
         (
             "armor regeneration",
-            totals.armor_regen_flat + totals.armor * totals.armor_regen_pct,
+            totals.armor_regen(),
             constraints.minimum_armor_regen,
         ),
         ("armor", totals.armor, constraints.minimum_armor),
@@ -127,5 +131,28 @@ def solve_nearest_builds(
     ordered_slots = sorted(options_by_slot)
     combinations = product(*(options_by_slot[slot] for slot in ordered_slots))
     candidates = [validate_build(tuple(items), constraints) for items in combinations]
-    candidates.sort(key=lambda item: (item.legality != BuildLegality.VALID, item.distance))
+    candidates.sort(
+        key=lambda item: (
+            item.legality != BuildLegality.VALID,
+            item.distance,
+            *(-value for value in _optimization_values(item, constraints.optimize_for)),
+        )
+    )
     return candidates[:limit]
+
+
+def _optimization_values(
+    candidate: BuildCandidate, priorities: tuple[str, ...]
+) -> tuple[float, ...]:
+    values = {
+        "armor": candidate.totals.armor,
+        "armor_regen": candidate.totals.armor_regen(),
+        "hazard_protection": candidate.totals.hazard_protection,
+        "protection_from_elites": candidate.totals.protection_from_elites,
+        "skill_tier": float(candidate.totals.skill_tier),
+        "weapon_damage": candidate.totals.weapon_damage,
+    }
+    unknown = [name for name in priorities if name not in values]
+    if unknown:
+        raise ValueError(f"Unknown optimization priorities: {', '.join(unknown)}")
+    return tuple(values[name] for name in priorities)

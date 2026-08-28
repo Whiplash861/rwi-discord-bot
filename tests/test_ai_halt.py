@@ -1,0 +1,86 @@
+from __future__ import annotations
+
+import asyncio
+from decimal import Decimal
+from pathlib import Path
+from types import SimpleNamespace
+from typing import Any, cast
+from uuid import uuid4
+
+import pytest
+
+from rwi_bot.ai.client import OpenAIUnavailableError, RwiOpenAIClient
+from rwi_bot.services.budget import BudgetGuard
+from rwi_bot.services.maintenance import MaintenanceManager
+
+
+class UsageStub:
+    def __init__(self) -> None:
+        self.records = 0
+
+    async def total_cost(self) -> Decimal:
+        return Decimal("0")
+
+    async def append(self, **_: object) -> None:
+        self.records += 1
+
+
+class BlockingResponses:
+    def __init__(self) -> None:
+        self.calls = 0
+        self.first_started = asyncio.Event()
+        self.release_first = asyncio.Event()
+
+    async def create(self, **_: object) -> Any:
+        self.calls += 1
+        if self.calls == 1:
+            self.first_started.set()
+            await self.release_first.wait()
+        return SimpleNamespace(
+            id=f"response-{self.calls}",
+            output_text="verified answer",
+            output=[],
+            usage=SimpleNamespace(
+                input_tokens=10,
+                output_tokens=5,
+                input_tokens_details=SimpleNamespace(cached_tokens=0, cache_write_tokens=0),
+            ),
+        )
+
+
+@pytest.mark.asyncio
+async def test_halt_rejects_request_waiting_for_paid_call_slot(tmp_path: Path) -> None:
+    maintenance = MaintenanceManager(tmp_path)
+    await maintenance.load()
+    usage = UsageStub()
+    responses = BlockingResponses()
+    client = RwiOpenAIClient(
+        api_key="test-placeholder",
+        maintenance=maintenance,
+        budget=BudgetGuard(cast(Any, usage), hard_limit=Decimal("25"), member_reserve=Decimal("5")),
+        usage_repository=cast(Any, usage),
+        normal_model="gpt-5.6-terra",
+        complex_model="gpt-5.6",
+        economy_model="gpt-5.6-luna",
+        official_domains=("example.invalid",),
+        max_concurrency=1,
+    )
+    client.client = cast(Any, SimpleNamespace(responses=responses))
+
+    first = asyncio.create_task(
+        client.answer(input_text="first", user_id=1, correlation_id=uuid4())
+    )
+    await responses.first_started.wait()
+    queued = asyncio.create_task(
+        client.answer(input_text="queued", user_id=2, correlation_id=uuid4())
+    )
+    await asyncio.sleep(0)
+
+    await maintenance.halt(actor_id=7, reason="cost breaker")
+    responses.release_first.set()
+
+    assert (await first).text == "verified answer"
+    with pytest.raises(OpenAIUnavailableError, match="before the request began"):
+        await queued
+    assert responses.calls == 1
+    assert usage.records == 1

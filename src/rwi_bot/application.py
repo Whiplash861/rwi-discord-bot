@@ -62,7 +62,6 @@ async def build_services(settings: Settings) -> AppServices:
         knowledge=knowledge,
         cache=cache,
         tickets=tickets,
-        discipline=discipline,
         ai=ai,
         audit=audit,
         web_search_enabled=settings.web_search_enabled,
@@ -77,6 +76,7 @@ async def build_services(settings: Settings) -> AppServices:
         knowledge=knowledge,
         cache=cache,
         tickets=tickets,
+        discipline=discipline,
         ai=ai,
         qa=qa,
     )
