@@ -246,12 +246,18 @@ a new question records the signal and continues through the normal answer path.
 
 ERIN checks provider completion state before sending or caching an answer. A token-limit
 cutoff receives one automatic concise retry. If the retry is also incomplete, the draft is
-discarded and replaced with a Technician ticket message. An `answer_retry` or
-`web_answer_retry` usage operation records the combined cost of both attempts.
+discarded and ERIN asks the member for current information. An `answer_retry` or
+`web_answer_retry` usage operation records the combined cost of both attempts. If the
+member says they do not know, the original question is then escalated to Technicians.
 
 ERIN removes its internal evidence-confidence marker before sending. An unknown/low
 assessment, or web support limited to one non-authoritative host after fallback search, is
-not delivered as an answer: ERIN admits uncertainty and opens an unanswered ticket.
+not delivered as an answer: ERIN admits uncertainty and asks the member for clarification
+or the correct answer. Substantive replies enter community review and stop the answer
+cycle; they are not reprocessed as new questions. A member who cannot provide the answer
+can explicitly defer to Technicians. The resulting alert contains the sanitized original
+question, a human-readable failure explanation, whether web search ran, and the specific
+verification requested instead of only internal event and target identifiers.
 
 Members can update their own answer profile with explicit first-person statements such
 as `I'm SHD 2500 and Expertise 20`, `I play PvP`, or `I prefer technical answers`.

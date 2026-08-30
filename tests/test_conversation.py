@@ -2,15 +2,21 @@ from __future__ import annotations
 
 from types import SimpleNamespace
 from typing import Any, cast
-from unittest.mock import AsyncMock
+from unittest.mock import AsyncMock, Mock
 from uuid import uuid4
 
 import pytest
 
-from rwi_bot.cogs.conversation import ConversationCog, ConversationTurn, split_discord_message
+from rwi_bot.cogs.conversation import (
+    ConversationCog,
+    ConversationTurn,
+    member_cannot_supply_answer,
+    split_discord_message,
+)
 from rwi_bot.db.models import CacheState
-from rwi_bot.domain.schemas import AnswerAssumptions, AnswerResult, SourceCitation
+from rwi_bot.domain.schemas import AnswerAssumptions, AnswerResult, AnswerTier, SourceCitation
 from rwi_bot.services.feedback import FeedbackSentiment, infer_feedback
+from rwi_bot.services.member_profiles import MemberAnswerProfile
 
 
 def test_discord_message_split_preserves_content() -> None:
@@ -112,7 +118,107 @@ def test_any_public_participant_can_build_on_the_latest_erin_answer() -> None:
 
 
 @pytest.mark.asyncio
-async def test_inferred_feedback_updates_cache_and_opens_ticket() -> None:
+async def test_archived_member_answer_stops_before_qa_creates_another_ticket() -> None:
+    claim = SimpleNamespace(id=uuid4())
+    learning = SimpleNamespace(submit_candidate=AsyncMock(return_value=claim))
+    qa = SimpleNamespace(answer=AsyncMock())
+    services = SimpleNamespace(
+        settings=SimpleNamespace(discord_guild_id=1),
+        qa=qa,
+    )
+
+    def get_cog(name: str) -> object | None:
+        return learning if name == "CommunityLearningCog" else None
+
+    bot = SimpleNamespace(services=services, get_cog=get_cog)
+    cog = ConversationCog(cast(Any, bot))
+    destination = SimpleNamespace(id=99, send=AsyncMock())
+    cog._destination = AsyncMock(return_value=destination)  # type: ignore[method-assign]
+    cog._is_ask_rwi_space = lambda _: True  # type: ignore[method-assign]
+    prior = ConversationTurn(
+        member="Can a Resolved shot trigger through an enemy shield?",
+        assistant="I could not verify that. Do you know the answer?",
+        author_id=42,
+        member_label="Agent",
+        question_signature="resolved-shield",
+        awaiting_user_input=True,
+    )
+    cog._memory[(42, 99)].append(prior)
+    cog._public_memory[99].append(prior)
+    message = SimpleNamespace(
+        author=SimpleNamespace(bot=False, id=42, display_name="Agent"),
+        content=(
+            "The answer is yes. Resolved triggers its headshot effect when the shot hits "
+            "an enemy shield instead of the body."
+        ),
+        channel=SimpleNamespace(id=99),
+        guild=SimpleNamespace(id=1),
+    )
+
+    await cog.on_message(cast(Any, message))
+
+    learning.submit_candidate.assert_awaited_once()
+    qa.answer.assert_not_awaited()
+    assert prior.awaiting_user_input is False
+    assert "archive for review" in destination.send.call_args.args[0]
+
+
+@pytest.mark.asyncio
+async def test_member_declining_to_answer_escalates_the_original_question_once() -> None:
+    qa = SimpleNamespace(
+        answer=AsyncMock(),
+        escalate_unresolved=AsyncMock(return_value=uuid4()),
+    )
+    services = SimpleNamespace(
+        settings=SimpleNamespace(discord_guild_id=1),
+        profiles=SimpleNamespace(
+            get_answer_profile=AsyncMock(
+                return_value=MemberAnswerProfile(
+                    assumptions=AnswerAssumptions(),
+                    detail_tier=AnswerTier.STANDARD,
+                )
+            )
+        ),
+        qa=qa,
+    )
+    bot = SimpleNamespace(
+        services=services,
+        get_cog=lambda _: None,
+        log=SimpleNamespace(info=Mock()),
+    )
+    cog = ConversationCog(cast(Any, bot))
+    destination = SimpleNamespace(id=99, send=AsyncMock())
+    cog._destination = AsyncMock(return_value=destination)  # type: ignore[method-assign]
+    cog._is_ask_rwi_space = lambda _: True  # type: ignore[method-assign]
+    prior = ConversationTurn(
+        member="What is the current Iron Will shield interaction?",
+        assistant="I could not verify that. Do you know the answer?",
+        author_id=42,
+        member_label="Agent",
+        question_signature="iron-will-shield",
+        awaiting_user_input=True,
+        failure_code="insufficient_current_evidence",
+        failure_summary="Current evidence did not establish the shield interaction.",
+        used_web_search=True,
+    )
+    cog._memory[(42, 99)].append(prior)
+    message = SimpleNamespace(
+        author=SimpleNamespace(bot=False, id=42, display_name="Agent"),
+        content="I don't know.",
+        channel=SimpleNamespace(id=99),
+        guild=SimpleNamespace(id=1),
+    )
+
+    await cog.on_message(cast(Any, message))
+
+    qa.escalate_unresolved.assert_awaited_once()
+    qa.answer.assert_not_awaited()
+    assert prior.awaiting_user_input is False
+    assert "plain-language summary" in destination.send.call_args.args[0]
+
+
+@pytest.mark.asyncio
+async def test_inferred_feedback_updates_cache_and_asks_for_correction() -> None:
     cache_id = uuid4()
     ticket_id = uuid4()
     services = SimpleNamespace(
@@ -132,13 +238,41 @@ async def test_inferred_feedback_updates_cache_and_opens_ticket() -> None:
     outcome = await cog._apply_inferred_feedback(turn, inferred, user_id=42)
 
     assert outcome.recorded is True
-    assert outcome.ticket_id == ticket_id
     services.cache.mark_feedback.assert_awaited_once_with(cache_id, helpful=False)
-    services.tickets.open_or_increment.assert_awaited_once()
+    services.tickets.open_or_increment.assert_not_awaited()
     audit = services.audit.record.call_args.args[0]
     assert audit.event_type == "answer.feedback_inferred"
     assert audit.details["sentiment"] == "incorrect"
     assert turn.feedback_sentiment is FeedbackSentiment.INCORRECT
+    assert turn.awaiting_user_input is True
+    assert turn.failure_code == "member_reported_incorrect"
+
+
+@pytest.mark.parametrize(
+    "text",
+    (
+        "I don't know",
+        "I don't know the correct answer.",
+        "I'm not sure.",
+        "No idea",
+        "I can't answer that.",
+        "Please ask the Technicians.",
+    ),
+)
+def test_member_can_explicitly_defer_unresolved_question(text: str) -> None:
+    assert member_cannot_supply_answer(text) is True
+
+
+@pytest.mark.parametrize(
+    "text",
+    (
+        "I don't know if that value is right, but I measured 25% in game.",
+        "Can you ask the Technicians what Glass Cannon does?",
+        "I am not sure why it works that way.",
+    ),
+)
+def test_substantive_or_ambiguous_replies_do_not_trigger_automatic_escalation(text: str) -> None:
+    assert member_cannot_supply_answer(text) is False
 
 
 @pytest.mark.asyncio

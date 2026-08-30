@@ -101,6 +101,23 @@ _QUESTION_ONLY = re.compile(
     re.IGNORECASE,
 )
 _RISK = re.compile(r"\b(?:bug|glitch|exploit|cheese|unintended)\b", re.IGNORECASE)
+_PROMPTED_ASSERTION = re.compile(
+    r"\b(?:is|are|can|cannot|can't|gives?|grants?|adds?|has|uses?|triggers?|"
+    r"activates?|deactivates?|works?|requires?|must|will)\b",
+    re.IGNORECASE,
+)
+_TEACHING_META_ONLY = re.compile(
+    r"^\s*(?:no[,;:-]?\s+)?i(?:'m|\s+am)\s+telling\s+you\s+"
+    r"(?:the\s+answer(?:\s+to\s+(?:my|the)\s+question)?\s+)?"
+    r"so\s+you\s+can\s+(?:learn(?:\s+and\s+archive)?|archive)"
+    r"(?:\s+it)?[.!]?\s*$",
+    re.IGNORECASE,
+)
+_UNCERTAIN_CLAIM = re.compile(
+    r"\b(?:not\s+sure|do\s+not\s+know|don't\s+know|dont\s+know|maybe|might|"
+    r"probably|i\s+think|i\s+guess)\b",
+    re.IGNORECASE,
+)
 _CLAIM_FOOTER = re.compile(
     r"^Community claim ([0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-"
     r"[89ab][0-9a-f]{3}-[0-9a-f]{12})$",
@@ -108,19 +125,39 @@ _CLAIM_FOOTER = re.compile(
 )
 
 
-def infer_community_claim(text: str) -> CommunityClaimProposal | None:
+def infer_community_claim(
+    text: str,
+    *,
+    prompted: bool = False,
+) -> CommunityClaimProposal | None:
     """Find substantial factual follow-ups without deciding whether they are true."""
 
     clean = " ".join(text.strip().split())
     words = re.findall(r"[a-z0-9][a-z0-9'-]*", clean.casefold())
-    if len(clean) < 45 or len(words) < 8:
+    minimum_characters = 24 if prompted else 45
+    minimum_words = 5 if prompted else 8
+    if len(clean) < minimum_characters or len(words) < minimum_words:
         return None
-    if _QUESTION_ONLY.fullmatch(clean) or _ASSERTION.search(clean) is None:
+    if (
+        _QUESTION_ONLY.fullmatch(clean)
+        or _TEACHING_META_ONLY.search(clean)
+        or (prompted and _UNCERTAIN_CLAIM.search(clean))
+    ):
+        return None
+    if _ASSERTION.search(clean) is None and (
+        not prompted or _PROMPTED_ASSERTION.search(clean) is None
+    ):
         return None
     return CommunityClaimProposal(
         claim_text=clean[:2000],
         risk_flag="possible_bug_or_exploit" if _RISK.search(clean) else None,
     )
+
+
+def is_teaching_meta(text: str) -> bool:
+    """Recognize a request to learn that does not yet contain the gameplay claim itself."""
+
+    return _TEACHING_META_ONLY.fullmatch(" ".join(text.strip().split())) is not None
 
 
 def infer_claim_review_reply(text: str) -> ClaimReviewDecision | None:

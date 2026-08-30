@@ -306,4 +306,42 @@ RELEASES: tuple[Release, ...] = (
             ),
         ),
     ),
+    Release(
+        release_id="erin-update-11",
+        update_number=11,
+        version="V0.1.10",
+        released_on=date(2026, 8, 30),
+        notes=(
+            ReleaseNote(
+                ReleaseSection.HIGH_IMPACT,
+                "Unresolved answers now ask the member for clarification or current in-game "
+                "information before creating a Technician ticket.",
+            ),
+            ReleaseNote(
+                ReleaseSection.NEW_FEATURES,
+                "A member can say they do not know the answer to escalate the original "
+                "question, while substantive replies enter experienced-member review.",
+            ),
+            ReleaseNote(
+                ReleaseSection.FIXES,
+                "Archived member corrections now end the answer cycle instead of being "
+                "misread as another question and spawning additional tickets.",
+            ),
+            ReleaseNote(
+                ReleaseSection.IMPROVEMENTS,
+                "Technician alerts now show the original question, the specific failure, "
+                "checks already attempted, and the verification work requested.",
+            ),
+            ReleaseNote(
+                ReleaseSection.IMPROVEMENTS,
+                "Talent explanations now surface supported activation, deactivation, "
+                "limitation, and interaction details in the initial breakdown.",
+            ),
+            ReleaseNote(
+                ReleaseSection.FIXES,
+                "The natural question 'What do you know about me?' now opens the member's "
+                "saved ERIN profile locally instead of entering the answer queue.",
+            ),
+        ),
+    ),
 )

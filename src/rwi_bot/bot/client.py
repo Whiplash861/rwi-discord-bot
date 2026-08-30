@@ -244,19 +244,66 @@ class RwiBot(commands.Bot):
         channel = discord.utils.get(guild.text_channels, name=target_name)
         if channel is None:
             return
-        embed = discord.Embed(
-            title=record.event_type,
-            description=(record.reason or "No reason supplied.")[:1500],
-            colour=discord.Colour.orange(),
-            timestamp=datetime.now(UTC),
-        )
-        embed.add_field(name="Event ID", value=f"`{event_id}`", inline=False)
-        if record.actor_id:
-            embed.add_field(name="Actor", value=f"<@{record.actor_id}> (`{record.actor_id}`)")
-        if record.target_id:
-            embed.add_field(name="Target", value=f"`{record.target_id}`", inline=False)
+        embed = build_audit_summary_embed(record, event_id)
         await channel.send(embed=embed)
 
     async def close(self) -> None:
         await self.services.database.dispose()
         await super().close()
+
+
+def build_audit_summary_embed(record: AuditRecord, event_id: UUID) -> discord.Embed:
+    if record.event_type == "knowledge.unanswered_ticket":
+        details = record.details
+        question = str(details.get("question") or "Original question was not recorded.")[:1024]
+        failure = str(
+            details.get("failure_summary")
+            or record.reason
+            or "ERIN could not establish a current, corroborated answer."
+        )[:1024]
+        requested_action = str(
+            details.get("requested_action")
+            or "Research the current answer and update ERIN's verified knowledge."
+        )[:1024]
+        web_status = (
+            "attempted, but it did not produce sufficient current evidence"
+            if details.get("used_web_search")
+            else "not completed or not available for this attempt"
+        )
+        embed = discord.Embed(
+            title="ERIN needs help with an unanswered question",
+            description=(
+                "The member could not supply the missing information, so this question now "
+                "needs Technician research."
+            ),
+            colour=discord.Colour.orange(),
+            timestamp=datetime.now(UTC),
+        )
+        embed.add_field(name="Original question", value=question, inline=False)
+        embed.add_field(name="What went wrong", value=failure, inline=False)
+        embed.add_field(
+            name="Checks already attempted",
+            value=f"ERIN knowledge: checked\nCurrent web search: {web_status}",
+            inline=False,
+        )
+        embed.add_field(
+            name="What the Technician should verify", value=requested_action, inline=False
+        )
+        if record.actor_id:
+            embed.add_field(name="Requested by", value=f"<@{record.actor_id}>")
+        if record.target_id:
+            embed.add_field(name="Ticket ID", value=f"`{record.target_id}`", inline=False)
+        return embed
+
+    embed = discord.Embed(
+        title=record.event_type,
+        description=(record.reason or "No reason supplied.")[:1500],
+        colour=discord.Colour.orange(),
+        timestamp=datetime.now(UTC),
+    )
+    embed.add_field(name="Event ID", value=f"`{event_id}`", inline=False)
+    if record.actor_id:
+        embed.add_field(name="Actor", value=f"<@{record.actor_id}> (`{record.actor_id}`)")
+    if record.target_id:
+        embed.add_field(name="Target", value=f"`{record.target_id}`", inline=False)
+    return embed

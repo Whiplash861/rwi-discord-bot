@@ -180,7 +180,7 @@ async def test_token_cutoff_is_regenerated_concisely_before_return(tmp_path: Pat
 
 
 @pytest.mark.asyncio
-async def test_still_incomplete_answer_is_not_sent_or_cached() -> None:
+async def test_still_incomplete_answer_asks_member_before_opening_ticket() -> None:
     ticket_id = uuid4()
     cache = SimpleNamespace(get_valid=AsyncMock(return_value=None), create_candidate=AsyncMock())
     tickets = SimpleNamespace(open_or_increment=AsyncMock(return_value=ticket_id))
@@ -223,12 +223,15 @@ async def test_still_incomplete_answer_is_not_sent_or_cached() -> None:
 
     assert "stopped an incomplete draft" in result.text
     assert "Cut off" not in result.text
-    assert result.ticket_id == ticket_id
+    assert result.ticket_id is None
+    assert result.awaiting_user_input is True
+    assert result.failure_code == "incomplete_answer"
+    tickets.open_or_increment.assert_not_awaited()
     cache.create_candidate.assert_not_awaited()
 
 
 @pytest.mark.asyncio
-async def test_low_confidence_generated_answer_is_withheld_and_ticketed() -> None:
+async def test_low_confidence_answer_asks_member_before_opening_ticket() -> None:
     ticket_id = uuid4()
     cache = SimpleNamespace(get_valid=AsyncMock(return_value=None), create_candidate=AsyncMock())
     tickets = SimpleNamespace(open_or_increment=AsyncMock(return_value=ticket_id))
@@ -272,7 +275,10 @@ async def test_low_confidence_generated_answer_is_withheld_and_ticketed() -> Non
     assert "I won't guess" in result.text
     assert "plausible" not in result.text
     assert result.confidence is ConfidenceLabel.UNKNOWN
-    assert result.ticket_id == ticket_id
+    assert result.ticket_id is None
+    assert result.awaiting_user_input is True
+    assert result.failure_code == "insufficient_current_evidence"
+    tickets.open_or_increment.assert_not_awaited()
     cache.create_candidate.assert_not_awaited()
 
 

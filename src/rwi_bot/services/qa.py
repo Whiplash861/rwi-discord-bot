@@ -291,84 +291,81 @@ class QuestionAnsweringService:
             elif generated is None:
                 raise OpenAIUnavailableError("Web fallback is disabled and no knowledge matched.")
         except OpenAIUnavailableError as exc:
-            ticket_id = await self._open_ticket(
+            return await self._request_member_input(
                 request,
-                signature,
                 correlation_id,
-                str(exc),
-                learning_opt_out=learning_opt_out,
-            )
-            return AnswerResult(
-                text=(
-                    "I couldn't verify that answer from ERIN's library right now. "
-                    f"I opened Technician ticket `{ticket_id}` so it can be researched and added."
+                failure_code="answer_service_unavailable",
+                failure_summary=(
+                    "ERIN's answer or search service was unavailable after retrying, so no "
+                    "complete answer could be verified."
                 ),
-                assumptions=request.assumptions,
-                confidence=ConfidenceLabel.UNKNOWN,
-                ticket_id=ticket_id,
+                member_message=(
+                    "I couldn't complete the current knowledge and web checks right now. "
+                    "If you know the answer or have current in-game information, tell me and "
+                    "I'll archive it for review. If you don't know, say so and I'll send the "
+                    "original question to the Technicians."
+                ),
+                diagnostic=str(exc),
                 used_web_search=used_web,
                 learning_opt_out=learning_opt_out,
             )
 
         if not getattr(generated, "complete", True):
             reason = getattr(generated, "incomplete_reason", None) or "unknown cutoff"
-            ticket_id = await self._open_ticket(
+            return await self._request_member_input(
                 request,
-                signature,
                 correlation_id,
-                f"Provider returned an incomplete answer after completion retry: {reason}",
-                learning_opt_out=learning_opt_out,
-            )
-            return AnswerResult(
-                text=(
-                    "I stopped an incomplete draft instead of sending or saving a cut-off "
-                    "answer. I opened Technician ticket "
-                    f"`{ticket_id}` so the request can be reviewed."
+                failure_code="incomplete_answer",
+                failure_summary=(
+                    "The answer service returned an incomplete draft after its completion "
+                    "retry, so ERIN discarded it instead of sending partial information."
                 ),
-                assumptions=request.assumptions,
-                confidence=ConfidenceLabel.UNKNOWN,
-                ticket_id=ticket_id,
+                member_message=(
+                    "I stopped an incomplete draft instead of sending a cut-off answer. If "
+                    "you know the answer or can add current details, tell me and I'll archive "
+                    "them for review. If you don't know, say so and I'll send the original "
+                    "question to the Technicians."
+                ),
+                diagnostic=f"Completion retry ended with: {reason}",
                 used_web_search=used_web,
                 learning_opt_out=learning_opt_out,
             )
 
         if not generated.text.strip():
-            ticket_id = await self._open_ticket(
+            return await self._request_member_input(
                 request,
-                signature,
                 correlation_id,
-                "The response contained no usable answer.",
-                learning_opt_out=learning_opt_out,
-            )
-            return AnswerResult(
-                text=(
-                    "I couldn't verify a usable answer. "
-                    f"Technician ticket `{ticket_id}` has been opened."
+                failure_code="empty_answer",
+                failure_summary=(
+                    "The answer service completed but returned no usable answer for the question."
                 ),
-                assumptions=request.assumptions,
-                confidence=ConfidenceLabel.UNKNOWN,
-                ticket_id=ticket_id,
+                member_message=(
+                    "I couldn't get a usable answer from the available checks. If you know "
+                    "the correct answer or have current in-game information, tell me and I'll "
+                    "archive it for review. If you don't know, say so and I'll send the "
+                    "original question to the Technicians."
+                ),
+                diagnostic="The response contained no usable answer text.",
                 used_web_search=used_web,
                 learning_opt_out=learning_opt_out,
             )
 
         if confidence in {ConfidenceLabel.LOW, ConfidenceLabel.UNKNOWN}:
-            ticket_id = await self._open_ticket(
+            return await self._request_member_input(
                 request,
-                signature,
                 correlation_id,
-                "Available evidence did not meet ERIN's answer-confidence threshold.",
-                learning_opt_out=learning_opt_out,
-            )
-            return AnswerResult(
-                text=(
-                    "I don't have enough current, corroborated evidence to answer that "
-                    "confidently, so I won't guess. I opened Technician ticket "
-                    f"`{ticket_id}` for review."
+                failure_code="insufficient_current_evidence",
+                failure_summary=(
+                    "ERIN checked its current knowledge and available web evidence, but the "
+                    "sources did not establish a sufficiently current, corroborated answer."
                 ),
-                assumptions=request.assumptions,
-                confidence=ConfidenceLabel.UNKNOWN,
-                ticket_id=ticket_id,
+                member_message=(
+                    "I don't have enough current, corroborated evidence to answer that "
+                    "confidently, so I won't guess. Do you know the correct answer or have "
+                    "current in-game information I can archive for review? If you don't know, "
+                    "say so and I'll send the original question to the Technicians."
+                ),
+                diagnostic="Available evidence did not meet ERIN's confidence threshold.",
                 used_web_search=used_web,
                 learning_opt_out=learning_opt_out,
             )
@@ -416,6 +413,67 @@ class QuestionAnsweringService:
             learning_opt_out=learning_opt_out,
         )
 
+    async def escalate_unresolved(
+        self,
+        request: AnswerRequest,
+        *,
+        signature: str,
+        failure_code: str,
+        failure_summary: str,
+        used_web_search: bool,
+        learning_opt_out: bool,
+    ) -> UUID:
+        """Escalate only after the member says they cannot supply the missing information."""
+
+        return await self._open_ticket(
+            request,
+            signature,
+            uuid4(),
+            failure_summary,
+            failure_code=failure_code,
+            used_web_search=used_web_search,
+            learning_opt_out=learning_opt_out,
+        )
+
+    async def _request_member_input(
+        self,
+        request: AnswerRequest,
+        correlation_id: UUID,
+        *,
+        failure_code: str,
+        failure_summary: str,
+        member_message: str,
+        diagnostic: str,
+        used_web_search: bool,
+        learning_opt_out: bool,
+    ) -> AnswerResult:
+        await self.audit.record(
+            AuditRecord(
+                event_type="answer.member_input_requested",
+                actor_id=request.user_id,
+                target_type="answer",
+                correlation_id=correlation_id,
+                reason=diagnostic,
+                details={
+                    "failure_code": failure_code,
+                    "failure_summary": failure_summary,
+                    "used_web_search": used_web_search,
+                    "is_dm": request.is_dm,
+                    "learning_opt_out": learning_opt_out,
+                },
+            )
+        )
+        return AnswerResult(
+            text=member_message,
+            assumptions=request.assumptions,
+            confidence=ConfidenceLabel.UNKNOWN,
+            awaiting_user_input=True,
+            failure_code=failure_code,
+            failure_summary=failure_summary,
+            used_web_search=used_web_search,
+            learning_opt_out=learning_opt_out,
+        )
+
     async def _open_ticket(
         self,
         request: AnswerRequest,
@@ -423,6 +481,8 @@ class QuestionAnsweringService:
         correlation_id: UUID,
         reason: str,
         *,
+        failure_code: str,
+        used_web_search: bool,
         learning_opt_out: bool,
     ) -> UUID:
         ticket_id = await self.tickets.open_or_increment(
@@ -444,7 +504,19 @@ class QuestionAnsweringService:
                 target_id=str(ticket_id),
                 correlation_id=correlation_id,
                 reason=reason,
-                details={"is_dm": request.is_dm, "learning_opt_out": learning_opt_out},
+                details={
+                    "question": sanitize_for_technicians(request.question),
+                    "failure_code": failure_code,
+                    "failure_summary": reason,
+                    "used_web_search": used_web_search,
+                    "requested_action": (
+                        "Verify the current Red Horizon answer, including any material limits "
+                        "or exceptions, then add or revise ERIN's verified knowledge."
+                    ),
+                    "escalated_after_member_prompt": True,
+                    "is_dm": request.is_dm,
+                    "learning_opt_out": learning_opt_out,
+                },
             )
         )
         return ticket_id

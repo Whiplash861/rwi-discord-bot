@@ -19,6 +19,7 @@ from rwi_bot.services.community_learning import (
     community_claim_has_query_anchor,
     infer_claim_review_reply,
     infer_community_claim,
+    is_teaching_meta,
 )
 from rwi_bot.services.qa import QuestionAnsweringService
 
@@ -55,11 +56,53 @@ def test_questions_and_low_substance_opinions_are_not_archived(text: str) -> Non
     assert infer_community_claim(text) is None
 
 
+def test_prompted_member_answer_is_archived_without_becoming_another_question() -> None:
+    text = (
+        "The answer is yes. Resolved makes a shield hit trigger its headshot effect even "
+        "when the projectile does not touch the enemy's body."
+    )
+
+    result = infer_community_claim(text, prompted=True)
+
+    assert result is not None
+    assert result.claim_text == text
+
+
+def test_teaching_meta_message_is_not_mistaken_for_the_gameplay_claim() -> None:
+    text = "No, I'm telling you the answer to my question so you can learn and archive it."
+
+    assert is_teaching_meta(text) is True
+    assert infer_community_claim(text, prompted=True) is None
+
+
+def test_teaching_preface_does_not_hide_an_actual_factual_correction() -> None:
+    text = (
+        "I'm telling you this so you can learn: Glass Cannon gives 25% amplified damage "
+        "and increases incoming damage by 50%."
+    )
+
+    result = infer_community_claim(text, prompted=True)
+
+    assert result is not None
+    assert result.claim_text == text
+
+
+def test_uncertain_prompted_reply_is_not_archived_as_a_factual_claim() -> None:
+    assert (
+        infer_community_claim(
+            "I am not sure why it works that way, but maybe it is intentional.",
+            prompted=True,
+        )
+        is None
+    )
+
+
 def test_build_prompt_requires_tiered_tradeoffs_and_silent_profiles() -> None:
     normalized = " ".join(RWI_ANSWER_INSTRUCTIONS.split())
     assert "separate tiered **Pros** and **Cons** lists" in normalized
     assert "Major, Situational, or Minor" in normalized
     assert "Never append a standardized assumptions footer" in normalized
+    assert "material activation and deactivation conditions" in normalized
 
 
 def test_bug_or_exploit_language_is_flagged_for_review_not_trusted() -> None:

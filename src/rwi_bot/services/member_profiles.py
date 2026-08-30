@@ -105,7 +105,7 @@ _PROFILE_QUERY = re.compile(
     r"(?:erin\s+)?profile\s*[?.!]*\s*$|"
     r"^\s*(?:what(?:'s|\s+is)|show)\s+my\s+(?:erin\s+)?"
     r"(?:profile|settings|assumptions)\s*[?.!]*\s*$|"
-    r"^\s*what\s+do\s+you\s+remember\s+about\s+me\s*[?.!]*\s*$",
+    r"^\s*what\s+do\s+you\s+(?:know|remember)\s+about\s+me\s*[?.!]*\s*$",
     re.IGNORECASE,
 )
 

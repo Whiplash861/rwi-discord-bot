@@ -42,7 +42,12 @@ its output limit, ERIN automatically regenerates a concise complete version once
 that remains incomplete is neither sent nor cached.
 Every generated answer also carries a hidden evidence assessment. ERIN can respectfully
 correct a member when current evidence is strong, while low-confidence answers are
-withheld and opened as Technician tickets instead of being guessed.
+withheld instead of being guessed. ERIN first asks the member for clarification or a
+current in-game answer that can enter moderated review. A Technician ticket is created
+only when the member says they cannot supply the missing information. Ticket alerts show
+the original question, the specific failure, prior checks, and the requested research.
+Talent and mechanic explanations surface supported activation, deactivation, limitation,
+and interaction details in the first breakdown rather than waiting for a follow-up.
 Every deployed application revision is also represented in the community-readable,
 read-only `#erin-patch-notes` index. Authored releases use severity-grouped notes;
 deployment fingerprinting produces a categorized fallback when a release manifest was

@@ -162,9 +162,29 @@ async def test_learning_opt_out_anonymizes_new_review_ticket_requester() -> None
         )
     )
 
-    assert result.ticket_id is not None
+    assert result.ticket_id is None
+    assert result.awaiting_user_input is True
     assert result.learning_opt_out is True
+    await service.escalate_unresolved(
+        AnswerRequest(
+            user_id=42,
+            guild_id=1,
+            channel_id=None,
+            question="Unknown private question",
+            is_dm=True,
+        ),
+        signature="unknown-private-question",
+        failure_code=result.failure_code or "answer_service_unavailable",
+        failure_summary=result.failure_summary or "No verified answer was available.",
+        used_web_search=result.used_web_search,
+        learning_opt_out=result.learning_opt_out,
+    )
     assert tickets.open_or_increment.call_args.kwargs["requester_user_id"] is None
+    ticket_event = service.audit.record.await_args_list[-1].args[0]
+    assert ticket_event.event_type == "knowledge.unanswered_ticket"
+    assert ticket_event.details["question"] == "Unknown private question"
+    assert ticket_event.details["failure_code"] == "answer_service_unavailable"
+    assert ticket_event.details["escalated_after_member_prompt"] is True
 
 
 def test_conversation_memory_can_be_cleared_per_member() -> None:

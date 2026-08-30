@@ -68,18 +68,21 @@ The answer path is:
     The target set combines current Ubisoft material, the exact official Division 2 Known
     Issues Trello board, Wikipedia and Division wikis, Reddit, Steam, and selected Q&A and
     community forums. Community pages remain corroborative rather than first-party truth.
-12. Open a sanitized Technician ticket when no answer can be verified.
+12. When no answer can be verified, ask the member for clarification or current in-game
+    information. Archive a substantive response for experienced-member review. Open a
+    sanitized Technician ticket only when the member says they cannot supply the answer.
 
 The provider response is inspected for `incomplete` status and token-limit metadata before
 Discord delivery or cache persistence. Normal and complex answers have separate output
 envelopes. A token-limit cutoff triggers one full concise regeneration with closed Markdown;
 usage from both attempts is combined for cost accounting. If that retry is still
-incomplete, its text is discarded, no cache record is created, and a sanitized Technician
-ticket replaces the broken draft.
+incomplete, its text is discarded, no cache record is created, and ERIN asks the member
+for information before Technician escalation.
 
 Generated text begins with an internal evidence marker that is removed before Discord
 delivery. The answer path requires high/medium model confidence plus authoritative web
-evidence or independent-source corroboration; otherwise it abstains and opens a ticket.
+evidence or independent-source corroboration; otherwise it abstains and requests member
+input before a ticket is allowed.
 Changing this contract changes the prompt version, so caches from weaker contracts are
 not reused.
 Source provenance is extracted from both message citation annotations and web-search tool
@@ -109,9 +112,11 @@ Normal Discord answers omit explicit citations and source links. Citations remai
 to the in-process conversation turn, and a source-only follow-up returns that stored list
 without another provider request. Explicit feedback-only follow-ups are also handled
 locally. High-confidence helpful signals update reusable answers; explicit incorrect or
-outdated signals open or increment a review ticket and count against a reusable answer
-when applicable. Signals are deduplicated per answer, negative cues take precedence over
-mixed politeness, and ambiguous questions such as “could this be outdated?” are not scored.
+outdated signals count against a reusable answer and ask the member for the correction.
+A substantive correction enters moderated community review; a ticket is opened only when
+the member cannot provide one. Signals are deduplicated per answer, negative cues take
+precedence over mixed politeness, and ambiguous questions such as “could this be
+outdated?” are not scored.
 
 The built-in current-season baseline is scoped to `Y8S3 Red Horizon` and uses
 [Ubisoft's official launch notes](https://www.ubisoft.com/en-us/game/the-division/the-division-2/news-updates/4mrYiFPIyKpzpoqshDQk80/the-division-2-red-horizon).

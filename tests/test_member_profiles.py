@@ -88,7 +88,12 @@ def test_out_of_range_profile_value_is_rejected() -> None:
 
 @pytest.mark.parametrize(
     "text",
-    ("Show my profile", "What's my ERIN profile?", "What do you remember about me?"),
+    (
+        "Show my profile",
+        "What's my ERIN profile?",
+        "What do you remember about me?",
+        "What do you know about me?",
+    ),
 )
 def test_profile_queries_are_local(text: str) -> None:
     assert is_profile_query(text) is True

@@ -17,9 +17,8 @@ from rwi_bot.domain.schemas import (
     AuditRecord,
     SourceCitation,
 )
-from rwi_bot.services.community_learning import infer_community_claim
+from rwi_bot.services.community_learning import infer_community_claim, is_teaching_meta
 from rwi_bot.services.feedback import FeedbackSentiment, InferredFeedback, infer_feedback
-from rwi_bot.services.knowledge import sanitize_for_technicians
 from rwi_bot.services.language import interpret_locally, question_signature
 from rwi_bot.services.member_profiles import (
     InferredMemberProfileUpdate,
@@ -45,12 +44,15 @@ class ConversationTurn:
     question_signature: str | None = None
     is_dm: bool = False
     feedback_sentiment: FeedbackSentiment | None = None
+    awaiting_user_input: bool = False
+    failure_code: str | None = None
+    failure_summary: str | None = None
+    used_web_search: bool = False
 
 
 @dataclass(frozen=True, slots=True)
 class FeedbackOutcome:
     recorded: bool
-    ticket_id: UUID | None = None
     eligible: bool = False
 
 
@@ -178,6 +180,61 @@ class ConversationCog(commands.Cog):
                 )
                 return
 
+            if (
+                prior_turn is not None
+                and prior_turn.awaiting_user_input
+                and member_cannot_supply_answer(message.content)
+            ):
+                profile = profile or await self.bot.services.profiles.get_answer_profile(
+                    message.author.id
+                )
+                original_request = AnswerRequest(
+                    user_id=message.author.id,
+                    guild_id=self.bot.services.settings.discord_guild_id,
+                    channel_id=message.channel.id,
+                    member_name=member_label,
+                    question=prior_turn.member,
+                    tier=profile.detail_tier,
+                    assumptions=profile.assumptions,
+                    is_dm=is_dm,
+                )
+                signature = prior_turn.question_signature or self._question_signature(
+                    original_request
+                )
+                ticket_id = await self.bot.services.qa.escalate_unresolved(
+                    original_request,
+                    signature=signature,
+                    failure_code=prior_turn.failure_code or "member_requested_research",
+                    failure_summary=(
+                        prior_turn.failure_summary
+                        or "ERIN could not verify the original question, and the member "
+                        "could not provide the missing information."
+                    ),
+                    used_web_search=prior_turn.used_web_search,
+                    learning_opt_out=prior_turn.learning_opt_out,
+                )
+                prior_turn.awaiting_user_input = False
+                reply = (
+                    "Understood. I sent your original question to the Technicians with a "
+                    "plain-language summary of what I could not verify and what checks were "
+                    "already attempted."
+                )
+                await destination.send(reply)
+                self._remember_local_exchange(
+                    session_key=session_key,
+                    destination_id=destination.id,
+                    is_dm=is_dm,
+                    author_id=message.author.id,
+                    member_label=member_label,
+                    member_text=message.content,
+                    assistant_text=reply,
+                    answer_kind="ticket",
+                )
+                self.bot.log.info(
+                    "member_requested_technician_escalation", ticket_id=str(ticket_id)
+                )
+                return
+
             retry_after = await self.rate_limiter.acquire(message.author.id)
             if retry_after is not None:
                 seconds = max(int(retry_after.total_seconds()), 1)
@@ -186,9 +243,26 @@ class ConversationCog(commands.Cog):
                 )
                 return
 
-            learning_turn = self._latest_public_answer(destination.id) if not is_dm else None
+            learning_turn = None
+            if not is_dm:
+                learning_turn = (
+                    prior_turn
+                    if prior_turn is not None and prior_turn.awaiting_user_input
+                    else self._latest_public_answer(destination.id)
+                )
             if learning_turn is not None:
-                claim_proposal = infer_community_claim(message.content)
+                if learning_turn.awaiting_user_input and is_teaching_meta(message.content):
+                    await destination.send(
+                        "I understand that you're teaching me. Please state the gameplay fact "
+                        "itself in one message, including the condition and any important "
+                        "exception you know. I'll archive that statement for review instead "
+                        "of treating it as another question."
+                    )
+                    return
+                claim_proposal = infer_community_claim(
+                    message.content,
+                    prompted=learning_turn.awaiting_user_input,
+                )
                 learning = self.bot.get_cog("CommunityLearningCog")
                 if claim_proposal is not None and learning is not None:
                     claim = await learning.submit_candidate(  # type: ignore[attr-defined]
@@ -199,12 +273,25 @@ class ConversationCog(commands.Cog):
                         prior_answer_excerpt=learning_turn.assistant,
                     )
                     if claim is not None:
-                        await destination.send(
+                        reply = (
                             "Thanks—that is substantial enough to archive for review. I asked "
                             "experienced members to verify it. I won't reuse it as fact unless "
                             "they approve or qualify it, and bug or exploit techniques are "
                             "excluded from recommendations."
                         )
+                        learning_turn.awaiting_user_input = False
+                        await destination.send(reply)
+                        self._remember_local_exchange(
+                            session_key=session_key,
+                            destination_id=destination.id,
+                            is_dm=is_dm,
+                            author_id=message.author.id,
+                            member_label=member_label,
+                            member_text=message.content,
+                            assistant_text=reply,
+                            answer_kind="learning",
+                        )
+                        return
 
             profile = profile or await self.bot.services.profiles.get_answer_profile(
                 message.author.id
@@ -239,6 +326,10 @@ class ConversationCog(commands.Cog):
                 learning_opt_out=result.learning_opt_out,
                 question_signature=signature,
                 is_dm=is_dm,
+                awaiting_user_input=result.awaiting_user_input,
+                failure_code=result.failure_code,
+                failure_summary=result.failure_summary,
+                used_web_search=result.used_web_search,
             )
             self._memory[session_key].append(turn)
             if not is_dm:
@@ -331,13 +422,15 @@ class ConversationCog(commands.Cog):
         member_label: str,
         member_text: str,
         assistant_text: str,
+        answer_kind: str = "profile",
     ) -> None:
         turn = ConversationTurn(
             member=member_text[:1200],
             assistant=assistant_text[:1800],
             author_id=author_id,
             member_label=member_label,
-            answer_kind="profile",
+            answer_kind=answer_kind,
+            is_dm=is_dm,
         )
         self._memory[session_key].append(turn)
         if not is_dm:
@@ -379,7 +472,6 @@ class ConversationCog(commands.Cog):
             return FeedbackOutcome(recorded=False, eligible=True)
 
         cache_state: str | None = None
-        ticket_id: UUID | None = None
         if turn.cache_entry_id is not None and not turn.learning_opt_out:
             try:
                 state = await self.bot.services.cache.mark_feedback(
@@ -391,14 +483,12 @@ class ConversationCog(commands.Cog):
             else:
                 cache_state = state.value
 
-        if (
-            inferred.sentiment is FeedbackSentiment.INCORRECT
-            and turn.question_signature is not None
-        ):
-            ticket_id = await self.bot.services.tickets.open_or_increment(
-                signature=turn.question_signature,
-                sanitized_question=sanitize_for_technicians(turn.member),
-                requester_user_id=None if turn.learning_opt_out else user_id,
+        if inferred.sentiment is FeedbackSentiment.INCORRECT:
+            turn.awaiting_user_input = True
+            turn.failure_code = "member_reported_incorrect"
+            turn.failure_summary = (
+                "A member reported that ERIN's prior answer was incorrect or outdated, but "
+                "the corrected current behavior has not yet been established."
             )
 
         if not turn.learning_opt_out:
@@ -421,13 +511,13 @@ class ConversationCog(commands.Cog):
                         "sentiment": inferred.sentiment.value,
                         "method": "explicit_follow_up",
                         "cache_state": cache_state,
-                        "ticket_id": str(ticket_id) if ticket_id is not None else None,
+                        "awaiting_member_correction": turn.awaiting_user_input,
                         "is_dm": turn.is_dm,
                     },
                 )
             )
         turn.feedback_sentiment = inferred.sentiment
-        return FeedbackOutcome(recorded=True, ticket_id=ticket_id, eligible=True)
+        return FeedbackOutcome(recorded=True, eligible=True)
 
     @staticmethod
     def _feedback_reply(
@@ -441,12 +531,11 @@ class ConversationCog(commands.Cog):
             return "Tell me which answer was wrong or outdated, and I'll take another look."
         if not outcome.recorded:
             return "I already recorded that concern."
-        if outcome.ticket_id is not None:
-            return (
-                "Thanks for flagging it. I recorded the answer for review under ticket "
-                f"`{outcome.ticket_id}`."
-            )
-        return "Thanks for flagging it. I recorded that the answer needs another look."
+        return (
+            "Thanks for flagging it. What specifically is wrong, and what is the correct "
+            "current behavior? I'll archive a substantive correction for experienced-member "
+            "review. If you don't know the correction, say so and I'll ask the Technicians."
+        )
 
     def _question_signature(self, request: AnswerRequest) -> str:
         interpreted = interpret_locally(request.question)
@@ -468,6 +557,21 @@ class ConversationCog(commands.Cog):
         chunks = split_discord_message(body)
         for chunk in chunks:
             await destination.send(chunk)
+
+
+_CANNOT_SUPPLY_ANSWER = re.compile(
+    r"^\s*(?:i\s+)?(?:do\s+not|don't|dont)\s+know"
+    r"(?:\s+the\s+(?:correct\s+)?answer)?[.!]?\s*$|"
+    r"^\s*(?:i(?:'m|\s+am)\s+)?not\s+sure[.!]?\s*$|"
+    r"^\s*(?:i\s+have\s+)?no\s+idea[.!]?\s*$|"
+    r"^\s*(?:i\s+)?can(?:not|'t)\s+(?:answer|help)(?:\s+(?:that|with\s+that))?[.!]?\s*$|"
+    r"^\s*(?:please\s+)?(?:ask|send\s+(?:it|this)\s+to)\s+(?:the\s+)?technicians[.!]?\s*$",
+    re.IGNORECASE,
+)
+
+
+def member_cannot_supply_answer(text: str) -> bool:
+    return _CANNOT_SUPPLY_ANSWER.fullmatch(" ".join(text.split())) is not None
 
 
 def split_discord_message(text: str, *, limit: int = 1950) -> list[str]:
