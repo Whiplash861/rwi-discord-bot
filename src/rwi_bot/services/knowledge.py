@@ -56,6 +56,30 @@ class TicketStateConflictError(RuntimeError):
         )
 
 
+class CacheStateConflictError(RuntimeError):
+    def __init__(self, *, expected: CacheState, actual: str) -> None:
+        self.expected = expected
+        self.actual = actual
+        super().__init__(
+            f"Cache state changed while confirmation was pending "
+            f"(expected {expected.value}, found {actual})."
+        )
+
+
+@dataclass(frozen=True, slots=True)
+class KnowledgeIntegrityReport:
+    total_entries: int
+    status_counts: dict[str, int]
+    active_without_sources: int
+    active_without_game_version: int
+    active_low_confidence: int
+    stale_active: int
+    possible_source_conflicts: int
+    open_review_tickets: int
+    quarantined_caches: int
+    stale_after_days: int
+
+
 def stable_context_hash(context: dict[str, Any]) -> str:
     payload = json.dumps(context, sort_keys=True, separators=(",", ":"), default=str)
     return hashlib.sha256(payload.encode()).hexdigest()
@@ -101,6 +125,107 @@ class KnowledgeRepository:
         )
         async with self.database.session() as session:
             return cast(KnowledgeEntry | None, await session.scalar(statement))
+
+    async def integrity_report(self, *, stale_after_days: int = 30) -> KnowledgeIntegrityReport:
+        if not 1 <= stale_after_days <= 365:
+            raise ValueError("stale_after_days must be between 1 and 365.")
+        stale_before = datetime.now(UTC) - timedelta(days=stale_after_days)
+        linked_source = (
+            select(KnowledgeSource.entry_id)
+            .where(KnowledgeSource.entry_id == KnowledgeEntry.id)
+            .exists()
+        )
+        possible_conflicts = (
+            select(KnowledgeSource.entry_id)
+            .group_by(KnowledgeSource.entry_id)
+            .having(func.bool_or(KnowledgeSource.supports_claim).is_(True))
+            .having(func.bool_or(KnowledgeSource.supports_claim.is_(False)).is_(True))
+            .subquery()
+        )
+        async with self.database.session() as session:
+            status_rows = (
+                await session.execute(
+                    select(KnowledgeEntry.status, func.count())
+                    .select_from(KnowledgeEntry)
+                    .group_by(KnowledgeEntry.status)
+                )
+            ).all()
+            status_counts = {str(status): int(count) for status, count in status_rows}
+            total_entries = sum(status_counts.values())
+            active_without_sources = int(
+                await session.scalar(
+                    select(func.count())
+                    .select_from(KnowledgeEntry)
+                    .where(KnowledgeEntry.status == KnowledgeStatus.ACTIVE.value)
+                    .where(~linked_source)
+                )
+                or 0
+            )
+            active_without_game_version = int(
+                await session.scalar(
+                    select(func.count())
+                    .select_from(KnowledgeEntry)
+                    .where(KnowledgeEntry.status == KnowledgeStatus.ACTIVE.value)
+                    .where(KnowledgeEntry.game_version.is_(None))
+                )
+                or 0
+            )
+            active_low_confidence = int(
+                await session.scalar(
+                    select(func.count())
+                    .select_from(KnowledgeEntry)
+                    .where(KnowledgeEntry.status == KnowledgeStatus.ACTIVE.value)
+                    .where(KnowledgeEntry.confidence < Decimal("0.750"))
+                )
+                or 0
+            )
+            stale_active = int(
+                await session.scalar(
+                    select(func.count())
+                    .select_from(KnowledgeEntry)
+                    .where(KnowledgeEntry.status == KnowledgeStatus.ACTIVE.value)
+                    .where(
+                        (KnowledgeEntry.verified_at.is_(None))
+                        | (KnowledgeEntry.verified_at < stale_before)
+                    )
+                )
+                or 0
+            )
+            possible_source_conflicts = int(
+                await session.scalar(select(func.count()).select_from(possible_conflicts)) or 0
+            )
+            open_review_tickets = int(
+                await session.scalar(
+                    select(func.count())
+                    .select_from(UnansweredTicket)
+                    .where(
+                        UnansweredTicket.status.in_(
+                            [TicketStatus.OPEN.value, TicketStatus.INVESTIGATING.value]
+                        )
+                    )
+                )
+                or 0
+            )
+            quarantined_caches = int(
+                await session.scalar(
+                    select(func.count())
+                    .select_from(AnswerCache)
+                    .where(AnswerCache.state == CacheState.QUARANTINED.value)
+                )
+                or 0
+            )
+        return KnowledgeIntegrityReport(
+            total_entries=total_entries,
+            status_counts=status_counts,
+            active_without_sources=active_without_sources,
+            active_without_game_version=active_without_game_version,
+            active_low_confidence=active_low_confidence,
+            stale_active=stale_active,
+            possible_source_conflicts=possible_source_conflicts,
+            open_review_tickets=open_review_tickets,
+            quarantined_caches=quarantined_caches,
+            stale_after_days=stale_after_days,
+        )
 
     async def add_candidate(
         self,
@@ -361,6 +486,21 @@ class CacheRepository:
                 cache.state = CacheState.STALE.value
                 return None
             return cache
+
+    async def get(self, cache_id: UUID) -> AnswerCache | None:
+        async with self.database.session() as session:
+            return await session.get(AnswerCache, cache_id)
+
+    async def quarantine(self, cache_id: UUID, *, expected_state: CacheState) -> None:
+        async with self.database.session() as session:
+            cache = await session.get(AnswerCache, cache_id, with_for_update=True)
+            if cache is None:
+                raise KeyError(f"Answer cache {cache_id} does not exist.")
+            if cache.state != expected_state.value:
+                raise CacheStateConflictError(expected=expected_state, actual=cache.state)
+            if cache.state == CacheState.QUARANTINED.value:
+                raise ValueError("That answer cache is already quarantined.")
+            cache.state = CacheState.QUARANTINED.value
 
     async def create_candidate(
         self,

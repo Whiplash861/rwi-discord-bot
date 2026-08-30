@@ -10,9 +10,10 @@ from rwi_bot.bot.checks import is_commander, is_maintenance_operator
 from rwi_bot.bot.client import RwiBot
 from rwi_bot.bot.server_blueprint import ServerReconciler
 from rwi_bot.bot.views import ConfirmationView
-from rwi_bot.db.models import KnowledgeStatus, TicketStatus
+from rwi_bot.db.models import CacheState, KnowledgeStatus, TicketStatus
 from rwi_bot.domain.schemas import AuditRecord
 from rwi_bot.services.knowledge import (
+    CacheStateConflictError,
     KnowledgeRevisionConflictError,
     TicketStateConflictError,
     sanitize_for_technicians,
@@ -219,6 +220,39 @@ class AdminCog(commands.Cog):
         if len(revisions) > 12:
             lines.append(f"…and {len(revisions) - 12} older revision(s).")
         await interaction.response.send_message("\n".join(lines)[:1950], ephemeral=True)
+
+    @rwi.command(
+        name="knowledge-report",
+        description="Show knowledge completeness, freshness, conflict, and queue health",
+    )
+    @app_commands.describe(stale_days="Treat active knowledge older than this as stale")
+    async def knowledge_report(
+        self,
+        interaction: discord.Interaction,
+        stale_days: app_commands.Range[int, 1, 365] = 30,
+    ) -> None:
+        if not self._maintenance_operator(interaction):
+            await self._deny(interaction)
+            return
+        report = await self.bot.services.knowledge.integrity_report(stale_after_days=stale_days)
+        statuses = " · ".join(
+            f"{status}: `{count}`" for status, count in sorted(report.status_counts.items())
+        )
+        await interaction.response.send_message(
+            "**RWI knowledge integrity report**\n\n"
+            f"Total entries: `{report.total_entries}`\n"
+            f"Statuses: {statuses or 'none'}\n"
+            f"Active without linked sources: `{report.active_without_sources}`\n"
+            f"Active without game version: `{report.active_without_game_version}`\n"
+            f"Active below 0.750 confidence: `{report.active_low_confidence}`\n"
+            f"Active not verified in {report.stale_after_days} days: "
+            f"`{report.stale_active}`\n"
+            f"Entries with mixed supporting/opposing evidence: "
+            f"`{report.possible_source_conflicts}`\n"
+            f"Open or investigating review tickets: `{report.open_review_tickets}`\n"
+            f"Quarantined answer caches: `{report.quarantined_caches}`",
+            ephemeral=True,
+        )
 
     @rwi.command(
         name="knowledge-revise",
@@ -498,6 +532,133 @@ class AdminCog(commands.Cog):
         )
         await interaction.edit_original_response(
             content="Review ticket resolved and linked to the verified knowledge entry.",
+            view=None,
+        )
+
+    @rwi.command(
+        name="cache-status",
+        description="Inspect shared answer-cache state without displaying answer text",
+    )
+    @app_commands.describe(cache_id="Answer-cache UUID")
+    async def cache_status(self, interaction: discord.Interaction, cache_id: str) -> None:
+        if not self._maintenance_operator(interaction):
+            await self._deny(interaction)
+            return
+        parsed_cache_id = await self._parse_uuid(interaction, cache_id, field_name="cache_id")
+        if parsed_cache_id is None:
+            return
+        cache = await self.bot.services.cache.get(parsed_cache_id)
+        if cache is None:
+            await interaction.response.send_message(
+                "That answer cache does not exist.", ephemeral=True
+            )
+            return
+        await interaction.response.send_message(
+            f"**Answer cache** `{cache.id}`\n"
+            f"State: `{cache.state}`\n"
+            f"Intent: `{cache.normalized_intent[:120]}`\n"
+            f"Tier: `{cache.answer_tier}`\n"
+            f"Dependencies: `{len(cache.dependency_revision_ids)}`\n"
+            f"Citations: `{len(cache.citations)}`\n"
+            f"Feedback: `+{cache.positive_feedback}` / `-{cache.negative_feedback}`\n"
+            f"Expires: {discord.utils.format_dt(cache.expires_at, style='R')}",
+            ephemeral=True,
+        )
+
+    @rwi.command(
+        name="cache-quarantine",
+        description="Confirm immediate quarantine of a suspect shared answer cache",
+    )
+    @app_commands.describe(
+        cache_id="Answer-cache UUID",
+        reason="Why this cached answer must no longer be served",
+    )
+    async def cache_quarantine(
+        self,
+        interaction: discord.Interaction,
+        cache_id: str,
+        reason: str,
+    ) -> None:
+        if not await self._knowledge_change_allowed(interaction):
+            return
+        parsed_cache_id = await self._parse_uuid(interaction, cache_id, field_name="cache_id")
+        if parsed_cache_id is None:
+            return
+        clean_reason = sanitize_for_technicians(reason)
+        if not clean_reason:
+            await interaction.response.send_message(
+                "A quarantine reason is required.", ephemeral=True
+            )
+            return
+        cache = await self.bot.services.cache.get(parsed_cache_id)
+        if cache is None:
+            await interaction.response.send_message(
+                "That answer cache does not exist.", ephemeral=True
+            )
+            return
+        try:
+            expected_state = CacheState(cache.state)
+        except ValueError:
+            await interaction.response.send_message(
+                f"Cache state `{cache.state}` is not recognized; no change was made.",
+                ephemeral=True,
+            )
+            return
+        if expected_state == CacheState.QUARANTINED:
+            await interaction.response.send_message(
+                "That answer cache is already quarantined.", ephemeral=True
+            )
+            return
+        view = ConfirmationView(interaction.user.id)
+        await interaction.response.send_message(
+            f"Confirm answer-cache quarantine.\n\n"
+            f"- Cache: `{cache.id}`\n"
+            f"- State: `{expected_state.value}` → `quarantined`\n"
+            f"- Intent: `{cache.normalized_intent[:120]}`\n"
+            f"- Reason: {clean_reason[:500]}\n\n"
+            "The cached answer will stop being served immediately; verified knowledge is "
+            "not changed.",
+            ephemeral=True,
+            view=view,
+        )
+        await view.wait()
+        if view.confirmed is not True:
+            await interaction.edit_original_response(
+                content="Cache quarantine cancelled or confirmation expired.", view=None
+            )
+            return
+        if self.bot.services.maintenance.halted:
+            await interaction.edit_original_response(
+                content="RWI entered maintenance mode; the cache state was not changed.",
+                view=None,
+            )
+            return
+        try:
+            await self.bot.services.cache.quarantine(
+                parsed_cache_id,
+                expected_state=expected_state,
+            )
+        except (KeyError, ValueError, CacheStateConflictError) as exc:
+            message = str(exc.args[0]) if exc.args else "The cache could not be quarantined."
+            await interaction.edit_original_response(content=message, view=None)
+            return
+        await self.bot.services.audit.record(
+            AuditRecord(
+                event_type="cache.technician_quarantined",
+                actor_id=interaction.user.id,
+                target_type="answer_cache",
+                target_id=str(parsed_cache_id),
+                reason=clean_reason,
+                details={
+                    "from_state": expected_state.value,
+                    "to_state": CacheState.QUARANTINED.value,
+                    "dependency_count": len(cache.dependency_revision_ids),
+                    "citation_count": len(cache.citations),
+                },
+            )
+        )
+        await interaction.edit_original_response(
+            content="Answer cache quarantined. Verified knowledge was not changed.",
             view=None,
         )
 

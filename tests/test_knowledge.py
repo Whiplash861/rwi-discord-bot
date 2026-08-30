@@ -10,8 +10,10 @@ from uuid import uuid4
 
 import pytest
 
-from rwi_bot.db.models import KnowledgeRevision, KnowledgeStatus, TicketStatus
+from rwi_bot.db.models import CacheState, KnowledgeRevision, KnowledgeStatus, TicketStatus
 from rwi_bot.services.knowledge import (
+    CacheRepository,
+    CacheStateConflictError,
     KnowledgeRepository,
     KnowledgeRevisionConflictError,
     TicketRepository,
@@ -226,3 +228,44 @@ async def test_review_ticket_resolution_rejects_stale_confirmation() -> None:
         )
 
     assert session.get.await_count == 1
+
+
+@pytest.mark.asyncio
+async def test_cache_quarantine_rejects_stale_confirmation() -> None:
+    cache_id = uuid4()
+    cache = SimpleNamespace(state=CacheState.ACTIVE.value)
+    session = AsyncMock()
+    session.get.return_value = cache
+    repository = CacheRepository(FakeDatabase(session))  # type: ignore[arg-type]
+
+    await repository.quarantine(cache_id, expected_state=CacheState.ACTIVE)
+
+    assert cache.state == CacheState.QUARANTINED.value
+    with pytest.raises(CacheStateConflictError, match="expected active"):
+        await repository.quarantine(cache_id, expected_state=CacheState.ACTIVE)
+
+
+@pytest.mark.asyncio
+async def test_integrity_report_combines_completeness_and_operational_counts() -> None:
+    session = AsyncMock()
+    session.execute.return_value = SimpleNamespace(
+        all=lambda: [
+            (KnowledgeStatus.ACTIVE.value, 10),
+            (KnowledgeStatus.DISPUTED.value, 2),
+        ]
+    )
+    session.scalar.side_effect = [3, 2, 1, 4, 1, 5, 2]
+    repository = KnowledgeRepository(FakeDatabase(session))  # type: ignore[arg-type]
+
+    report = await repository.integrity_report(stale_after_days=45)
+
+    assert report.total_entries == 12
+    assert report.status_counts == {"active": 10, "disputed": 2}
+    assert report.active_without_sources == 3
+    assert report.active_without_game_version == 2
+    assert report.active_low_confidence == 1
+    assert report.stale_active == 4
+    assert report.possible_source_conflicts == 1
+    assert report.open_review_tickets == 5
+    assert report.quarantined_caches == 2
+    assert report.stale_after_days == 45

@@ -106,6 +106,17 @@ shows the status/link diff and requires user-bound confirmation. Concurrent tick
 changes are rejected instead of overwritten. Claim and resolution actions are audited;
 all queue writes stop during maintenance mode.
 
+Use `/rwi knowledge-report` for the current completeness and verification-health
+summary. Its `stale_days` option controls the active-record freshness threshold. The
+report also identifies possible source conflicts, represented by entries that have both
+supporting and opposing source links, plus open review work and quarantined caches.
+
+`/rwi cache-status` shows cache metadata and feedback without revealing answer text.
+When a shared answer is suspect, `/rwi cache-quarantine` shows a state diff and requires
+user-bound confirmation. Quarantine takes effect immediately, is conflict-safe and
+audited, and does not change any knowledge entry. Cache writes are disabled during
+maintenance mode.
+
 ## Backup
 
 Database backups must be written outside the container and runtime volume. Create the

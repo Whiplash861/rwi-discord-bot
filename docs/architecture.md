@@ -56,6 +56,13 @@ checked, and audited. Resolution requires confirmation and a link to an existing
 knowledge entry, and rejects stale confirmations if another Technician changed the
 ticket first.
 
+`/rwi knowledge-report` is a read-only integrity surface over authoritative database
+state. It reports lifecycle counts, active records missing sources or game-version
+scope, low-confidence and stale verification, mixed supporting/opposing source links,
+open review work, and quarantined answer caches. `/rwi cache-quarantine` is a separate,
+confirmed typed action: it stops a suspect shared answer from being served and records
+the state transition without altering verified knowledge.
+
 ## Emergency boundary
 
 `MaintenanceManager` serializes a durable JSON state file using atomic replacement. A
