@@ -10,9 +10,13 @@ from rwi_bot.bot.checks import is_commander, is_maintenance_operator
 from rwi_bot.bot.client import RwiBot
 from rwi_bot.bot.server_blueprint import ServerReconciler
 from rwi_bot.bot.views import ConfirmationView
-from rwi_bot.db.models import KnowledgeStatus
+from rwi_bot.db.models import KnowledgeStatus, TicketStatus
 from rwi_bot.domain.schemas import AuditRecord
-from rwi_bot.services.knowledge import KnowledgeRevisionConflictError
+from rwi_bot.services.knowledge import (
+    KnowledgeRevisionConflictError,
+    TicketStateConflictError,
+    sanitize_for_technicians,
+)
 from rwi_bot.services.technician import (
     KnowledgeAction,
     KnowledgeChangeProposal,
@@ -325,6 +329,178 @@ class AdminCog(commands.Cog):
             return
         await self._confirm_knowledge_change(interaction, proposal)
 
+    @rwi.command(
+        name="review-queue",
+        description="Inspect privacy-sanitized unresolved and disputed answer tickets",
+    )
+    @app_commands.describe(limit="Maximum tickets to show")
+    async def review_queue(
+        self,
+        interaction: discord.Interaction,
+        limit: app_commands.Range[int, 1, 20] = 12,
+    ) -> None:
+        if not self._maintenance_operator(interaction):
+            await self._deny(interaction)
+            return
+        tickets = await self.bot.services.tickets.review_queue(limit=limit)
+        if not tickets:
+            await interaction.response.send_message(
+                "The Technician review queue is empty.", ephemeral=True
+            )
+            return
+        lines = ["**Technician review queue**", ""]
+        for ticket in tickets:
+            question = " ".join(sanitize_for_technicians(ticket.sanitized_question).split())[:320]
+            question = discord.utils.escape_mentions(question)
+            lines.append(
+                f"`{ticket.id}` · **{ticket.status}** · {ticket.duplicate_count} report(s) · "
+                f"{discord.utils.format_dt(ticket.created_at, style='R')}\n> {question}"
+            )
+        await interaction.response.send_message("\n".join(lines)[:1950], ephemeral=True)
+
+    @rwi.command(
+        name="review-claim",
+        description="Mark an open review ticket as under Technician investigation",
+    )
+    @app_commands.describe(ticket_id="Review ticket UUID")
+    async def review_claim(self, interaction: discord.Interaction, ticket_id: str) -> None:
+        if not await self._knowledge_change_allowed(interaction):
+            return
+        parsed_ticket_id = await self._parse_uuid(interaction, ticket_id, field_name="ticket_id")
+        if parsed_ticket_id is None:
+            return
+        try:
+            await self.bot.services.tickets.claim(parsed_ticket_id)
+        except (KeyError, TicketStateConflictError) as exc:
+            message = str(exc.args[0]) if exc.args else "The review ticket could not be claimed."
+            await interaction.response.send_message(message, ephemeral=True)
+            return
+        await self.bot.services.audit.record(
+            AuditRecord(
+                event_type="knowledge.review_claimed",
+                actor_id=interaction.user.id,
+                target_type="unanswered_ticket",
+                target_id=str(parsed_ticket_id),
+                reason="Technician investigation started",
+                details={
+                    "from_status": TicketStatus.OPEN.value,
+                    "to_status": TicketStatus.INVESTIGATING.value,
+                },
+            )
+        )
+        await interaction.response.send_message(
+            "Review ticket marked as **investigating**.", ephemeral=True
+        )
+
+    @rwi.command(
+        name="review-resolve",
+        description="Resolve a review ticket against a verified knowledge entry",
+    )
+    @app_commands.describe(
+        ticket_id="Review ticket UUID",
+        entry_id="Knowledge entry UUID that resolves the question",
+        note="Reproducible resolution summary without private member information",
+    )
+    async def review_resolve(
+        self,
+        interaction: discord.Interaction,
+        ticket_id: str,
+        entry_id: str,
+        note: str,
+    ) -> None:
+        if not await self._knowledge_change_allowed(interaction):
+            return
+        parsed_ticket_id = await self._parse_uuid(interaction, ticket_id, field_name="ticket_id")
+        if parsed_ticket_id is None:
+            return
+        parsed_entry_id = await self._parse_entry_id(interaction, entry_id)
+        if parsed_entry_id is None:
+            return
+        ticket = await self.bot.services.tickets.get(parsed_ticket_id)
+        entry = await self.bot.services.knowledge.get(parsed_entry_id)
+        if ticket is None or entry is None:
+            missing = "review ticket" if ticket is None else "knowledge entry"
+            await interaction.response.send_message(
+                f"That {missing} does not exist.", ephemeral=True
+            )
+            return
+        try:
+            expected_status = TicketStatus(ticket.status)
+        except ValueError:
+            await interaction.response.send_message(
+                f"Ticket status `{ticket.status}` cannot be resolved from this queue.",
+                ephemeral=True,
+            )
+            return
+        if expected_status not in (TicketStatus.OPEN, TicketStatus.INVESTIGATING):
+            await interaction.response.send_message(
+                f"Ticket status `{ticket.status}` cannot be resolved from this queue.",
+                ephemeral=True,
+            )
+            return
+        clean_note = sanitize_for_technicians(note)
+        if not clean_note:
+            await interaction.response.send_message(
+                "A resolution note is required.", ephemeral=True
+            )
+            return
+        question = discord.utils.escape_mentions(
+            " ".join(sanitize_for_technicians(ticket.sanitized_question).split())[:500]
+        )
+        view = ConfirmationView(interaction.user.id)
+        await interaction.response.send_message(
+            f"Confirm review resolution.\n\n"
+            f"- Ticket `{ticket.id}`: `{expected_status.value}` → `resolved`\n"
+            f"- Knowledge entry: **{entry.subject}** (`{entry.id}`, revision "
+            f"`{entry.current_revision}`)\n"
+            f"- Resolution note: {clean_note[:500]}\n\n"
+            f"> {question}",
+            ephemeral=True,
+            view=view,
+        )
+        await view.wait()
+        if view.confirmed is not True:
+            await interaction.edit_original_response(
+                content="Review resolution cancelled or confirmation expired.", view=None
+            )
+            return
+        if self.bot.services.maintenance.halted:
+            await interaction.edit_original_response(
+                content="RWI entered maintenance mode; the review ticket was not changed.",
+                view=None,
+            )
+            return
+        try:
+            await self.bot.services.tickets.resolve(
+                ticket_id=parsed_ticket_id,
+                entry_id=parsed_entry_id,
+                resolution_note=clean_note,
+                expected_status=expected_status,
+            )
+        except (KeyError, ValueError, TicketStateConflictError) as exc:
+            message = str(exc.args[0]) if exc.args else "The review ticket could not be resolved."
+            await interaction.edit_original_response(content=message, view=None)
+            return
+        await self.bot.services.audit.record(
+            AuditRecord(
+                event_type="knowledge.review_resolved",
+                actor_id=interaction.user.id,
+                target_type="unanswered_ticket",
+                target_id=str(parsed_ticket_id),
+                reason=clean_note,
+                details={
+                    "from_status": expected_status.value,
+                    "to_status": TicketStatus.RESOLVED.value,
+                    "resolved_entry_id": str(parsed_entry_id),
+                    "resolved_entry_revision": entry.current_revision,
+                },
+            )
+        )
+        await interaction.edit_original_response(
+            content="Review ticket resolved and linked to the verified knowledge entry.",
+            view=None,
+        )
+
     async def _confirm_knowledge_change(
         self,
         interaction: discord.Interaction,
@@ -423,10 +599,19 @@ class AdminCog(commands.Cog):
 
     @staticmethod
     async def _parse_entry_id(interaction: discord.Interaction, entry_id: str) -> UUID | None:
+        return await AdminCog._parse_uuid(interaction, entry_id, field_name="entry_id")
+
+    @staticmethod
+    async def _parse_uuid(
+        interaction: discord.Interaction,
+        value: str,
+        *,
+        field_name: str,
+    ) -> UUID | None:
         try:
-            return UUID(entry_id.strip())
+            return UUID(value.strip())
         except ValueError:
-            message = "entry_id must be a valid UUID."
+            message = f"{field_name} must be a valid UUID."
             if interaction.response.is_done():
                 await interaction.followup.send(message, ephemeral=True)
             else:

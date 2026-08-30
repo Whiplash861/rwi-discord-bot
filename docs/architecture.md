@@ -48,6 +48,14 @@ who opened it. The proposal records its expected current revision; a concurrent 
 causes a conflict instead of silently overwriting newer knowledge. Confirmed changes
 take effect immediately and write a separate audit event containing the diff.
 
+Unanswered questions and member-reported incorrect answers enter one deduplicated
+Technician review queue. Before persistence, the queue text redacts Discord identifiers,
+mentions, email addresses, IP addresses, phone numbers, and links; requester identifiers
+are never shown in queue output. Claim and resolution transitions are typed, permission
+checked, and audited. Resolution requires confirmation and a link to an existing
+knowledge entry, and rejects stale confirmations if another Technician changed the
+ticket first.
+
 ## Emergency boundary
 
 `MaintenanceManager` serializes a durable JSON state file using atomic replacement. A

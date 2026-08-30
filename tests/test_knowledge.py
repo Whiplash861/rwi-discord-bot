@@ -10,11 +10,14 @@ from uuid import uuid4
 
 import pytest
 
-from rwi_bot.db.models import KnowledgeRevision, KnowledgeStatus
+from rwi_bot.db.models import KnowledgeRevision, KnowledgeStatus, TicketStatus
 from rwi_bot.services.knowledge import (
     KnowledgeRepository,
     KnowledgeRevisionConflictError,
+    TicketRepository,
+    TicketStateConflictError,
     normalized_confidence,
+    sanitize_for_technicians,
 )
 
 
@@ -157,3 +160,69 @@ async def test_revise_rejects_stale_confirmation_before_any_write() -> None:
     session.add.assert_not_called()
     session.scalars.assert_not_awaited()
     session.scalar.assert_not_awaited()
+
+
+def test_technician_ticket_sanitizer_removes_common_private_identifiers() -> None:
+    raw = (
+        "Ask <@123>, <@&456>, or <#789>; reference "
+        + "1" * 18
+        + " at pilot@example.test, 192.0.2.1, 202-555-0101, "
+        "https://example.test/private?token=sample or @private_handle about the build"
+    )
+
+    sanitized = sanitize_for_technicians(raw)
+
+    assert sanitized == (
+        "Ask [member], [role], or [channel]; reference [id] at [email], [ip], [phone], "
+        "[link] or [handle] about the build"
+    )
+
+
+@pytest.mark.asyncio
+async def test_review_ticket_claim_and_resolution_enforce_state_transitions() -> None:
+    ticket_id = uuid4()
+    entry_id = uuid4()
+    ticket = SimpleNamespace(
+        status=TicketStatus.OPEN.value,
+        resolved_entry_id=None,
+        resolution_note=None,
+    )
+    session = AsyncMock()
+    session.get.return_value = ticket
+    repository = TicketRepository(FakeDatabase(session))  # type: ignore[arg-type]
+
+    await repository.claim(ticket_id)
+
+    assert ticket.status == TicketStatus.INVESTIGATING.value
+    with pytest.raises(TicketStateConflictError, match="expected open"):
+        await repository.claim(ticket_id)
+
+    session.get.side_effect = [ticket, SimpleNamespace(id=entry_id)]
+    await repository.resolve(
+        ticket_id=ticket_id,
+        entry_id=entry_id,
+        resolution_note="  Reproduced and documented in verified knowledge.  ",
+        expected_status=TicketStatus.INVESTIGATING,
+    )
+
+    assert ticket.status == TicketStatus.RESOLVED.value
+    assert ticket.resolved_entry_id == entry_id
+    assert ticket.resolution_note == "Reproduced and documented in verified knowledge."
+
+
+@pytest.mark.asyncio
+async def test_review_ticket_resolution_rejects_stale_confirmation() -> None:
+    ticket = SimpleNamespace(status=TicketStatus.CLOSED.value)
+    session = AsyncMock()
+    session.get.return_value = ticket
+    repository = TicketRepository(FakeDatabase(session))  # type: ignore[arg-type]
+
+    with pytest.raises(TicketStateConflictError, match="found closed"):
+        await repository.resolve(
+            ticket_id=uuid4(),
+            entry_id=uuid4(),
+            resolution_note="Stale action",
+            expected_status=TicketStatus.INVESTIGATING,
+        )
+
+    assert session.get.await_count == 1

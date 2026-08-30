@@ -97,6 +97,15 @@ Rollback copies that immutable snapshot—including its source-evidence snapshot
 new revision; it never rewrites or deletes history. Knowledge writes are disabled while
 maintenance mode is active.
 
+Use `/rwi review-queue` to inspect deduplicated unresolved and member-disputed answers.
+The displayed question is privacy-sanitized and never includes the requester identifier.
+`/rwi review-claim` moves an open ticket to investigating. After reproducing the issue
+and creating or revising the supporting knowledge, use `/rwi review-resolve` with the
+ticket UUID, resolving knowledge-entry UUID, and a non-private resolution note. The bot
+shows the status/link diff and requires user-bound confirmation. Concurrent ticket
+changes are rejected instead of overwritten. Claim and resolution actions are audited;
+all queue writes stop during maintenance mode.
+
 ## Backup
 
 Database backups must be written outside the container and runtime volume. Create the

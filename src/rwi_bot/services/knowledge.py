@@ -21,6 +21,7 @@ from rwi_bot.db.models import (
     KnowledgeSource,
     KnowledgeStatus,
     Source,
+    TicketStatus,
     UnansweredTicket,
 )
 from rwi_bot.db.session import Database
@@ -41,6 +42,17 @@ class KnowledgeRevisionConflictError(RuntimeError):
         super().__init__(
             f"Knowledge changed while confirmation was pending "
             f"(expected revision {expected}, found {actual})."
+        )
+
+
+class TicketStateConflictError(RuntimeError):
+    def __init__(self, *, expected: tuple[TicketStatus, ...], actual: str) -> None:
+        self.expected = expected
+        self.actual = actual
+        expected_values = ", ".join(status.value for status in expected)
+        super().__init__(
+            f"Review ticket changed while the action was pending "
+            f"(expected {expected_values}, found {actual})."
         )
 
 
@@ -465,10 +477,88 @@ class TicketRepository:
             await session.flush()
             return ticket.id
 
+    async def get(self, ticket_id: UUID) -> UnansweredTicket | None:
+        async with self.database.session() as session:
+            return await session.get(UnansweredTicket, ticket_id)
+
+    async def review_queue(self, *, limit: int = 12) -> list[UnansweredTicket]:
+        if not 1 <= limit <= 25:
+            raise ValueError("Review queue limit must be between 1 and 25.")
+        statement = (
+            select(UnansweredTicket)
+            .where(
+                UnansweredTicket.status.in_(
+                    [TicketStatus.OPEN.value, TicketStatus.INVESTIGATING.value]
+                )
+            )
+            .order_by(
+                UnansweredTicket.duplicate_count.desc(),
+                UnansweredTicket.created_at.asc(),
+            )
+            .limit(limit)
+        )
+        async with self.database.session() as session:
+            return list(await session.scalars(statement))
+
+    async def claim(self, ticket_id: UUID) -> None:
+        async with self.database.session() as session:
+            ticket = await session.get(UnansweredTicket, ticket_id, with_for_update=True)
+            if ticket is None:
+                raise KeyError(f"Review ticket {ticket_id} does not exist.")
+            if ticket.status != TicketStatus.OPEN.value:
+                raise TicketStateConflictError(
+                    expected=(TicketStatus.OPEN,),
+                    actual=ticket.status,
+                )
+            ticket.status = TicketStatus.INVESTIGATING.value
+
+    async def resolve(
+        self,
+        *,
+        ticket_id: UUID,
+        entry_id: UUID,
+        resolution_note: str,
+        expected_status: TicketStatus,
+    ) -> None:
+        note = sanitize_for_technicians(resolution_note)
+        if not note:
+            raise ValueError("A resolution note is required.")
+        async with self.database.session() as session:
+            ticket = await session.get(UnansweredTicket, ticket_id, with_for_update=True)
+            if ticket is None:
+                raise KeyError(f"Review ticket {ticket_id} does not exist.")
+            if ticket.status != expected_status.value:
+                raise TicketStateConflictError(
+                    expected=(expected_status,),
+                    actual=ticket.status,
+                )
+            entry = await session.get(KnowledgeEntry, entry_id)
+            if entry is None:
+                raise KeyError(f"Knowledge entry {entry_id} does not exist.")
+            ticket.status = TicketStatus.RESOLVED.value
+            ticket.resolved_entry_id = entry_id
+            ticket.resolution_note = note[:2000]
+
 
 def sanitize_for_technicians(question: str) -> str:
     sanitized = re.sub(r"<@!?\d+>", "[member]", question)
+    sanitized = re.sub(r"<@&\d+>", "[role]", sanitized)
+    sanitized = re.sub(r"<#\d+>", "[channel]", sanitized)
     sanitized = re.sub(r"\b\d{15,22}\b", "[id]", sanitized)
+    sanitized = re.sub(
+        r"\b[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}\b",
+        "[email]",
+        sanitized,
+        flags=re.IGNORECASE,
+    )
+    sanitized = re.sub(r"\b(?:\d{1,3}\.){3}\d{1,3}\b", "[ip]", sanitized)
+    sanitized = re.sub(r"https?://\S+", "[link]", sanitized, flags=re.IGNORECASE)
+    sanitized = re.sub(
+        r"(?<!\w)(?:\+?1[ .-]?)?(?:\(\d{3}\)|\d{3})[ .-]?\d{3}[ .-]?\d{4}(?!\w)",
+        "[phone]",
+        sanitized,
+    )
+    sanitized = re.sub(r"(?<!\w)@[A-Z0-9_.]{2,32}\b", "[handle]", sanitized, flags=re.IGNORECASE)
     return sanitized.strip()[:2000]
 
 
