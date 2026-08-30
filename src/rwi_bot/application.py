@@ -16,6 +16,7 @@ from rwi_bot.services.maintenance import MaintenanceManager
 from rwi_bot.services.privacy import ProfileRepository
 from rwi_bot.services.qa import QuestionAnsweringService
 from rwi_bot.services.releases import ReleaseHistoryRepository
+from rwi_bot.services.seeding import apply_red_horizon_seed
 
 
 @dataclass(slots=True)
@@ -59,6 +60,7 @@ async def build_services(settings: Settings) -> AppServices:
     community_loadouts = CommunityLoadoutRepository(database)
     community_claims = CommunityClaimRepository(database)
     release_history = ReleaseHistoryRepository(database)
+    await apply_red_horizon_seed(knowledge, actor_id=settings.owner_user_id)
     ai = RwiOpenAIClient(
         api_key=settings.openai_api_key.get_secret_value(),
         maintenance=maintenance,

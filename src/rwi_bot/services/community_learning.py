@@ -17,6 +17,51 @@ REUSABLE_CLAIM_STATUSES = frozenset(
     {CommunityClaimStatus.VERIFIED.value, CommunityClaimStatus.QUALIFIED.value}
 )
 
+_SEARCH_STOPWORDS = frozenset(
+    {
+        "a",
+        "an",
+        "and",
+        "are",
+        "be",
+        "bonus",
+        "bonuses",
+        "can",
+        "could",
+        "do",
+        "does",
+        "for",
+        "how",
+        "i",
+        "in",
+        "is",
+        "it",
+        "know",
+        "me",
+        "of",
+        "on",
+        "or",
+        "please",
+        "set",
+        "that",
+        "the",
+        "this",
+        "to",
+        "what",
+        "when",
+        "where",
+        "which",
+        "who",
+        "why",
+        "with",
+        "work",
+        "works",
+        "would",
+        "you",
+        "your",
+    }
+)
+
 
 @dataclass(frozen=True, slots=True)
 class CommunityClaimProposal:
@@ -233,14 +278,18 @@ class CommunityClaimRepository:
             .where(CommunityClaim.status.in_(REUSABLE_CLAIM_STATUSES))
             .where(similarity >= 0.24)
             .order_by(similarity.desc(), CommunityClaim.reviewed_at.desc().nullslast())
-            .limit(limit)
+            .limit(min(limit * 4, 40))
         )
         async with self.database.session() as session:
             rows = (await session.execute(statement)).all()
-        return [
+        anchored = [
             CommunityClaimHit(claim=cast(CommunityClaim, row[0]), similarity=float(row[1]))
             for row in rows
+            if community_claim_has_query_anchor(
+                normalized, cast(CommunityClaim, row[0]).search_text
+            )
         ]
+        return anchored[:limit]
 
     async def by_submitter(self, user_id: int) -> list[CommunityClaim]:
         async with self.database.session() as session:
@@ -271,6 +320,23 @@ def community_claim_search_text(
     *, question: str, claim: str, qualification: str | None, game_version: str
 ) -> str:
     return normalize_text(" ".join((question, claim, qualification or "", game_version)))
+
+
+def community_claim_has_query_anchor(query: str, claim_search_text: str) -> bool:
+    """Require a meaningful shared term before fuzzy claim retrieval can suppress web search."""
+
+    query_terms = _search_anchor_terms(query)
+    if not query_terms:
+        return False
+    return bool(query_terms & _search_anchor_terms(claim_search_text))
+
+
+def _search_anchor_terms(text: str) -> set[str]:
+    return {
+        token
+        for token in re.findall(r"[a-z0-9][a-z0-9'-]*", normalize_text(text))
+        if len(token) >= 3 and token not in _SEARCH_STOPWORDS
+    }
 
 
 def community_claim_context(hits: list[CommunityClaimHit]) -> str:

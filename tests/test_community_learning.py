@@ -11,11 +11,12 @@ import pytest
 from rwi_bot.ai.prompts import RWI_ANSWER_INSTRUCTIONS
 from rwi_bot.cogs.community_learning import CommunityClaimReviewView, CommunityLearningCog
 from rwi_bot.db.models import CommunityClaimStatus
-from rwi_bot.domain.schemas import AnswerRequest
+from rwi_bot.domain.schemas import AnswerRequest, SourceCitation
 from rwi_bot.services.community_learning import (
     CommunityClaimHit,
     claim_id_from_footer,
     community_claim_context,
+    community_claim_has_query_anchor,
     infer_claim_review_reply,
     infer_community_claim,
 )
@@ -180,6 +181,26 @@ def test_qualified_context_makes_the_reviewer_limitation_controlling() -> None:
     assert "in-hand weapon" in context
 
 
+def test_fuzzy_claim_match_requires_a_meaningful_query_anchor() -> None:
+    unrelated = (
+        "can you help with my progress we'll get you where you need to be girl you're "
+        "on track for greatness y8s3 red horizon"
+    )
+    relevant = (
+        "does the tdi kard custom skill tier work while holstered the tdi kard custom "
+        "grants one skill tier only while in hand y8s3 red horizon"
+    )
+
+    assert not community_claim_has_query_anchor(
+        "Do you know the Belstone Armory bonuses?",
+        unrelated,
+    )
+    assert community_claim_has_query_anchor(
+        "Does the TDI Kard Custom Skill Tier work while holstered?",
+        relevant,
+    )
+
+
 @pytest.mark.asyncio
 async def test_reviewed_claim_answers_without_web_and_is_not_cached() -> None:
     hit = CommunityClaimHit(claim=cast(Any, claim_fixture()), similarity=0.88)
@@ -222,4 +243,69 @@ async def test_reviewed_claim_answers_without_web_and_is_not_cached() -> None:
     assert "Controlling reviewer qualification" in ai.answer.call_args.kwargs["input_text"]
     assert "web_search" not in ai.answer.call_args.kwargs
     cache.get_valid.assert_not_awaited()
+    cache.create_candidate.assert_not_awaited()
+
+
+@pytest.mark.asyncio
+async def test_insufficient_local_claim_escalates_to_web_search() -> None:
+    hit = CommunityClaimHit(claim=cast(Any, claim_fixture()), similarity=0.88)
+    community_claims = SimpleNamespace(search=AsyncMock(return_value=[hit]))
+    cache = SimpleNamespace(get_valid=AsyncMock(), create_candidate=AsyncMock())
+    knowledge = SimpleNamespace(search=AsyncMock(return_value=[]))
+    wiki_citation = SourceCitation(
+        title="Current Division Wiki",
+        url="https://thedivision.fandom.com/wiki/Belstone_Armory",
+        source_type="community_wiki",
+        official=False,
+    )
+    ai = SimpleNamespace(
+        answer=AsyncMock(
+            side_effect=(
+                SimpleNamespace(
+                    text="I cannot establish that from the local claim.",
+                    citations=[],
+                    evidence_confidence="unknown",
+                ),
+                SimpleNamespace(
+                    text="Belstone Armory has the requested current bonuses.",
+                    citations=[wiki_citation],
+                    evidence_confidence="medium",
+                ),
+            )
+        ),
+        _select_model=Mock(return_value="test-model"),
+    )
+    audit = SimpleNamespace(record=AsyncMock())
+    service = QuestionAnsweringService(
+        maintenance=cast(Any, SimpleNamespace(halted=False)),
+        knowledge=cast(Any, knowledge),
+        cache=cast(Any, cache),
+        tickets=cast(Any, SimpleNamespace()),
+        profiles=cast(Any, SimpleNamespace(learning_opted_out=AsyncMock(return_value=False))),
+        community_claims=cast(Any, community_claims),
+        ai=cast(Any, ai),
+        audit=cast(Any, audit),
+        web_search_enabled=True,
+        current_game_version="Y8S3 Red Horizon",
+    )
+
+    result = await service.answer(
+        AnswerRequest(
+            user_id=42,
+            guild_id=1,
+            channel_id=2,
+            question="Do you know the Belstone Armory bonuses?",
+        )
+    )
+
+    assert result.text.startswith("Belstone Armory")
+    assert result.used_web_search is True
+    assert ai.answer.await_count == 2
+    assert ai.answer.await_args_list[0].kwargs.get("web_search") is None
+    assert ai.answer.await_args_list[1].kwargs["web_search"] is True
+    assert (
+        "Controlling reviewer qualification"
+        not in (ai.answer.await_args_list[1].kwargs["input_text"])
+    )
+    assert "Independently verify" in ai.answer.await_args_list[1].kwargs["input_text"]
     cache.create_candidate.assert_not_awaited()

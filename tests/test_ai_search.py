@@ -14,6 +14,7 @@ from rwi_bot.ai.client import (
     WebSearchScope,
     _completion_state,
     _extract_evidence_confidence,
+    _extract_output,
     classify_external_source,
 )
 from rwi_bot.domain.schemas import AnswerRequest, ConfidenceLabel, SourceCitation
@@ -111,6 +112,34 @@ def test_evidence_marker_is_removed_and_missing_marker_fails_closed() -> None:
         "An unmarked answer.",
         ConfidenceLabel.UNKNOWN,
     )
+
+
+def test_web_tool_source_metadata_becomes_stored_citations() -> None:
+    source = SimpleNamespace(
+        url="https://thedivision.fandom.com/wiki/Belstone_Armory",
+        title="Belstone Armory",
+    )
+    response = SimpleNamespace(
+        output_text="ERIN_EVIDENCE: medium\nBelstone answer.",
+        output=[
+            SimpleNamespace(
+                type="web_search_call",
+                action=SimpleNamespace(sources=[source]),
+            )
+        ],
+    )
+
+    text, citations, search_calls = _extract_output(
+        response,
+        official_domains=("ubisoft.com",),
+        community_domains=("thedivision.fandom.com",),
+    )
+
+    assert text.startswith("ERIN_EVIDENCE: medium")
+    assert search_calls == 1
+    assert len(citations) == 1
+    assert citations[0].title == "Belstone Armory"
+    assert citations[0].source_type == "community_wiki"
 
 
 @pytest.mark.asyncio

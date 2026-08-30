@@ -306,10 +306,36 @@ def _extract_output(
     seen_urls: set[str] = set()
     search_calls = 0
 
+    def add_citation(url: str, title: str) -> None:
+        if not url or url in seen_urls:
+            return
+        source_type, official = classify_external_source(
+            url,
+            official_domains=official_domains,
+            official_urls=official_urls,
+            community_domains=community_domains,
+        )
+        try:
+            citation = SourceCitation(
+                title=title or (urlparse(url).hostname or "Web source"),
+                url=HttpUrl(url),
+                source_type=source_type,
+                official=official,
+            )
+        except ValueError:
+            return
+        seen_urls.add(url)
+        citations.append(citation)
+
     for item in getattr(response, "output", []) or []:
         item_type = getattr(item, "type", "")
         if item_type == "web_search_call":
             search_calls += 1
+            action = getattr(item, "action", None)
+            for source in getattr(action, "sources", []) or []:
+                url = str(getattr(source, "url", "") or "")
+                title = str(getattr(source, "title", "") or "")
+                add_citation(url, title)
         if item_type != "message":
             continue
         for content in getattr(item, "content", []) or []:
@@ -317,24 +343,8 @@ def _extract_output(
                 if getattr(annotation, "type", "") != "url_citation":
                     continue
                 url = str(getattr(annotation, "url", "") or "")
-                if not url or url in seen_urls:
-                    continue
-                seen_urls.add(url)
                 title = str(getattr(annotation, "title", "Source") or "Source")
-                source_type, official = classify_external_source(
-                    url,
-                    official_domains=official_domains,
-                    official_urls=official_urls,
-                    community_domains=community_domains,
-                )
-                citations.append(
-                    SourceCitation(
-                        title=title,
-                        url=HttpUrl(url),
-                        source_type=source_type,
-                        official=official,
-                    )
-                )
+                add_citation(url, title)
     return text, citations, search_calls
 
 

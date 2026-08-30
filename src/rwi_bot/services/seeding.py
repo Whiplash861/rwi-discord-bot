@@ -47,6 +47,13 @@ async def apply_red_horizon_seed(knowledge: KnowledgeRepository, *, actor_id: in
     created: list[UUID] = []
     skipped = 0
     for seed in RED_HORIZON_SEEDS:
+        if await knowledge.identity_exists(
+            subject=seed.subject,
+            claim_key=seed.claim_key,
+            context=seed.context,
+        ):
+            skipped += 1
+            continue
         try:
             entry_id = await knowledge.add_candidate(
                 subject=seed.subject,
@@ -59,7 +66,7 @@ async def apply_red_horizon_seed(knowledge: KnowledgeRepository, *, actor_id: in
                 game_version=GAME_VERSION,
                 confidence=seed.confidence,
                 status=seed.status,
-                sources=(OFFICIAL_SOURCE,),
+                sources=seed.sources or (OFFICIAL_SOURCE,),
             )
         except KnowledgeIdentityConflictError:
             skipped += 1

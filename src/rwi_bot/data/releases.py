@@ -219,4 +219,91 @@ RELEASES: tuple[Release, ...] = (
             ),
         ),
     ),
+    Release(
+        release_id="erin-update-7",
+        update_number=7,
+        version="V0.1.6",
+        released_on=date(2026, 8, 30),
+        notes=(
+            ReleaseNote(
+                ReleaseSection.FIXES,
+                "Fixed partial or unrelated reviewed community claims suppressing internet "
+                "search for questions such as current brand-set bonuses.",
+            ),
+            ReleaseNote(
+                ReleaseSection.IMPROVEMENTS,
+                "Community-memory retrieval now requires a meaningful shared subject or "
+                "mechanic term in addition to fuzzy similarity.",
+            ),
+            ReleaseNote(
+                ReleaseSection.IMPROVEMENTS,
+                "An insufficient local answer now escalates through curated and open web "
+                "search instead of immediately opening an unanswered ticket.",
+            ),
+            ReleaseNote(
+                ReleaseSection.IMPROVEMENTS,
+                "Current curated wiki references may support stable descriptive facts, "
+                "while changeable mechanics still require stronger corroboration.",
+            ),
+        ),
+    ),
+    Release(
+        release_id="erin-update-8",
+        update_number=8,
+        version="V0.1.7",
+        released_on=date(2026, 8, 30),
+        notes=(
+            ReleaseNote(
+                ReleaseSection.FIXES,
+                "Fixed valid web answers being rejected when the provider returned source "
+                "links in web-tool metadata instead of inline citation annotations.",
+            ),
+            ReleaseNote(
+                ReleaseSection.MAINTENANCE,
+                "Web-search usage is now preserved on abstained responses, making search "
+                "execution distinguishable from a local-only unanswered result.",
+            ),
+        ),
+    ),
+    Release(
+        release_id="erin-update-9",
+        update_number=9,
+        version="V0.1.8",
+        released_on=date(2026, 8, 30),
+        notes=(
+            ReleaseNote(
+                ReleaseSection.FIXES,
+                "Fixed incomplete or conflicting local context carrying into web fallback "
+                "and causing current externally supported answers to be rejected.",
+            ),
+            ReleaseNote(
+                ReleaseSection.IMPROVEMENTS,
+                "After local evidence proves insufficient, curated and open searches now "
+                "perform an independent current-game verification of the original question.",
+            ),
+        ),
+    ),
+    Release(
+        release_id="erin-update-10",
+        update_number=10,
+        version="V0.1.9",
+        released_on=date(2026, 8, 30),
+        notes=(
+            ReleaseNote(
+                ReleaseSection.HIGH_IMPACT,
+                "Imported Ubisoft's final Red Horizon bonuses for all 29 changed Brand "
+                "Sets as source-backed verified knowledge.",
+            ),
+            ReleaseNote(
+                ReleaseSection.FIXES,
+                "Current verified Brand values now override conflicting older community "
+                "notes and pre-season search results.",
+            ),
+            ReleaseNote(
+                ReleaseSection.MAINTENANCE,
+                "The built-in Red Horizon baseline now imports idempotently during startup, "
+                "preventing an empty production knowledge database after deployment.",
+            ),
+        ),
+    ),
 )

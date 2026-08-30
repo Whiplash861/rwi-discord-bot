@@ -21,6 +21,18 @@ OFFICIAL_SOURCE = SourceEvidence(
     supports_claim=True,
     note="Official Red Horizon launch article published August 26, 2026.",
 )
+OFFICIAL_BRAND_BREAKDOWN_URL = (
+    "https://canopy.ubisoft.com/AssetLink/kh506il172knvrt4x7c680hw03b8g63f.pdf"
+)
+OFFICIAL_BRAND_BREAKDOWN_SOURCE = SourceEvidence(
+    url=OFFICIAL_BRAND_BREAKDOWN_URL,
+    title="Red Horizon Gear Updates",
+    source_type=SourceType.OFFICIAL,
+    trust_score=Decimal("0.990"),
+    publisher="Ubisoft",
+    supports_claim=True,
+    note="Final Y8S3 Gear and Brand Set breakdown linked from the Red Horizon launch article.",
+)
 
 
 @dataclass(frozen=True, slots=True)
@@ -32,6 +44,156 @@ class KnowledgeSeed:
     context: dict[str, Any]
     confidence: float = 0.98
     status: KnowledgeStatus = KnowledgeStatus.ACTIVE
+    sources: tuple[SourceEvidence, ...] = ()
+
+
+RED_HORIZON_BRAND_BONUSES: dict[str, tuple[str, str, str]] = {
+    "China Light Industries Corporation": (
+        "+15% Explosive Damage",
+        "+20% Status Effects (+8% PvP)",
+        "+30% Skill Haste (+20% PvP)",
+    ),
+    "Electrique": (
+        "+10% Status Effects",
+        "+20% Hazard Protection (+20% PvP)",
+        "+8% Skill Efficiency (+6% PvP)",
+    ),
+    "Empress International": (
+        "+10% Skill Health",
+        "+13% Skill Damage",
+        "+8% Skill Efficiency",
+    ),
+    "Hana-U Corporation": (
+        "+10% Skill Haste",
+        "+13% Skill Damage",
+        "+18% Weapon Damage",
+    ),
+    "Richter & Kaiser GmbH": (
+        "+10% Skill Haste (+10% PvP)",
+        "+40% Explosive Resistance",
+        "+52% Repair Skills",
+    ),
+    "Wyvern Wear": (
+        "+8% Skill Damage",
+        "+20% Status Effects",
+        "+45% Skill Duration",
+    ),
+    "5.11 Tactical": (
+        "+12% Protection from Elites (+10% PvP)",
+        "+100% Increased Threat (+100% PvP)",
+        "+30% Hazard Protection",
+    ),
+    "Badger Tuff": (
+        "+12% Shotgun Damage",
+        "+10% Armor on Kill (+12% PvP)",
+        "+15% Total Armor (+12% PvP)",
+    ),
+    "Belstone Armory": (
+        "+1% Armor Regeneration",
+        "+100% Increased Threat (+100% PvP)",
+        "+36% Protection from Elites (+20% PvP)",
+    ),
+    "Gila Guard": (
+        "+5% Total Armor",
+        "+20% Hazard Protection (+15% PvP)",
+        "+2% Armor Regeneration",
+    ),
+    "Golan Gear Ltd": (
+        "+20% Explosive Resistance (+20% PvP)",
+        "+1.5% Armor Regeneration",
+        "+150% Increased Threat (+150% PvP)",
+    ),
+    "Habsburg Guard": (
+        "+13% Headshot Damage",
+        "+24% Marksman Rifle Damage",
+        "+25% Status Effects",
+    ),
+    "Palisade Steelworks": (
+        "+10% Armor on Kill",
+        "+24% Protection from Elites (+15% PvP)",
+        "+1 Skill Tier",
+    ),
+    "Lengmo": (
+        "+15% Reload Speed (+15% PvP)",
+        "+24% LMG Damage (+12% PvP)",
+        "+30% Weapon Handling (+30% PvP)",
+    ),
+    "Airaldi Holdings": (
+        "+12% Marksman Rifle Damage",
+        "+26% Headshot Damage",
+        "+5% Damage to Armor",
+    ),
+    "Ceska Vyroba s.r.o.": (
+        "+8% Critical Hit Chance",
+        "+24% Shotgun Damage (+12% PvP)",
+        "+30% Hazard Protection (+30% PvP)",
+    ),
+    "Douglas & Harding": (
+        "+24% Pistol Damage",
+        "+20% Skill Health (+20% PvP)",
+        "+50% Accuracy",
+    ),
+    "Fenris Group AB": (
+        "+12% Assault Rifle Damage",
+        "+32% Magazine Size (+20% PvP)",
+        "+50% Stability",
+    ),
+    "Grupo Sombra S.A.": (
+        "+13% Critical Hit Damage",
+        "+20% Explosive Damage",
+        "+39% Headshot Damage",
+    ),
+    "Imminence Armaments": (
+        "+6% Weapon Damage",
+        "+48% Pistol Damage (+22% PvP)",
+        "+30% Skill Health (+30% PvP)",
+    ),
+    "Legatus S.p.A.": (
+        "+15% Magazine Size (+10% PvP)",
+        "+24% SMG Damage (+12% PvP)",
+        "+105% Optimal Range (+75% PvP)",
+    ),
+    "Petrov Defense Group": (
+        "+12% LMG Damage",
+        "+15% Weapon Handling",
+        "+50% Ammo Capacity",
+    ),
+    "Overlord Armaments": (
+        "+12% Rifle Damage",
+        "+30% Accuracy",
+        "+30% Weapon Handling",
+    ),
+    "Royal Works": (
+        "+5% Weapon Handling",
+        "+24% LMG Damage (+12% PvP)",
+        "+50% Accuracy (+40% PvP)",
+    ),
+    "Sokolov Concern": (
+        "+12% SMG Damage",
+        "+13% Critical Hit Damage",
+        "+8% Critical Hit Chance",
+    ),
+    "Unit Alloys": (
+        "+5% Rate of Fire",
+        "+24% Assault Rifle Damage",
+        "+50% Magazine Size",
+    ),
+    "Urban Lookout": (
+        "+5% Weapon Handling (+10% PvP)",
+        "+24% Marksman Rifle Damage (+12% PvP)",
+        "+45% Skill Duration (+30% PvP)",
+    ),
+    "Walker, Harris & Co.": (
+        "+6% Weapon Damage",
+        "+5% Damage to Armor",
+        "+10% Damage to Health",
+    ),
+    "Zwiadowka Sp. z o.o.": (
+        "+15% Magazine Size",
+        "+24% Rifle Damage",
+        "+30% Weapon Handling",
+    ),
+}
 
 
 RED_HORIZON_SEEDS: tuple[KnowledgeSeed, ...] = (
@@ -344,5 +506,21 @@ RED_HORIZON_SEEDS: tuple[KnowledgeSeed, ...] = (
             "targeted_loot_additions": ["Caduceus", "Nurse's Kneepads"],
         },
         context={"season": "Red Horizon", "mode": "current"},
+    ),
+    *(
+        KnowledgeSeed(
+            subject=brand,
+            entity_type="brand_set",
+            claim_key="current_bonuses",
+            content={
+                "one_piece": bonuses[0],
+                "two_piece": bonuses[1],
+                "three_piece": bonuses[2],
+            },
+            context={"season": "Red Horizon", "mode": "pve_and_pvp"},
+            confidence=0.99,
+            sources=(OFFICIAL_SOURCE, OFFICIAL_BRAND_BREAKDOWN_SOURCE),
+        )
+        for brand, bonuses in RED_HORIZON_BRAND_BONUSES.items()
     ),
 )

@@ -21,6 +21,16 @@ Q&A/community forums. Adding a domain expands discovery but does not elevate com
 content to first-party evidence. Do not replace the exact Trello URL with a domain-wide
 trust rule.
 
+Community-claim retrieval requires a meaningful query anchor in addition to fuzzy
+similarity. If a local generation still reports insufficient evidence, ERIN escalates to
+curated and then open web search. A current curated wiki can support a stable descriptive
+fact; live mechanics, stats, and builds continue to require stronger corroboration.
+The fallback prompt omits the insufficient local excerpt so a stale partial claim cannot
+force current external evidence into an artificial conflict.
+The provider may return source links either as inline annotations or under web-tool source
+metadata. Both forms are extracted; a nonzero web-tool count with no retained citations is
+therefore a useful signal that the search returned no usable source links.
+
 `RWI_COMMUNITY_LOADOUT_INDEXING_ENABLED` controls whether new and edited public forum
 starter posts are indexed. ERIN's server nickname is reconciled idempotently on each
 Discord connection and does not change the application ID, credentials, or permissions.
@@ -159,7 +169,9 @@ Use `/rwi seed-red-horizon` to preview the built-in current-season baseline sour
 The private preview lists the total, new, and already-existing identities and requires
 user-bound confirmation. The import creates active revision-1 entries with immutable
 official source snapshots; it never overwrites an existing subject/claim/context
-identity. Re-running it is safe and imports only identities still missing.
+identity. Service startup performs the same create-only, idempotent import automatically;
+the command remains available for private inspection and manual recovery. Re-running it is
+safe and imports only identities still missing.
 
 Exact Technicians, Division Commanders, and the configured owner can inspect an entry
 with `/rwi knowledge-history`. Create the first source-backed revision with

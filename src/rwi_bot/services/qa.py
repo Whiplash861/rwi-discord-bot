@@ -215,6 +215,7 @@ class QuestionAnsweringService:
             conversation_summary=request.conversation_summary,
         )
 
+        used_web = False
         try:
             if hits or community_claim_hits:
                 generated = await self.ai.answer(
@@ -226,9 +227,39 @@ class QuestionAnsweringService:
                 citations = _merge_citations(knowledge_citations, generated.citations)
                 confidence = _declared_confidence(generated)
                 used_web = False
-            elif self.web_search_enabled:
+            else:
+                generated = None
+                citations = []
+                confidence = ConfidenceLabel.UNKNOWN
+                used_web = False
+
+            if self.web_search_enabled and confidence in {
+                ConfidenceLabel.LOW,
+                ConfidenceLabel.UNKNOWN,
+            }:
+                self.log.info(
+                    "answer_web_escalation",
+                    correlation_id=str(correlation_id),
+                    local_knowledge_hits=len(hits),
+                    community_claim_hits=len(community_claim_hits),
+                )
+                web_input_text = input_text
+                if hits or community_claim_hits:
+                    web_input_text = compose_answer_input(
+                        question=request.question,
+                        member_name=request.member_name,
+                        detail_tier=request.tier.value,
+                        assumptions=_format_assumptions(assumptions_dict),
+                        current_game_version=self.current_game_version,
+                        freshness_boundary=self.current_game_version_started_on.isoformat(),
+                        knowledge_context=(
+                            "Local retrieval did not completely support this question. "
+                            "Independently verify the answer from current external evidence."
+                        ),
+                        conversation_summary=request.conversation_summary,
+                    )
                 generated = await self.ai.answer(
-                    input_text=input_text,
+                    input_text=web_input_text,
                     user_id=request.user_id,
                     correlation_id=correlation_id,
                     complexity=complexity,
@@ -237,9 +268,13 @@ class QuestionAnsweringService:
                     spending_class=SpendingClass.MEMBER_ANSWER,
                 )
                 citations = generated.citations
-                if _web_evidence_confidence(citations) is ConfidenceLabel.LOW:
+                confidence = _minimum_confidence(
+                    _declared_confidence(generated),
+                    _web_evidence_confidence(citations),
+                )
+                if confidence in {ConfidenceLabel.LOW, ConfidenceLabel.UNKNOWN}:
                     generated = await self.ai.answer(
-                        input_text=input_text,
+                        input_text=web_input_text,
                         user_id=request.user_id,
                         correlation_id=correlation_id,
                         complexity=complexity,
@@ -248,12 +283,12 @@ class QuestionAnsweringService:
                         spending_class=SpendingClass.MEMBER_ANSWER,
                     )
                     citations = generated.citations
-                confidence = _minimum_confidence(
-                    _declared_confidence(generated),
-                    _web_evidence_confidence(citations),
-                )
+                    confidence = _minimum_confidence(
+                        _declared_confidence(generated),
+                        _web_evidence_confidence(citations),
+                    )
                 used_web = True
-            else:
+            elif generated is None:
                 raise OpenAIUnavailableError("Web fallback is disabled and no knowledge matched.")
         except OpenAIUnavailableError as exc:
             ticket_id = await self._open_ticket(
@@ -271,6 +306,7 @@ class QuestionAnsweringService:
                 assumptions=request.assumptions,
                 confidence=ConfidenceLabel.UNKNOWN,
                 ticket_id=ticket_id,
+                used_web_search=used_web,
                 learning_opt_out=learning_opt_out,
             )
 
@@ -292,6 +328,7 @@ class QuestionAnsweringService:
                 assumptions=request.assumptions,
                 confidence=ConfidenceLabel.UNKNOWN,
                 ticket_id=ticket_id,
+                used_web_search=used_web,
                 learning_opt_out=learning_opt_out,
             )
 
@@ -311,6 +348,7 @@ class QuestionAnsweringService:
                 assumptions=request.assumptions,
                 confidence=ConfidenceLabel.UNKNOWN,
                 ticket_id=ticket_id,
+                used_web_search=used_web,
                 learning_opt_out=learning_opt_out,
             )
 
@@ -331,6 +369,7 @@ class QuestionAnsweringService:
                 assumptions=request.assumptions,
                 confidence=ConfidenceLabel.UNKNOWN,
                 ticket_id=ticket_id,
+                used_web_search=used_web,
                 learning_opt_out=learning_opt_out,
             )
 
@@ -426,6 +465,8 @@ def _declared_confidence(generated: object) -> ConfidenceLabel:
 def _web_evidence_confidence(citations: list[SourceCitation]) -> ConfidenceLabel:
     if any(citation.official for citation in citations):
         return ConfidenceLabel.HIGH
+    if any(citation.source_type == "community_wiki" for citation in citations):
+        return ConfidenceLabel.MEDIUM
     independent_hosts = {
         (urlparse(str(citation.url)).hostname or "").casefold() for citation in citations
     }

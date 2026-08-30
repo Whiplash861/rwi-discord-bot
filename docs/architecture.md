@@ -51,18 +51,23 @@ The answer path is:
 4. For build advice, search the current-version Community Builds index and return a
    clearly labeled local match with links to the original posts when one is relevant.
 5. Search current-version community claims that an authorized experienced member has
-   verified or qualified. A qualification controls over the original wording.
+   verified or qualified. A qualification controls over the original wording. Retrieval
+   requires both fuzzy similarity and a meaningful shared subject/mechanic term.
 6. Look for a fresh, dependency-valid shared cache entry whose signature includes the
    current author's assumptions.
 7. Search active verified knowledge across subject, identity, structured content,
-   context, and game-version text.
+   context, and game-version text. The source-backed Red Horizon baseline is imported
+   idempotently during service startup.
 8. Use deterministic code for values and build legality as coverage is added.
 9. Reserve budget before an external request can start.
 10. Use OpenAI without web search when reviewed or verified context is sufficient.
-11. Use curated web fallback only when local coverage is missing and web search is enabled.
-   The target set combines current Ubisoft material, the exact official Division 2 Known
-   Issues Trello board, Wikipedia and Division wikis, Reddit, Steam, and selected Q&A and
-   community forums. Community pages remain corroborative rather than first-party truth.
+11. Use curated web fallback when local coverage is missing or the local answer declares
+    insufficient evidence, then use open-web fallback if the curated result remains weak.
+    A fallback caused by insufficient local evidence independently verifies the original
+    question without carrying the incomplete or conflicting local excerpt forward.
+    The target set combines current Ubisoft material, the exact official Division 2 Known
+    Issues Trello board, Wikipedia and Division wikis, Reddit, Steam, and selected Q&A and
+    community forums. Community pages remain corroborative rather than first-party truth.
 12. Open a sanitized Technician ticket when no answer can be verified.
 
 The provider response is inspected for `incomplete` status and token-limit metadata before
@@ -77,6 +82,9 @@ delivery. The answer path requires high/medium model confidence plus authoritati
 evidence or independent-source corroboration; otherwise it abstains and opens a ticket.
 Changing this contract changes the prompt version, so caches from weaker contracts are
 not reused.
+Source provenance is extracted from both message citation annotations and web-search tool
+source metadata; either provider representation is retained for confidence grading and a
+later member source request.
 
 Profile writes require explicit self-reference such as `I'm SHD 2500`, `my Expertise is
 20`, or `I play PvP`. A statement about another member never updates either profile.

@@ -14,6 +14,12 @@ the current-game freshness boundary: older material can provide history but cann
 support a claim about how the game works now. When local coverage is missing, curated
 discovery includes Ubisoft, the exact Division 2 Known Issues Trello board linked by
 Ubisoft, Wikipedia and Division wikis, Reddit, Steam, and selected Q&A/community forums.
+Reviewed community-memory matches require a meaningful shared subject/mechanic term; an
+irrelevant fuzzy match cannot suppress web search. Insufficient local context escalates to
+web search before ERIN abstains. A current curated wiki may support a stable descriptive
+fact, while changeable mechanics still require stronger corroboration.
+The official Red Horizon baseline, including all 29 changed Brand Sets, is imported
+idempotently at startup so a deployed bot cannot silently run with an empty core catalog.
 Normal answers keep citations out of the message; a member can ask for the sources from
 ERIN's immediately preceding answer. Explicit natural follow-ups such as “thanks,” “that
 worked,” “that's wrong,” or “that's outdated” replace rating buttons and are inferred
