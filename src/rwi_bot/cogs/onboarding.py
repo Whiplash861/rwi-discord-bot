@@ -44,7 +44,13 @@ class OnboardingCog(commands.Cog):
             colour=discord.Colour.orange(),
         )
         embed.set_footer(text=PLATFORM_PANEL_MARKER)
-        panel = await channel.send(embed=embed, view=PlatformRoleView())
+        panel = await channel.send(
+            embed=embed,
+            view=PlatformRoleView(
+                guild_id=self.bot.services.settings.discord_guild_id,
+                halted=lambda: self.bot.services.maintenance.halted,
+            ),
+        )
         try:
             await panel.pin(reason="Persistent RWI platform-role selector")
         except discord.Forbidden:

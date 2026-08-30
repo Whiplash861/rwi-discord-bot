@@ -75,5 +75,10 @@ Technicians, and members at or above the bot's highest role are excluded from au
 actions. Detection stops completely during durable maintenance mode. Conversation-space
 messages pass through this check before any answer or paid provider request can begin.
 
+Persistent platform-role buttons are bound to the configured RWI guild, toggle Xbox,
+PC, and PS independently, reply ephemerally, and stop during maintenance. Rogue Agent
+members cannot use the selector to bypass restrictions. These local Discord operations
+never invoke OpenAI.
+
 Live server reconciliation is a deliberate administrative action and is never run as
 part of local tests or startup unless explicitly enabled.

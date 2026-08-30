@@ -43,7 +43,12 @@ class RwiBot(commands.Bot):
         from rwi_bot.cogs.moderation import ModerationCog
         from rwi_bot.cogs.onboarding import OnboardingCog
 
-        self.add_view(PlatformRoleView())
+        self.add_view(
+            PlatformRoleView(
+                guild_id=self.services.settings.discord_guild_id,
+                halted=lambda: self.services.maintenance.halted,
+            )
+        )
         await self.add_cog(AdminCog(self))
         await self.add_cog(OnboardingCog(self))
         await self.add_cog(ModerationCog(self))

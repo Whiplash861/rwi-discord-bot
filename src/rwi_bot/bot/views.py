@@ -39,7 +39,15 @@ class ConfirmationView(discord.ui.View):
 
 
 class PlatformButton(discord.ui.Button[discord.ui.View]):
-    def __init__(self, role_name: str, emoji: str, style: discord.ButtonStyle) -> None:
+    def __init__(
+        self,
+        role_name: str,
+        emoji: str,
+        style: discord.ButtonStyle,
+        *,
+        guild_id: int,
+        halted: Callable[[], bool],
+    ) -> None:
         super().__init__(
             label=role_name,
             emoji=emoji,
@@ -47,11 +55,25 @@ class PlatformButton(discord.ui.Button[discord.ui.View]):
             custom_id=f"rwi:platform:{role_name.casefold()}",
         )
         self.role_name = role_name
+        self.guild_id = guild_id
+        self._halted = halted
 
     async def callback(self, interaction: discord.Interaction) -> None:
+        if self._halted():
+            await interaction.response.send_message(
+                "RWI is in maintenance mode. Platform roles will be available after resume.",
+                ephemeral=True,
+            )
+            return
         if not isinstance(interaction.user, discord.Member) or interaction.guild is None:
             await interaction.response.send_message(
                 "Platform roles can only be changed inside the RWI server.", ephemeral=True
+            )
+            return
+        if interaction.guild.id != self.guild_id:
+            await interaction.response.send_message(
+                "This platform selector belongs to The Redwing Initiative server.",
+                ephemeral=True,
             )
             return
         member = interaction.user
@@ -76,7 +98,7 @@ class PlatformButton(discord.ui.Button[discord.ui.View]):
             else:
                 await member.add_roles(role, reason="Member platform-role toggle")
                 message = f"Added **{role.name}**. You may select more than one platform."
-        except discord.Forbidden:
+        except (discord.Forbidden, discord.HTTPException):
             message = (
                 "I cannot manage that role. Please ask a Division Commander to check role order."
             )
@@ -84,11 +106,35 @@ class PlatformButton(discord.ui.Button[discord.ui.View]):
 
 
 class PlatformRoleView(discord.ui.View):
-    def __init__(self) -> None:
+    def __init__(self, *, guild_id: int, halted: Callable[[], bool]) -> None:
         super().__init__(timeout=None)
-        self.add_item(PlatformButton(names.XBOX, "🎮", discord.ButtonStyle.success))
-        self.add_item(PlatformButton(names.PC, "🖥️", discord.ButtonStyle.secondary))
-        self.add_item(PlatformButton(names.PS, "🎮", discord.ButtonStyle.primary))
+        self.add_item(
+            PlatformButton(
+                names.XBOX,
+                "🎮",
+                discord.ButtonStyle.success,
+                guild_id=guild_id,
+                halted=halted,
+            )
+        )
+        self.add_item(
+            PlatformButton(
+                names.PC,
+                "🖥️",
+                discord.ButtonStyle.secondary,
+                guild_id=guild_id,
+                halted=halted,
+            )
+        )
+        self.add_item(
+            PlatformButton(
+                names.PS,
+                "🎮",
+                discord.ButtonStyle.primary,
+                guild_id=guild_id,
+                halted=halted,
+            )
+        )
 
 
 class FeedbackView(discord.ui.View):
