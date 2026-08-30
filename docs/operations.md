@@ -77,6 +77,26 @@ docker compose stop bot
 Do not use local container startup as a substitute for `/rwi resume` when the durable
 halt file is active; the restarted bot will correctly remain halted.
 
+## Technician knowledge changes
+
+Exact Technicians, Division Commanders, and the configured owner can inspect an entry
+with `/rwi knowledge-history`. Use `/rwi knowledge-revise` with the entry UUID, a full
+replacement `content_json` object, and a reason. Optional `context_json`, status, game
+version, and confidence fields replace their current values; omitted fields are
+preserved. Use `clear_game_version:true` to remove version scope explicitly.
+
+The bot responds privately with a field-level proposal. Only the initiating user can
+confirm it. A confirmed revision takes effect immediately, snapshots the currently
+linked source evidence, invalidates answer caches that depend on the former revision,
+and records the actor, reason, diff, and resulting revision in the audit trail. If the
+entry changes while the proposal is open, the write is rejected and the command must be
+run again.
+
+`/rwi knowledge-rollback` accepts an entry UUID, historical revision number, and reason.
+Rollback copies that immutable snapshot—including its source-evidence snapshot—into a
+new revision; it never rewrites or deletes history. Knowledge writes are disabled while
+maintenance mode is active.
+
 ## Backup
 
 Database backups must be written outside the container and runtime volume. Create the

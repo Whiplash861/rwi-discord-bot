@@ -34,6 +34,16 @@ class KnowledgeHit:
     similarity: float
 
 
+class KnowledgeRevisionConflictError(RuntimeError):
+    def __init__(self, *, expected: int, actual: int) -> None:
+        self.expected = expected
+        self.actual = actual
+        super().__init__(
+            f"Knowledge changed while confirmation was pending "
+            f"(expected revision {expected}, found {actual})."
+        )
+
+
 def stable_context_hash(context: dict[str, Any]) -> str:
     payload = json.dumps(context, sort_keys=True, separators=(",", ":"), default=str)
     return hashlib.sha256(payload.encode()).hexdigest()
@@ -144,15 +154,18 @@ class KnowledgeRepository:
         reason: str,
         game_version: str | None,
         confidence: float | None = None,
+        expected_current_revision: int | None = None,
     ) -> UUID:
         now = datetime.now(UTC)
         async with self.database.session() as session:
             entry = await session.get(KnowledgeEntry, entry_id, with_for_update=True)
             if entry is None:
                 raise KeyError(f"Knowledge entry {entry_id} does not exist.")
+            self._check_expected_revision(entry, expected_current_revision)
             next_confidence = (
                 entry.confidence if confidence is None else normalized_confidence(confidence)
             )
+            source_snapshot = await self._source_snapshot(session, entry_id)
             return await self._commit_revision(
                 session,
                 entry=entry,
@@ -163,6 +176,7 @@ class KnowledgeRepository:
                 reason=reason,
                 game_version=game_version,
                 confidence=next_confidence,
+                source_snapshot=source_snapshot,
                 now=now,
             )
 
@@ -173,6 +187,7 @@ class KnowledgeRepository:
         target_revision_number: int,
         actor_id: int,
         reason: str,
+        expected_current_revision: int | None = None,
     ) -> UUID:
         if target_revision_number < 1:
             raise ValueError("target_revision_number must be positive")
@@ -185,6 +200,7 @@ class KnowledgeRepository:
             entry = await session.get(KnowledgeEntry, entry_id, with_for_update=True)
             if entry is None:
                 raise KeyError(f"Knowledge entry {entry_id} does not exist.")
+            self._check_expected_revision(entry, expected_current_revision)
             target = await session.scalar(
                 select(KnowledgeRevision)
                 .where(KnowledgeRevision.entry_id == entry_id)
@@ -206,8 +222,46 @@ class KnowledgeRepository:
                 reason=f"Rollback to revision {target_revision_number}: {reason[:900]}",
                 game_version=target.game_version,
                 confidence=target.confidence,
+                source_snapshot=target.source_snapshot,
                 now=now,
             )
+
+    @staticmethod
+    def _check_expected_revision(
+        entry: KnowledgeEntry, expected_current_revision: int | None
+    ) -> None:
+        if (
+            expected_current_revision is not None
+            and entry.current_revision != expected_current_revision
+        ):
+            raise KnowledgeRevisionConflictError(
+                expected=expected_current_revision,
+                actual=entry.current_revision,
+            )
+
+    @staticmethod
+    async def _source_snapshot(session: AsyncSession, entry_id: UUID) -> list[dict[str, Any]]:
+        links = await session.scalars(
+            select(KnowledgeSource)
+            .where(KnowledgeSource.entry_id == entry_id)
+            .options(selectinload(KnowledgeSource.source))
+        )
+        snapshot = [
+            {
+                "source_id": str(link.source_id),
+                "url": link.source.url,
+                "title": link.source.title,
+                "source_type": link.source.source_type,
+                "publisher": link.source.publisher,
+                "retrieved_at": link.source.retrieved_at.isoformat(),
+                "content_hash": link.source.content_hash,
+                "trust_score": str(link.source.trust_score),
+                "supports_claim": link.supports_claim,
+                "note": link.note,
+            }
+            for link in links
+        ]
+        return sorted(snapshot, key=lambda item: (item["url"], item["source_id"]))
 
     @staticmethod
     async def _commit_revision(
@@ -221,6 +275,7 @@ class KnowledgeRepository:
         reason: str,
         game_version: str | None,
         confidence: Decimal,
+        source_snapshot: list[dict[str, Any]],
         now: datetime,
     ) -> UUID:
         current_revision_id = await session.scalar(
@@ -242,7 +297,7 @@ class KnowledgeRepository:
             status=status.value,
             game_version=game_version,
             confidence=confidence,
-            source_snapshot=[],
+            source_snapshot=source_snapshot,
             actor_id=actor_id,
             reason=reason[:1000],
             created_at=now,

@@ -11,7 +11,11 @@ from uuid import uuid4
 import pytest
 
 from rwi_bot.db.models import KnowledgeRevision, KnowledgeStatus
-from rwi_bot.services.knowledge import KnowledgeRepository, normalized_confidence
+from rwi_bot.services.knowledge import (
+    KnowledgeRepository,
+    KnowledgeRevisionConflictError,
+    normalized_confidence,
+)
 
 
 def test_knowledge_confidence_is_bounded_and_normalized() -> None:
@@ -48,6 +52,7 @@ async def test_revise_snapshots_metadata_and_invalidates_previous_cache_dependen
     session = AsyncMock()
     session.add = Mock()
     session.get.return_value = entry
+    session.scalars.return_value = []
     session.scalar.return_value = previous_revision_id
     session.execute.return_value = SimpleNamespace(rowcount=2)
     repository = KnowledgeRepository(FakeDatabase(session))  # type: ignore[arg-type]
@@ -96,6 +101,7 @@ async def test_rollback_creates_a_new_revision_instead_of_rewriting_history() ->
         status=KnowledgeStatus.ACTIVE.value,
         game_version="1.0",
         confidence=Decimal("0.800"),
+        source_snapshot=[{"url": "https://example.test/original"}],
     )
     session = AsyncMock()
     session.add = Mock()
@@ -118,7 +124,36 @@ async def test_rollback_creates_a_new_revision_instead_of_rewriting_history() ->
     assert rollback_revision.content == {"value": 1}
     assert rollback_revision.game_version == "1.0"
     assert rollback_revision.confidence == Decimal("0.800")
+    assert rollback_revision.source_snapshot == [{"url": "https://example.test/original"}]
     assert entry.current_revision == 3
     assert entry.content == {"value": 1}
     assert entry.game_version == "1.0"
     session.execute.assert_awaited_once()
+
+
+@pytest.mark.asyncio
+async def test_revise_rejects_stale_confirmation_before_any_write() -> None:
+    entry_id = uuid4()
+    entry = SimpleNamespace(current_revision=4)
+    session = AsyncMock()
+    session.add = Mock()
+    session.get.return_value = entry
+    repository = KnowledgeRepository(FakeDatabase(session))  # type: ignore[arg-type]
+
+    with pytest.raises(KnowledgeRevisionConflictError) as error:
+        await repository.revise(
+            entry_id=entry_id,
+            actor_id=7,
+            content={"value": 2},
+            context={},
+            status=KnowledgeStatus.ACTIVE,
+            reason="Stale proposal",
+            game_version="2.0",
+            expected_current_revision=3,
+        )
+
+    assert error.value.expected == 3
+    assert error.value.actual == 4
+    session.add.assert_not_called()
+    session.scalars.assert_not_awaited()
+    session.scalar.assert_not_awaited()

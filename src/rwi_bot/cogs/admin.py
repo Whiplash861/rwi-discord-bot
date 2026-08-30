@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from uuid import UUID
+
 import discord
 from discord import app_commands
 from discord.ext import commands
@@ -8,7 +10,17 @@ from rwi_bot.bot.checks import is_commander, is_maintenance_operator
 from rwi_bot.bot.client import RwiBot
 from rwi_bot.bot.server_blueprint import ServerReconciler
 from rwi_bot.bot.views import ConfirmationView
+from rwi_bot.db.models import KnowledgeStatus
 from rwi_bot.domain.schemas import AuditRecord
+from rwi_bot.services.knowledge import KnowledgeRevisionConflictError
+from rwi_bot.services.technician import (
+    KnowledgeAction,
+    KnowledgeChangeProposal,
+    parse_json_object,
+    propose_revision,
+    propose_rollback,
+    render_proposal,
+)
 
 
 class AdminCog(commands.Cog):
@@ -165,6 +177,261 @@ class AdminCog(commands.Cog):
             )
         )
         await interaction.edit_original_response(content=summary)
+
+    @rwi.command(
+        name="knowledge-history",
+        description="Inspect the immutable revision history for a knowledge entry",
+    )
+    @app_commands.describe(entry_id="Knowledge entry UUID")
+    async def knowledge_history(self, interaction: discord.Interaction, entry_id: str) -> None:
+        if not self._maintenance_operator(interaction):
+            await self._deny(interaction)
+            return
+        parsed_entry_id = await self._parse_entry_id(interaction, entry_id)
+        if parsed_entry_id is None:
+            return
+        entry = await self.bot.services.knowledge.get(parsed_entry_id)
+        if entry is None:
+            await interaction.response.send_message(
+                "That knowledge entry does not exist.", ephemeral=True
+            )
+            return
+        revisions = sorted(entry.revisions, key=lambda item: item.revision_number, reverse=True)
+        lines = [
+            f"**{entry.subject}** (`{entry.id}`)",
+            f"Current revision: `{entry.current_revision}`",
+            "",
+        ]
+        for revision in revisions[:12]:
+            marker = " **(current)**" if revision.revision_number == entry.current_revision else ""
+            actor = f"<@{revision.actor_id}>" if revision.actor_id is not None else "system"
+            lines.append(
+                f"`r{revision.revision_number}`{marker} · `{revision.status}` · "
+                f"confidence `{revision.confidence}` · actor {actor} · "
+                f"{discord.utils.format_dt(revision.created_at, style='R')}\n"
+                f"Game version: `{revision.game_version or 'unspecified'}` · "
+                f"Reason: {revision.reason[:240]}"
+            )
+        if len(revisions) > 12:
+            lines.append(f"…and {len(revisions) - 12} older revision(s).")
+        await interaction.response.send_message("\n".join(lines)[:1950], ephemeral=True)
+
+    @rwi.command(
+        name="knowledge-revise",
+        description="Propose and confirm a typed revision to a knowledge entry",
+    )
+    @app_commands.describe(
+        entry_id="Knowledge entry UUID",
+        content_json="Complete replacement content as a JSON object",
+        reason="Why this verified change is needed",
+        context_json="Replacement context JSON; omit to preserve it",
+        status="Replacement lifecycle status; omit to preserve it",
+        game_version="Replacement game version; omit to preserve it",
+        clear_game_version="Remove the current game version instead of preserving it",
+        confidence="Replacement confidence from 0 to 1; omit to preserve it",
+    )
+    @app_commands.choices(
+        status=[
+            app_commands.Choice(name=status.value.title(), value=status.value)
+            for status in KnowledgeStatus
+        ]
+    )
+    async def knowledge_revise(
+        self,
+        interaction: discord.Interaction,
+        entry_id: str,
+        content_json: str,
+        reason: str,
+        context_json: str | None = None,
+        status: str | None = None,
+        game_version: str | None = None,
+        clear_game_version: bool = False,
+        confidence: app_commands.Range[float, 0.0, 1.0] | None = None,
+    ) -> None:
+        if not await self._knowledge_change_allowed(interaction):
+            return
+        parsed_entry_id = await self._parse_entry_id(interaction, entry_id)
+        if parsed_entry_id is None:
+            return
+        try:
+            content = parse_json_object(content_json, field_name="content_json")
+            context = (
+                None
+                if context_json is None
+                else parse_json_object(context_json, field_name="context_json")
+            )
+            next_status = None if status is None else KnowledgeStatus(status)
+        except ValueError as exc:
+            await interaction.response.send_message(str(exc), ephemeral=True)
+            return
+        entry = await self.bot.services.knowledge.get(parsed_entry_id)
+        if entry is None:
+            await interaction.response.send_message(
+                "That knowledge entry does not exist.", ephemeral=True
+            )
+            return
+        try:
+            proposal = propose_revision(
+                entry,
+                content=content,
+                context=context,
+                status=next_status,
+                game_version=game_version,
+                clear_game_version=clear_game_version,
+                confidence=confidence,
+                reason=reason,
+            )
+        except ValueError as exc:
+            await interaction.response.send_message(str(exc), ephemeral=True)
+            return
+        await self._confirm_knowledge_change(interaction, proposal)
+
+    @rwi.command(
+        name="knowledge-rollback",
+        description="Propose and confirm rollback by creating a new current revision",
+    )
+    @app_commands.describe(
+        entry_id="Knowledge entry UUID",
+        revision="Historical revision number to restore",
+        reason="Why rollback is needed",
+    )
+    async def knowledge_rollback(
+        self,
+        interaction: discord.Interaction,
+        entry_id: str,
+        revision: app_commands.Range[int, 1],
+        reason: str,
+    ) -> None:
+        if not await self._knowledge_change_allowed(interaction):
+            return
+        parsed_entry_id = await self._parse_entry_id(interaction, entry_id)
+        if parsed_entry_id is None:
+            return
+        entry = await self.bot.services.knowledge.get(parsed_entry_id)
+        if entry is None:
+            await interaction.response.send_message(
+                "That knowledge entry does not exist.", ephemeral=True
+            )
+            return
+        try:
+            proposal = propose_rollback(
+                entry,
+                target_revision_number=revision,
+                reason=reason,
+            )
+        except (KeyError, ValueError) as exc:
+            message = str(exc.args[0]) if exc.args else "The rollback proposal is invalid."
+            await interaction.response.send_message(message, ephemeral=True)
+            return
+        await self._confirm_knowledge_change(interaction, proposal)
+
+    async def _confirm_knowledge_change(
+        self,
+        interaction: discord.Interaction,
+        proposal: KnowledgeChangeProposal,
+    ) -> None:
+        view = ConfirmationView(interaction.user.id)
+        await interaction.response.send_message(
+            render_proposal(proposal),
+            ephemeral=True,
+            view=view,
+        )
+        await view.wait()
+        if view.confirmed is not True:
+            await interaction.edit_original_response(
+                content="Knowledge change cancelled or confirmation expired.", view=None
+            )
+            return
+        if self.bot.services.maintenance.halted:
+            await interaction.edit_original_response(
+                content="RWI entered maintenance mode; the knowledge change was not applied.",
+                view=None,
+            )
+            return
+        try:
+            if proposal.action == KnowledgeAction.REVISE:
+                revision_id = await self.bot.services.knowledge.revise(
+                    entry_id=proposal.entry_id,
+                    actor_id=interaction.user.id,
+                    content=proposal.content,
+                    context=proposal.context,
+                    status=proposal.status,
+                    reason=proposal.reason,
+                    game_version=proposal.game_version,
+                    confidence=float(proposal.confidence),
+                    expected_current_revision=proposal.expected_current_revision,
+                )
+                event_type = "knowledge.revised"
+            else:
+                assert proposal.target_revision_number is not None
+                revision_id = await self.bot.services.knowledge.rollback(
+                    entry_id=proposal.entry_id,
+                    target_revision_number=proposal.target_revision_number,
+                    actor_id=interaction.user.id,
+                    reason=proposal.reason,
+                    expected_current_revision=proposal.expected_current_revision,
+                )
+                event_type = "knowledge.rolled_back"
+        except KnowledgeRevisionConflictError as exc:
+            await interaction.edit_original_response(
+                content=f"{exc} Run the command again to review the latest values.", view=None
+            )
+            return
+        except (KeyError, ValueError) as exc:
+            message = str(exc.args[0]) if exc.args else "The knowledge change could not be applied."
+            await interaction.edit_original_response(content=message, view=None)
+            return
+        await self.bot.services.audit.record(
+            AuditRecord(
+                event_type=event_type,
+                actor_id=interaction.user.id,
+                target_type="knowledge_entry",
+                target_id=str(proposal.entry_id),
+                reason=proposal.reason,
+                details={
+                    "revision_id": str(revision_id),
+                    "from_revision": proposal.expected_current_revision,
+                    "to_revision": proposal.next_revision_number,
+                    "rollback_target_revision": proposal.target_revision_number,
+                    "status": proposal.status.value,
+                    "game_version": proposal.game_version,
+                    "confidence": str(proposal.confidence),
+                    "diff": proposal.audit_diff(),
+                },
+            )
+        )
+        await interaction.edit_original_response(
+            content=(
+                f"Knowledge entry updated to revision `{proposal.next_revision_number}`. "
+                "The immutable revision and audit event were recorded, and dependent caches "
+                "were invalidated."
+            ),
+            view=None,
+        )
+
+    async def _knowledge_change_allowed(self, interaction: discord.Interaction) -> bool:
+        if not self._maintenance_operator(interaction):
+            await self._deny(interaction)
+            return False
+        if self.bot.services.maintenance.halted:
+            await interaction.response.send_message(
+                "Knowledge changes are disabled while RWI is in maintenance mode.",
+                ephemeral=True,
+            )
+            return False
+        return True
+
+    @staticmethod
+    async def _parse_entry_id(interaction: discord.Interaction, entry_id: str) -> UUID | None:
+        try:
+            return UUID(entry_id.strip())
+        except ValueError:
+            message = "entry_id must be a valid UUID."
+            if interaction.response.is_done():
+                await interaction.followup.send(message, ephemeral=True)
+            else:
+                await interaction.response.send_message(message, ephemeral=True)
+            return None
 
     def _maintenance_operator(self, interaction: discord.Interaction) -> bool:
         return isinstance(interaction.user, discord.Member) and is_maintenance_operator(

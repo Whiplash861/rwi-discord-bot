@@ -36,10 +36,17 @@ An answer produced from the web remains externally sourced. It is not promoted t
 verified knowledge automatically.
 
 Every knowledge change creates an immutable revision snapshot containing its content,
-context, status, game version, confidence, actor, reason, and timestamp. Revising or
-rolling back a record transactionally marks caches that depend on the former current
-revision stale. Rollback never rewrites history; it copies the selected snapshot into a
-new current revision.
+context, status, game version, confidence, linked-source evidence, actor, reason, and
+timestamp. Revising or rolling back a record transactionally marks caches that depend
+on the former current revision stale. Rollback never rewrites history; it copies the
+selected snapshot into a new current revision.
+
+Technician changes use typed `/rwi knowledge-revise` and `/rwi knowledge-rollback`
+controls. The bot parses structured JSON locally, checks the exact authorized staff
+roles, displays a deterministic field-level diff, and binds confirmation to the user
+who opened it. The proposal records its expected current revision; a concurrent change
+causes a conflict instead of silently overwriting newer knowledge. Confirmed changes
+take effect immediately and write a separate audit event containing the diff.
 
 ## Emergency boundary
 
