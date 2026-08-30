@@ -11,6 +11,8 @@ COPY pyproject.toml README.md ./
 COPY src ./src
 COPY alembic.ini ./
 COPY alembic ./alembic
+COPY Dockerfile compose.yml ./release-inputs/
+COPY scripts ./release-inputs/scripts
 
 RUN python -m pip install --no-cache-dir .
 

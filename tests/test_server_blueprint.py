@@ -4,6 +4,7 @@ from unittest.mock import Mock
 
 import discord
 
+from rwi_bot.bot import names
 from rwi_bot.bot.server_blueprint import ROLE_SPECS, ChannelKind, ChannelSpec, ServerReconciler
 
 
@@ -84,3 +85,36 @@ def test_unchanged_text_channel_does_not_need_update() -> None:
     spec = ChannelSpec("canonical", ChannelKind.TEXT, "Canonical topic")
 
     assert not ServerReconciler._channel_needs_update(channel, spec, {role: overwrite})
+
+
+def test_patch_notes_channel_is_read_only_for_community_roles() -> None:
+    default_role = Mock(spec=discord.Role)
+    default_role.id = 1
+    agent = Mock(spec=discord.Role)
+    agent.id = 2
+    rogue = Mock(spec=discord.Role)
+    rogue.id = 3
+    bot_member = Mock(spec=discord.Member)
+    bot_member.id = 4
+    guild = Mock(spec=discord.Guild)
+    guild.default_role = default_role
+    spec = ChannelSpec(
+        names.ERIN_PATCH_NOTES,
+        ChannelKind.TEXT,
+        access_roles=(names.AGENT, names.ROGUE_AGENT),
+        bot_access=True,
+        read_only=True,
+    )
+
+    overwrites = ServerReconciler(guild)._channel_overwrites(
+        spec,
+        {names.AGENT: agent, names.ROGUE_AGENT: rogue},
+        bot_member,
+    )
+
+    assert overwrites[agent].view_channel is True
+    assert overwrites[agent].send_messages is False
+    assert overwrites[agent].add_reactions is False
+    assert overwrites[agent].create_public_threads is False
+    assert overwrites[rogue].send_messages is False
+    assert overwrites[bot_member].send_messages is True

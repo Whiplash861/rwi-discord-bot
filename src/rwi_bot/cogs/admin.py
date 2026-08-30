@@ -138,6 +138,9 @@ class AdminCog(commands.Cog):
                     details={"force": force, "state_revision": state.revision},
                 )
             )
+            releases = self.bot.get_cog("ReleaseNotesCog")
+            if releases is not None:
+                releases.schedule_publish()  # type: ignore[attr-defined]
         await interaction.followup.send(f"{heading}\n\n" + "\n".join(lines), ephemeral=True)
 
     @rwi.command(
@@ -174,6 +177,9 @@ class AdminCog(commands.Cog):
         onboarding = self.bot.get_cog("OnboardingCog")
         if onboarding is not None:
             await onboarding.ensure_platform_panel()  # type: ignore[attr-defined]
+        releases = self.bot.get_cog("ReleaseNotesCog")
+        if releases is not None:
+            releases.schedule_publish()  # type: ignore[attr-defined]
         summary = (
             f"Created {len(report.created_roles)} roles, "
             f"{len(report.created_categories)} categories, and "

@@ -63,6 +63,33 @@ edits update the index, deletion removes the indexed copy, and startup synchroni
 is bounded to 100 active or archived threads. Learning opt-out removes the author's
 indexed submissions and prevents re-indexing while the preference remains enabled.
 
+## Release index
+
+`#erin-patch-notes` is a community-readable text channel under Alliance Hub. Agent and
+Rogue Agent overwrites explicitly deny sending messages, reactions, and thread creation;
+ERIN retains the send and history permissions needed to maintain the index. Discord
+server administrators can still moderate the channel because Administrator bypasses
+channel overwrites.
+
+Each authored release has a stable release ID, monotonically increasing ERIN Update
+number, `Vmajor.minor.patch` version, date, and notes classified as Critical, Privacy &
+Safety, High Impact, New Features, Improvements, Fixes, or Reliability & Maintenance.
+The publisher reconciles only this explicitly requested channel; it does not run the
+full server blueprint or change role hierarchy.
+
+At startup ERIN fingerprints packaged application source, migrations, configuration,
+container definitions, and deployment scripts. Pending authored releases are published
+first. If the fingerprint changed without a new authored manifest, ERIN increments the
+patch version and emits a conservative component-level fallback rather than silently
+omitting the deployment. The fingerprint contains hashes and file labels, never source
+content or credentials.
+
+Publication is idempotent across reconnects and process restarts. A stable marker in the
+Discord embed and an immutable audit event identify each release and destination channel;
+a message sent immediately before a process interruption can therefore be recovered
+without duplication. Durable maintenance mode suppresses channel creation and publishing;
+a successful `/rwi resume` schedules all pending notes.
+
 The deterministic build core keeps PvE and PvP stat variants explicit, excludes
 conditional buffs unless requested, enforces data-driven activation and uniqueness
 requirements, distinguishes gear and weapon Exotic limits, and records the default SHD

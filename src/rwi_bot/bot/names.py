@@ -22,6 +22,7 @@ GENERAL_CHAT = "general-chat"
 ASK_RWI = "ask-rwi"
 COMMUNITY_BUILDS = "community-builds"
 COMMUNITY_LOADOUT_CHANNELS = (COMMUNITY_BUILDS, "community-loadouts")
+ERIN_PATCH_NOTES = "erin-patch-notes"
 GALLERY = "gallery"
 NSFW_CHAT = "nsfw-chat"
 XBOX_MATCHMAKING = "xbox-matchmaking"

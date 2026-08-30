@@ -34,6 +34,7 @@ class ChannelSpec:
     nsfw: bool = False
     access_roles: tuple[str, ...] = ()
     bot_access: bool = False
+    read_only: bool = False
 
 
 ROLE_SPECS = (
@@ -79,6 +80,14 @@ CATEGORY_CHANNELS: dict[str, tuple[ChannelSpec, ...]] = {
         ),
     ),
     names.ALLIANCE_HUB: (
+        ChannelSpec(
+            names.ERIN_PATCH_NOTES,
+            ChannelKind.TEXT,
+            "Read-only release history for ERIN features, fixes, safety changes, and operations.",
+            access_roles=(names.AGENT, names.ROGUE_AGENT),
+            bot_access=True,
+            read_only=True,
+        ),
         ChannelSpec(
             names.GENERAL_CHAT,
             ChannelKind.TEXT,
@@ -291,6 +300,45 @@ class ServerReconciler:
             )
         return report
 
+    async def ensure_channel(
+        self,
+        category_name: str,
+        spec: ChannelSpec,
+    ) -> discord.abc.GuildChannel:
+        """Reconcile one explicitly requested channel without touching roles or peers."""
+
+        bot_member = self.guild.me
+        if bot_member is None:
+            raise RuntimeError("The bot member is not available in the target guild.")
+        category = discord.utils.get(self.guild.categories, name=category_name)
+        if category is None:
+            raise RuntimeError(f"The {category_name} category does not exist.")
+        roles: dict[str, discord.Role] = {}
+        for role_name in spec.access_roles:
+            role = discord.utils.get(self.guild.roles, name=role_name)
+            if role is None:
+                raise RuntimeError(f"The {role_name} role does not exist.")
+            roles[role_name] = role
+
+        overwrites = self._channel_overwrites(spec, roles, bot_member)
+        channel = discord.utils.get(category.channels, name=spec.name)
+        if channel is None:
+            return await self._create_channel(category, spec, overwrites)
+        if spec.kind == ChannelKind.TEXT and not isinstance(channel, discord.TextChannel):
+            raise RuntimeError(f"{category_name}/{spec.name} is not a text channel.")
+        if not self._channel_is_editable(channel, bot_member):
+            raise PermissionError(f"ERIN cannot manage {category_name}/{spec.name}.")
+        if self._channel_needs_update(channel, spec, overwrites):
+            if not isinstance(channel, (discord.TextChannel, discord.ForumChannel)):
+                raise RuntimeError(f"{category_name}/{spec.name} has an incompatible type.")
+            await channel.edit(
+                overwrites=overwrites,
+                topic=spec.topic or "",
+                nsfw=spec.nsfw,
+                reason="Reconcile the explicitly requested ERIN patch-notes channel",
+            )
+        return channel
+
     async def _ensure_roles(
         self,
         report: ReconcileReport,
@@ -451,7 +499,7 @@ class ServerReconciler:
         for role_name in spec.access_roles:
             role = roles[role_name]
             overwrite = discord.PermissionOverwrite(view_channel=True, read_message_history=True)
-            if role_name == names.ROGUE_AGENT:
+            if spec.read_only or role_name == names.ROGUE_AGENT:
                 overwrite.update(
                     send_messages=False,
                     add_reactions=False,

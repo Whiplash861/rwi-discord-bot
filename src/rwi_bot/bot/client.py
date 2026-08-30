@@ -44,6 +44,7 @@ class RwiBot(commands.Bot):
         from rwi_bot.cogs.moderation import ModerationCog
         from rwi_bot.cogs.onboarding import OnboardingCog
         from rwi_bot.cogs.privacy import PrivacyCog
+        from rwi_bot.cogs.releases import ReleaseNotesCog
 
         self.add_view(
             PlatformRoleView(
@@ -57,6 +58,7 @@ class RwiBot(commands.Bot):
         await self.add_cog(CommunityLoadoutsCog(self))
         await self.add_cog(ConversationCog(self))
         await self.add_cog(PrivacyCog(self))
+        await self.add_cog(ReleaseNotesCog(self))
 
         if self.services.settings.sync_commands:
             guild = discord.Object(id=self.services.settings.discord_guild_id)
@@ -113,6 +115,9 @@ class RwiBot(commands.Bot):
         community = self.get_cog("CommunityLoadoutsCog")
         if community is not None:
             community.schedule_sync()  # type: ignore[attr-defined]
+        releases = self.get_cog("ReleaseNotesCog")
+        if releases is not None:
+            releases.schedule_publish()  # type: ignore[attr-defined]
 
     async def ensure_server_identity(self, guild: discord.Guild) -> None:
         member = guild.me
@@ -220,7 +225,7 @@ class RwiBot(commands.Bot):
         return results
 
     async def send_audit_summary(self, record: AuditRecord, event_id: UUID) -> None:
-        if record.event_type.startswith("answer."):
+        if record.event_type.startswith("answer.") or record.event_type == "release.published":
             return
         guild = self.get_guild(self.services.settings.discord_guild_id)
         if guild is None:

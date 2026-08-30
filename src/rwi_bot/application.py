@@ -14,6 +14,7 @@ from rwi_bot.services.knowledge import CacheRepository, KnowledgeRepository, Tic
 from rwi_bot.services.maintenance import MaintenanceManager
 from rwi_bot.services.privacy import ProfileRepository
 from rwi_bot.services.qa import QuestionAnsweringService
+from rwi_bot.services.releases import ReleaseHistoryRepository
 
 
 @dataclass(slots=True)
@@ -30,6 +31,7 @@ class AppServices:
     discipline: DisciplineRepository
     profiles: ProfileRepository
     community_loadouts: CommunityLoadoutRepository
+    release_history: ReleaseHistoryRepository
     ai: RwiOpenAIClient
     qa: QuestionAnsweringService
 
@@ -53,6 +55,7 @@ async def build_services(settings: Settings) -> AppServices:
     discipline = DisciplineRepository(database)
     profiles = ProfileRepository(database)
     community_loadouts = CommunityLoadoutRepository(database)
+    release_history = ReleaseHistoryRepository(database)
     ai = RwiOpenAIClient(
         api_key=settings.openai_api_key.get_secret_value(),
         maintenance=maintenance,
@@ -88,6 +91,7 @@ async def build_services(settings: Settings) -> AppServices:
         discipline=discipline,
         profiles=profiles,
         community_loadouts=community_loadouts,
+        release_history=release_history,
         ai=ai,
         qa=qa,
     )

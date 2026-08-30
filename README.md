@@ -10,6 +10,10 @@ The current catalog target is **Y8S3 Red Horizon**. ERIN can search structured c
 content—not only item titles—and can locally reference privacy-sanitized starter posts
 from the server's Community Builds forum before considering an OpenAI request. Community
 loadouts are always labeled as player submissions rather than verified game truth.
+Every deployed application revision is also represented in the community-readable,
+read-only `#erin-patch-notes` index. Authored releases use severity-grouped notes;
+deployment fingerprinting produces a categorized fallback when a release manifest was
+not supplied.
 
 This repository is under active private-alpha development.
 
@@ -24,6 +28,7 @@ This repository is under active private-alpha development.
 - Normal answers are limited to DMs from current RWI members and `#ask-rwi`.
 - Raw DMs, secrets, and unnecessary personal information are excluded from audit logs.
 - Members can opt out of shared answer learning and privately export or reset profile data.
+- Release announcements are idempotent: reconnecting the same build never reposts it.
 
 ## Local quick start
 

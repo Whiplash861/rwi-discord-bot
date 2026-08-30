@@ -13,6 +13,11 @@ Builds index records and local retrieval; the default is `Y8S3 Red Horizon`.
 starter posts are indexed. ERIN's server nickname is reconciled idempotently on each
 Discord connection and does not change the application ID, credentials, or permissions.
 
+ERIN also reconciles only the explicitly requested `#erin-patch-notes` channel on a
+healthy Discord connection. The channel is readable but not writable by Agent and Rogue
+Agent roles. This targeted operation does not reconcile other channels or the role
+hierarchy.
+
 The bot requires Python 3.12. Docker provides that runtime even when the Windows host
 uses another Python version.
 
@@ -62,6 +67,27 @@ uv run ruff check .
 uv run mypy src
 uv run pytest
 ```
+
+## Release announcements
+
+Production releases are declared in `src/rwi_bot/data/releases.py`. Add one immutable
+`Release` record per authored update with a unique lowercase release ID, the next ERIN
+Update number, a `Vmajor.minor.patch` version, release date, and one or more categorized
+notes. Notes render in severity/significance order regardless of declaration order. The
+initial public entry is **ERIN Update 1 — V1.22.333**.
+
+After an image containing a new release is deployed, startup automatically creates or
+repairs `#erin-patch-notes` and publishes every entry not yet recorded in that channel.
+Rebuilding or restarting the same image does not repost it. If a Git update is built and
+deployed without an authored record, ERIN detects the changed deployment fingerprint,
+increments the last patch version, and posts a conservative categorized summary of the
+affected application components. Add an authored manifest whenever exact member-facing
+detail is available; the fallback exists so a deployed change is never invisible.
+
+No release publication occurs during durable maintenance mode. A successful
+`/rwi resume` schedules pending announcements. If the Alliance Hub category or required
+community roles do not exist, ERIN logs the failure and leaves the rest of the server
+untouched.
 
 ## Maintenance mode
 
