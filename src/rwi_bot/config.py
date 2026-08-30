@@ -40,6 +40,15 @@ class Settings(BaseSettings):
     auto_bootstrap_server: bool = False
     sync_commands: bool = True
 
+    spam_detection_enabled: bool = True
+    spam_repeated_messages: int = Field(default=3, ge=2, le=20)
+    spam_burst_messages: int = Field(default=7, ge=3, le=50)
+    spam_severe_messages: int = Field(default=12, ge=3, le=100)
+    spam_window_seconds: int = Field(default=10, ge=2, le=120)
+    spam_incident_cooldown_seconds: int = Field(default=4, ge=0, le=120)
+    spam_history_hours: int = Field(default=24, ge=1, le=720)
+    spam_timeout_minutes: int = Field(default=10, ge=1, le=10080)
+
     @field_validator("official_search_domains", mode="before")
     @classmethod
     def split_domains(cls, value: object) -> object:
@@ -65,6 +74,14 @@ class Settings(BaseSettings):
     def reserve_fits_budget(self) -> Settings:
         if self.member_reserve_usd > self.openai_hard_budget_usd:
             raise ValueError("member reserve cannot exceed the hard budget")
+        return self
+
+    @model_validator(mode="after")
+    def spam_thresholds_are_ordered(self) -> Settings:
+        if self.spam_burst_messages < self.spam_repeated_messages:
+            raise ValueError("spam burst threshold cannot be below repeated threshold")
+        if self.spam_severe_messages < self.spam_burst_messages:
+            raise ValueError("spam severe threshold cannot be below burst threshold")
         return self
 
     @field_validator("runtime_dir")

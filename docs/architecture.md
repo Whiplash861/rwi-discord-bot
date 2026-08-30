@@ -57,5 +57,17 @@ that arrives while those checks are running.
   Commander.
 - Technicians receive no moderation authority from the bot.
 
+## Spam moderation
+
+Spam detection is local and keeps only short-lived SHA-256 fingerprints, timestamps,
+and attachment counts; message text is not written to discipline or audit records. A
+first incident is deleted and warned, a later incident is temporarily timed out, and
+continued or severe spam is kicked. The bot never automatically bans a member.
+
+The configured owner, Discord server owner, Division Commanders, Division Coordinators,
+Technicians, and members at or above the bot's highest role are excluded from automated
+actions. Detection stops completely during durable maintenance mode. Conversation-space
+messages pass through this check before any answer or paid provider request can begin.
+
 Live server reconciliation is a deliberate administrative action and is never run as
 part of local tests or startup unless explicitly enabled.

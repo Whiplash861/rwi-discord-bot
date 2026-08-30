@@ -53,6 +53,10 @@ class ConversationCog(commands.Cog):
             if not self._is_ask_rwi_space(message.channel):
                 return
 
+            moderation = self.bot.get_cog("ModerationCog")
+            if moderation is not None and await moderation.handle_message(message):  # type: ignore[attr-defined]
+                return
+
         retry_after = await self.rate_limiter.acquire(message.author.id)
         if retry_after is not None:
             seconds = max(int(retry_after.total_seconds()), 1)

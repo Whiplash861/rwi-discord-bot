@@ -42,6 +42,11 @@ def test_settings_reject_reserve_above_budget() -> None:
         valid_settings(openai_hard_budget_usd=5, member_reserve_usd=6)
 
 
+def test_settings_reject_inverted_spam_thresholds() -> None:
+    with pytest.raises(ValidationError, match="spam severe threshold"):
+        valid_settings(spam_burst_messages=10, spam_severe_messages=9)
+
+
 def test_settings_repr_does_not_reveal_secrets() -> None:
     settings = valid_settings()
 
