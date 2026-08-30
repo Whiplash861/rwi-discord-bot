@@ -7,6 +7,12 @@ result. Deployment identifiers are required rather than embedded in source defau
 Use a unique, randomly generated database password and keep the database URL consistent
 with the database service settings.
 
+`RWI_CURRENT_GAME_VERSION` selects the exact season/patch scope used for new Community
+Builds index records and local retrieval; the default is `Y8S3 Red Horizon`.
+`RWI_COMMUNITY_LOADOUT_INDEXING_ENABLED` controls whether new and edited public forum
+starter posts are indexed. ERIN's server nickname is reconciled idempotently on each
+Discord connection and does not change the application ID, credentials, or permissions.
+
 The bot requires Python 3.12. Docker provides that runtime even when the Windows host
 uses another Python version.
 
@@ -61,7 +67,7 @@ uv run pytest
 
 Use `/rwi halt` for cost, failure-loop, queue, source, or full-system emergencies. The
 durable flag is written before normal bot work can continue. Presence changes to Do Not
-Disturb with `RWI Maintenance Mode`; offline presence remains reserved for a real process
+Disturb with `ERIN Maintenance Mode`; offline presence remains reserved for a real process
 or connectivity outage.
 
 Use `/rwi status` to inspect the state. `/rwi resume` runs health checks and does not
@@ -82,6 +88,13 @@ Do not use local container startup as a substitute for `/rwi resume` when the du
 halt file is active; the restarted bot will correctly remain halted.
 
 ## Technician knowledge changes
+
+Use `/rwi seed-red-horizon` to preview the built-in current-season baseline sourced from
+[Ubisoft's official Red Horizon launch notes](https://www.ubisoft.com/en-us/game/the-division/the-division-2/news-updates/4mrYiFPIyKpzpoqshDQk80/the-division-2-red-horizon).
+The private preview lists the total, new, and already-existing identities and requires
+user-bound confirmation. The import creates active revision-1 entries with immutable
+official source snapshots; it never overwrites an existing subject/claim/context
+identity. Re-running it is safe and imports only identities still missing.
 
 Exact Technicians, Division Commanders, and the configured owner can inspect an entry
 with `/rwi knowledge-history`. Create the first source-backed revision with
@@ -148,12 +161,19 @@ tickets. Questions still have to be processed—including by the configured exte
 provider when required—to answer the member.
 
 `/privacy export` privately attaches a JSON export of the member profile, persisted
-conversation summaries, and feedback. `/privacy reset` requires user-bound confirmation,
-then resets profile preferences, deletes persisted conversation and feedback state,
-anonymizes review-ticket and API-usage associations, and clears in-process conversation
-memory. The learning preference is preserved. Security, moderation, and immutable audit
+conversation summaries, feedback, and indexed Community Builds starter posts.
+`/privacy reset` requires user-bound confirmation, then resets profile preferences,
+deletes persisted conversation, feedback, and Community Builds index state, anonymizes
+review-ticket and API-usage associations, and clears in-process conversation memory. The
+learning preference is preserved. Neither reset nor learning opt-out deletes the original
+Discord post; it removes ERIN's indexed copy. Security, moderation, and immutable audit
 records are retained for integrity and are disclosed in both the confirmation and export.
 Privacy controls fail closed during emergency maintenance mode with no data change.
+
+Community indexing is limited to public starter posts in the configured
+`community-builds` or `community-loadouts` forum. Replies and other channels are not
+indexed. Edits refresh the sanitized local copy, message or thread deletion removes it,
+and a bounded startup synchronization covers at most 100 active or archived threads.
 
 ## Backup
 

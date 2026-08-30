@@ -68,6 +68,12 @@ class KnowledgeEntry(UUIDPrimaryKeyMixin, TimestampMixin, Base):
             postgresql_ops={"normalized_subject": "gin_trgm_ops"},
         ),
         Index(
+            "ix_knowledge_search_text_trgm",
+            "search_text",
+            postgresql_using="gin",
+            postgresql_ops={"search_text": "gin_trgm_ops"},
+        ),
+        Index(
             "ix_knowledge_embedding_hnsw",
             "embedding",
             postgresql_using="hnsw",
@@ -79,6 +85,7 @@ class KnowledgeEntry(UUIDPrimaryKeyMixin, TimestampMixin, Base):
     normalized_subject: Mapped[str] = mapped_column(String(300), nullable=False, index=True)
     entity_type: Mapped[str] = mapped_column(String(80), nullable=False, index=True)
     claim_key: Mapped[str] = mapped_column(String(160), nullable=False)
+    search_text: Mapped[str] = mapped_column(Text, nullable=False)
     content: Mapped[dict[str, Any]] = mapped_column(JSONB, nullable=False)
     context: Mapped[dict[str, Any]] = mapped_column(JSONB, default=dict, nullable=False)
     context_hash: Mapped[str] = mapped_column(String(64), nullable=False)
@@ -197,6 +204,41 @@ class UserProfile(TimestampMixin, Base):
     platform_roles: Mapped[list[str]] = mapped_column(JSONB, default=list)
     preferences: Mapped[dict[str, Any]] = mapped_column(JSONB, default=dict)
     learning_opt_out: Mapped[bool] = mapped_column(Boolean, default=False)
+
+
+class CommunityLoadout(UUIDPrimaryKeyMixin, TimestampMixin, Base):
+    __tablename__ = "community_loadouts"
+    __table_args__ = (
+        UniqueConstraint("guild_id", "thread_id", name="uq_community_loadouts_guild_thread"),
+        UniqueConstraint(
+            "guild_id",
+            "starter_message_id",
+            name="uq_community_loadouts_guild_starter_message",
+        ),
+        Index(
+            "ix_community_loadouts_search_text_trgm",
+            "search_text",
+            postgresql_using="gin",
+            postgresql_ops={"search_text": "gin_trgm_ops"},
+        ),
+    )
+
+    guild_id: Mapped[int] = mapped_column(BigInteger, nullable=False, index=True)
+    forum_channel_id: Mapped[int] = mapped_column(BigInteger, nullable=False, index=True)
+    thread_id: Mapped[int] = mapped_column(BigInteger, nullable=False)
+    starter_message_id: Mapped[int] = mapped_column(BigInteger, nullable=False)
+    author_user_id: Mapped[int] = mapped_column(BigInteger, nullable=False, index=True)
+    title: Mapped[str] = mapped_column(String(300), nullable=False)
+    content: Mapped[str] = mapped_column(Text, nullable=False)
+    tags: Mapped[list[str]] = mapped_column(JSONB, default=list, nullable=False)
+    search_text: Mapped[str] = mapped_column(Text, nullable=False)
+    source_url: Mapped[str] = mapped_column(Text, nullable=False)
+    game_version: Mapped[str] = mapped_column(String(80), nullable=False, index=True)
+    verification_status: Mapped[str] = mapped_column(
+        String(40), default="community_submitted", nullable=False, index=True
+    )
+    active: Mapped[bool] = mapped_column(Boolean, default=True, nullable=False, index=True)
+    submitted_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
 
 
 class Feedback(UUIDPrimaryKeyMixin, Base):

@@ -124,11 +124,13 @@ class KnowledgeRepository:
 
     async def search(self, query: str, *, limit: int = 8) -> list[KnowledgeHit]:
         normalized = normalize_text(query)
-        similarity = func.similarity(KnowledgeEntry.normalized_subject, normalized)
+        subject_similarity = func.similarity(KnowledgeEntry.normalized_subject, normalized)
+        content_similarity = func.word_similarity(normalized, KnowledgeEntry.search_text)
+        similarity = func.greatest(subject_similarity, content_similarity)
         statement = (
             select(KnowledgeEntry, similarity.label("score"))
             .where(KnowledgeEntry.status == KnowledgeStatus.ACTIVE.value)
-            .where(similarity >= 0.18)
+            .where((subject_similarity >= 0.18) | (content_similarity >= 0.24))
             .options(
                 selectinload(KnowledgeEntry.revisions),
                 selectinload(KnowledgeEntry.sources).selectinload(KnowledgeSource.source),
@@ -151,6 +153,19 @@ class KnowledgeRepository:
         )
         async with self.database.session() as session:
             return cast(KnowledgeEntry | None, await session.scalar(statement))
+
+    async def identity_exists(
+        self, *, subject: str, claim_key: str, context: dict[str, Any]
+    ) -> bool:
+        statement = (
+            select(KnowledgeEntry.id)
+            .where(KnowledgeEntry.normalized_subject == normalize_text(subject))
+            .where(KnowledgeEntry.claim_key == claim_key)
+            .where(KnowledgeEntry.context_hash == stable_context_hash(context))
+            .limit(1)
+        )
+        async with self.database.session() as session:
+            return await session.scalar(statement) is not None
 
     async def integrity_report(self, *, stale_after_days: int = 30) -> KnowledgeIntegrityReport:
         if not 1 <= stale_after_days <= 365:
@@ -270,6 +285,14 @@ class KnowledgeRepository:
     ) -> UUID:
         normalized_subject = normalize_text(subject)
         context_hash = stable_context_hash(context)
+        search_text = knowledge_search_text(
+            subject=subject,
+            entity_type=entity_type,
+            claim_key=claim_key,
+            content=content,
+            context=context,
+            game_version=game_version,
+        )
         if len({source.url for source in sources}) != len(sources):
             raise ValueError("Source URLs must be unique within one knowledge entry.")
         now = datetime.now(UTC)
@@ -281,6 +304,7 @@ class KnowledgeRepository:
             normalized_subject=normalized_subject,
             entity_type=entity_type,
             claim_key=claim_key,
+            search_text=search_text,
             content=content,
             context=context,
             context_hash=context_hash,
@@ -561,6 +585,14 @@ class KnowledgeRepository:
         entry.content = content
         entry.context = context
         entry.context_hash = stable_context_hash(context)
+        entry.search_text = knowledge_search_text(
+            subject=entry.subject,
+            entity_type=entry.entity_type,
+            claim_key=entry.claim_key,
+            content=content,
+            context=context,
+            game_version=game_version,
+        )
         entry.status = status.value
         entry.game_version = game_version
         entry.confidence = confidence
@@ -571,6 +603,28 @@ class KnowledgeRepository:
         await session.flush()
         await _invalidate_cache_dependencies(session, current_revision_id)
         return revision.id
+
+
+def knowledge_search_text(
+    *,
+    subject: str,
+    entity_type: str,
+    claim_key: str,
+    content: dict[str, Any],
+    context: dict[str, Any],
+    game_version: str | None,
+) -> str:
+    payload = " ".join(
+        (
+            subject,
+            entity_type,
+            claim_key,
+            json.dumps(content, sort_keys=True, default=str),
+            json.dumps(context, sort_keys=True, default=str),
+            game_version or "",
+        )
+    )
+    return normalize_text(payload)
 
 
 class CacheRepository:

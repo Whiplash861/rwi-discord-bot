@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import os
-from datetime import timedelta
+from datetime import UTC, datetime, timedelta
 from decimal import Decimal
 from uuid import uuid4
 
@@ -11,12 +11,14 @@ from sqlalchemy import delete
 from rwi_bot.db.models import (
     AnswerCache,
     CacheState,
+    CommunityLoadout,
     KnowledgeEntry,
     KnowledgeStatus,
     SourceType,
 )
 from rwi_bot.db.session import Database
 from rwi_bot.domain.schemas import AnswerTier
+from rwi_bot.services.community import CommunityLoadoutRepository
 from rwi_bot.services.knowledge import CacheRepository, KnowledgeRepository, SourceEvidence
 
 
@@ -37,7 +39,7 @@ async def test_revision_invalidation_and_rollback_are_transactional() -> None:
             subject=f"integration-revision-test-{test_suffix}",
             entity_type="test",
             claim_key=f"transactional-cache-invalidation-{test_suffix}",
-            content={"value": 1},
+            content={"value": 1, "search_marker": "ember engine combustion"},
             context={"mode": "pve"},
             actor_id=None,
             reason="Integration fixture",
@@ -62,6 +64,8 @@ async def test_revision_invalidation_and_rollback_are_transactional() -> None:
         assert len(entry.sources) == 1
         assert revision_one.source_snapshot[0]["url"].endswith(test_suffix)
         assert revision_one.source_snapshot[0]["supports_claim"] is True
+        structured_hits = await knowledge.search("ember engine combustion")
+        assert any(hit.entry.id == entry_id for hit in structured_hits)
         cache_id = await cache.create_candidate(
             signature=test_suffix,
             normalized_intent="integration revision",
@@ -82,7 +86,7 @@ async def test_revision_invalidation_and_rollback_are_transactional() -> None:
         await knowledge.revise(
             entry_id=entry_id,
             actor_id=1,
-            content={"value": 2},
+            content={"value": 2, "search_marker": "fafnir burn"},
             context={"mode": "pvp"},
             status=KnowledgeStatus.ACTIVE,
             reason="Integration revision",
@@ -119,7 +123,7 @@ async def test_revision_invalidation_and_rollback_are_transactional() -> None:
         restored = await knowledge.get(entry_id)
         assert restored is not None
         assert restored.current_revision == 3
-        assert restored.content == {"value": 1}
+        assert restored.content == {"value": 1, "search_marker": "ember engine combustion"}
         assert restored.game_version == "1.0-test"
     finally:
         if cache_id is not None or entry_id is not None:
@@ -130,4 +134,60 @@ async def test_revision_invalidation_and_rollback_are_transactional() -> None:
                     await session.execute(
                         delete(KnowledgeEntry).where(KnowledgeEntry.id == entry_id)
                     )
+        await database.dispose()
+
+
+@pytest.mark.integration
+@pytest.mark.asyncio
+async def test_community_loadout_search_and_lifecycle_are_local() -> None:
+    if os.getenv("RWI_RUN_DB_INTEGRATION") != "1":
+        pytest.skip("set RWI_RUN_DB_INTEGRATION=1 against a disposable test database")
+    database = Database(os.environ["RWI_DATABASE_URL"])
+    repository = CommunityLoadoutRepository(database)
+    suffix = uuid4().hex
+    guild_id = 101
+    thread_id = 202
+    try:
+        first_id = await repository.upsert(
+            guild_id=guild_id,
+            forum_channel_id=201,
+            thread_id=thread_id,
+            starter_message_id=thread_id,
+            author_user_id=303,
+            title=f"Hazard anchor {suffix}",
+            content="Broken Rain tank with hazard protection and armor regeneration.",
+            tags=["Tank", "Broken Rain"],
+            source_url=f"https://discord.com/channels/{guild_id}/{thread_id}/{thread_id}",
+            game_version="Y8S3 Red Horizon",
+            submitted_at=datetime.now(UTC),
+        )
+
+        hits = await repository.search(
+            "Broken Rain hazard regeneration tank",
+            guild_id=guild_id,
+            game_version="Y8S3 Red Horizon",
+        )
+        assert hits
+        assert hits[0].loadout.id == first_id
+
+        second_id = await repository.upsert(
+            guild_id=guild_id,
+            forum_channel_id=201,
+            thread_id=thread_id,
+            starter_message_id=thread_id,
+            author_user_id=303,
+            title=f"Updated hazard anchor {suffix}",
+            content="Updated armor regeneration and hazard protection setup.",
+            tags=["Tank"],
+            source_url=f"https://discord.com/channels/{guild_id}/{thread_id}/{thread_id}",
+            game_version="Y8S3 Red Horizon",
+            submitted_at=datetime.now(UTC),
+        )
+        assert second_id == first_id
+        assert await repository.remove_by_author(303) == 1
+    finally:
+        async with database.session() as session:
+            await session.execute(
+                delete(CommunityLoadout).where(CommunityLoadout.guild_id == guild_id)
+            )
         await database.dispose()

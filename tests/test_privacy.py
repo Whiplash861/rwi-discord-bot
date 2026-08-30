@@ -28,6 +28,7 @@ async def test_learning_preference_is_created_and_read() -> None:
     session = AsyncMock()
     session.add = Mock()
     session.get.return_value = None
+    session.execute.return_value = SimpleNamespace(rowcount=0)
     repository = ProfileRepository(FakeDatabase(session))  # type: ignore[arg-type]
 
     await repository.set_learning_opt_out(42, opted_out=True)
@@ -57,6 +58,7 @@ async def test_private_state_reset_preserves_opt_out_and_anonymizes_links() -> N
         SimpleNamespace(rowcount=3),
         SimpleNamespace(rowcount=4),
         SimpleNamespace(rowcount=5),
+        SimpleNamespace(rowcount=6),
     ]
     repository = ProfileRepository(FakeDatabase(session))  # type: ignore[arg-type]
 
@@ -72,6 +74,7 @@ async def test_private_state_reset_preserves_opt_out_and_anonymizes_links() -> N
     assert result.feedback_deleted == 3
     assert result.tickets_anonymized == 4
     assert result.usage_records_anonymized == 5
+    assert result.community_loadouts_deleted == 6
     assert result.learning_opt_out_preserved is True
 
 

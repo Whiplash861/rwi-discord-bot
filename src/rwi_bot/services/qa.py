@@ -11,10 +11,12 @@ from rwi_bot.domain.schemas import (
     AnswerResult,
     AuditRecord,
     ConfidenceLabel,
+    IntentKind,
     SourceCitation,
 )
 from rwi_bot.services.audit import AuditService
 from rwi_bot.services.budget import SpendingClass
+from rwi_bot.services.community import CommunityLoadoutHit, CommunityLoadoutRepository
 from rwi_bot.services.knowledge import (
     CacheRepository,
     KnowledgeRepository,
@@ -27,7 +29,7 @@ from rwi_bot.services.maintenance import MaintenanceManager
 from rwi_bot.services.privacy import ProfileRepository
 
 MAINTENANCE_MESSAGE = (
-    "RWI is in maintenance mode. I'm not accepting questions or starting external checks "
+    "ERIN is in maintenance mode. I'm not accepting questions or starting external checks "
     "until a Technician or Division Commander resumes service."
 )
 
@@ -44,6 +46,8 @@ class QuestionAnsweringService:
         ai: RwiOpenAIClient,
         audit: AuditService,
         web_search_enabled: bool,
+        community_loadouts: CommunityLoadoutRepository | None = None,
+        current_game_version: str = "Y8S3 Red Horizon",
     ) -> None:
         self.maintenance = maintenance
         self.knowledge = knowledge
@@ -53,6 +57,8 @@ class QuestionAnsweringService:
         self.ai = ai
         self.audit = audit
         self.web_search_enabled = web_search_enabled
+        self.community_loadouts = community_loadouts
+        self.current_game_version = current_game_version
         self.log = structlog.get_logger("qa")
 
     async def answer(self, request: AnswerRequest) -> AnswerResult:
@@ -62,6 +68,51 @@ class QuestionAnsweringService:
 
         learning_opt_out = await self.profiles.learning_opted_out(request.user_id)
         interpreted = interpret_locally(request.question)
+        if interpreted.intent is IntentKind.BUILD_ADVICE and self.community_loadouts is not None:
+            try:
+                community_hits = await self.community_loadouts.search(
+                    interpreted.normalized_question,
+                    guild_id=request.guild_id,
+                    game_version=self.current_game_version,
+                )
+            except Exception:
+                self.log.exception("community_loadout_search_failed")
+            else:
+                if community_hits:
+                    await self.audit.record(
+                        AuditRecord(
+                            event_type="answer.community_loadout_match",
+                            actor_id=request.user_id,
+                            target_type="community_loadout",
+                            correlation_id=correlation_id,
+                            details={
+                                "is_dm": request.is_dm,
+                                "game_version": self.current_game_version,
+                                "loadout_ids": [str(hit.loadout.id) for hit in community_hits],
+                                "similarities": [
+                                    round(hit.similarity, 3) for hit in community_hits
+                                ],
+                            },
+                        )
+                    )
+                    return AnswerResult(
+                        text=render_community_loadouts(
+                            community_hits, game_version=self.current_game_version
+                        ),
+                        citations=[
+                            SourceCitation(
+                                title=hit.loadout.title,
+                                url=hit.loadout.source_url,
+                                source_type="community_loadout",
+                                verified_at=hit.loadout.updated_at,
+                                official=False,
+                            )
+                            for hit in community_hits
+                        ],
+                        assumptions=request.assumptions,
+                        confidence=ConfidenceLabel.MEDIUM,
+                        learning_opt_out=learning_opt_out,
+                    )
         assumptions_dict = request.assumptions.model_dump(mode="json")
         signature = question_signature(
             interpreted.normalized_question,
@@ -156,7 +207,7 @@ class QuestionAnsweringService:
             )
             return AnswerResult(
                 text=(
-                    "I couldn't verify that answer from the RWI library right now. "
+                    "I couldn't verify that answer from ERIN's library right now. "
                     f"I opened Technician ticket `{ticket_id}` so it can be researched and added."
                 ),
                 assumptions=request.assumptions,
@@ -276,3 +327,38 @@ def _merge_citations(
             seen.add(key)
             merged.append(citation)
     return merged
+
+
+def render_community_loadouts(hits: list[CommunityLoadoutHit], *, game_version: str) -> str:
+    lines = [
+        f"I found {len(hits)} locally indexed community loadout(s) matching that description "
+        f"for **{game_version}**. These are player submissions, not verified game truth.",
+        "",
+    ]
+    labels = {
+        "community_submitted": "Community Submitted",
+        "technician_verified": "Technician Verified",
+        "rwi_tested": "RWI Tested",
+        "mathematically_validated": "Mathematically Validated",
+    }
+    for index, hit in enumerate(hits, start=1):
+        loadout = hit.loadout
+        title = loadout.title.replace("[", "\\[").replace("]", "\\]")
+        tags = ", ".join(loadout.tags) if loadout.tags else "untagged"
+        excerpt = " ".join(loadout.content.split())
+        if len(excerpt) > 420:
+            excerpt = excerpt[:419].rstrip() + "…"
+        label = labels.get(loadout.verification_status, "Community Submitted")
+        lines.extend(
+            (
+                f"**{index}. [{title}]({loadout.source_url})**",
+                f"Label: **{label}** · Tags: {tags} · Match: {hit.similarity:.0%}",
+                f"> {excerpt}",
+                "",
+            )
+        )
+    lines.append(
+        "I can use one of these as a starting point, while keeping its community status "
+        "separate from source-backed item statistics and legality rules."
+    )
+    return "\n".join(lines)

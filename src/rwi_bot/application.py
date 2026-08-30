@@ -9,6 +9,7 @@ from rwi_bot.db.repositories import AuditRepository, DisciplineRepository, Usage
 from rwi_bot.db.session import Database
 from rwi_bot.services.audit import AuditService
 from rwi_bot.services.budget import BudgetGuard
+from rwi_bot.services.community import CommunityLoadoutRepository
 from rwi_bot.services.knowledge import CacheRepository, KnowledgeRepository, TicketRepository
 from rwi_bot.services.maintenance import MaintenanceManager
 from rwi_bot.services.privacy import ProfileRepository
@@ -28,6 +29,7 @@ class AppServices:
     tickets: TicketRepository
     discipline: DisciplineRepository
     profiles: ProfileRepository
+    community_loadouts: CommunityLoadoutRepository
     ai: RwiOpenAIClient
     qa: QuestionAnsweringService
 
@@ -50,6 +52,7 @@ async def build_services(settings: Settings) -> AppServices:
     tickets = TicketRepository(database)
     discipline = DisciplineRepository(database)
     profiles = ProfileRepository(database)
+    community_loadouts = CommunityLoadoutRepository(database)
     ai = RwiOpenAIClient(
         api_key=settings.openai_api_key.get_secret_value(),
         maintenance=maintenance,
@@ -66,9 +69,11 @@ async def build_services(settings: Settings) -> AppServices:
         cache=cache,
         tickets=tickets,
         profiles=profiles,
+        community_loadouts=community_loadouts,
         ai=ai,
         audit=audit,
         web_search_enabled=settings.web_search_enabled,
+        current_game_version=settings.current_game_version,
     )
     return AppServices(
         settings=settings,
@@ -82,6 +87,7 @@ async def build_services(settings: Settings) -> AppServices:
         tickets=tickets,
         discipline=discipline,
         profiles=profiles,
+        community_loadouts=community_loadouts,
         ai=ai,
         qa=qa,
     )

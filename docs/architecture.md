@@ -1,12 +1,14 @@
 # RWI architecture
 
-RWI is organized around three trust domains that must not be merged:
+ERIN is organized around four trust domains that must not be merged:
 
 1. **Verified knowledge** is server-wide, source-backed, versioned game truth.
-2. **Adaptive answer cache** stores reusable answer text and the exact knowledge
+2. **Community loadouts** are public player submissions indexed locally for retrieval.
+   They are useful examples, not verified claims, and remain visibly labeled as such.
+3. **Adaptive answer cache** stores reusable answer text and the exact knowledge
    revisions, assumptions, citations, model, prompt version, freshness, and feedback
    state that support it.
-3. **Private member state** contains individual preferences, inventory, saved builds,
+4. **Private member state** contains individual preferences, inventory, saved builds,
    and conversation context. Private state is never copied into shared cache entries.
 
 Members control this boundary with `/privacy`. Learning opt-out is checked before each
@@ -15,11 +17,12 @@ create shared cache candidates, submit cache feedback, or attach the requester i
 to new review tickets. It does not prevent the member's current question from being
 processed to answer them.
 
-Private export includes the member's profile, persisted conversation summaries, and
-feedback. Confirmed reset clears those records, anonymizes review-ticket and usage
-associations, and clears in-process conversation memory while preserving the learning
-preference. Security, moderation, and immutable audit records remain retained and are
-identified as such before reset.
+Private export includes the member's profile, persisted conversation summaries,
+feedback, and any indexed Community Builds starter posts they authored. Confirmed reset
+clears those records and indexed copies, anonymizes review-ticket and usage associations,
+and clears in-process conversation memory while preserving the learning preference. It
+does not delete the original Discord forum post. Security, moderation, and immutable
+audit records remain retained and are identified as such before reset.
 
 PostgreSQL is authoritative for versioned application data. Discord is an interaction
 and review surface. The local runtime volume holds the emergency maintenance state so a
@@ -35,14 +38,30 @@ The answer path is:
 
 1. Reject immediately when durable maintenance mode is active.
 2. Normalize aliases and common language locally.
-3. Look for a fresh, dependency-valid shared cache entry.
-4. Search active verified knowledge.
-5. Use deterministic code for values and build legality as coverage is added.
-6. Reserve budget before an external request can start.
-7. Use OpenAI without web search when verified context is sufficient.
-8. Use source-backed web fallback only when local coverage is missing and web search is
+3. For build advice, search the current-version Community Builds index and return a
+   clearly labeled local match with links to the original posts when one is relevant.
+4. Look for a fresh, dependency-valid shared cache entry.
+5. Search active verified knowledge across subject, identity, structured content,
+   context, and game-version text.
+6. Use deterministic code for values and build legality as coverage is added.
+7. Reserve budget before an external request can start.
+8. Use OpenAI without web search when verified context is sufficient.
+9. Use source-backed web fallback only when local coverage is missing and web search is
    enabled.
-9. Open a sanitized Technician ticket when no answer can be verified.
+10. Open a sanitized Technician ticket when no answer can be verified.
+
+The built-in current-season baseline is scoped to `Y8S3 Red Horizon` and uses
+[Ubisoft's official launch notes](https://www.ubisoft.com/en-us/game/the-division/the-division-2/news-updates/4mrYiFPIyKpzpoqshDQk80/the-division-2-red-horizon).
+It is a governed create-only import: it does not overwrite an entry with the same
+subject, claim key, and context. This keeps launch values distinct from earlier PTS
+values and preserves technician-authored revisions.
+
+The Community Builds index accepts only non-bot starter posts in the configured guild's
+public `community-builds` or `community-loadouts` forum. Replies, DMs, other channels,
+and private or unrelated spaces are excluded. Content is sanitized before persistence;
+edits update the index, deletion removes the indexed copy, and startup synchronization
+is bounded to 100 active or archived threads. Learning opt-out removes the author's
+indexed submissions and prevents re-indexing while the preference remains enabled.
 
 The deterministic build core keeps PvE and PvP stat variants explicit, excludes
 conditional buffs unless requested, enforces data-driven activation and uniqueness
@@ -60,8 +79,9 @@ timestamp. Revising or rolling back a record transactionally marks caches that d
 on the former current revision stale. Rollback never rewrites history; it copies the
 selected snapshot into a new current revision.
 
-Technician changes use typed `/rwi knowledge-create`, `/rwi knowledge-revise`, and
-`/rwi knowledge-rollback` controls. Creation requires typed HTTPS source evidence and
+Technician changes use typed `/rwi knowledge-create`, `/rwi knowledge-revise`,
+`/rwi knowledge-rollback`, and `/rwi seed-red-horizon` controls. Creation requires typed
+HTTPS source evidence and
 atomically writes the entry, source links, and immutable initial snapshot. It rejects
 duplicate knowledge identities, conflicting metadata for a known source URL, credential-
 bearing URLs, and active claims without supporting evidence. The bot parses structured

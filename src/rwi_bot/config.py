@@ -34,6 +34,8 @@ class Settings(BaseSettings):
     member_reserve_usd: float = 5.0
     web_search_enabled: bool = True
     official_search_domains: Annotated[tuple[str, ...], NoDecode] = ("ubisoft.com",)
+    current_game_version: str = "Y8S3 Red Horizon"
+    community_loadout_indexing_enabled: bool = True
 
     log_level: str = "INFO"
     runtime_dir: Path = Path("/data/runtime")
@@ -62,6 +64,14 @@ class Settings(BaseSettings):
         if value < 0:
             raise ValueError("budget values cannot be negative")
         return value
+
+    @field_validator("current_game_version")
+    @classmethod
+    def valid_current_game_version(cls, value: str) -> str:
+        clean = " ".join(value.split())
+        if not clean or len(clean) > 80:
+            raise ValueError("current game version must contain 1 to 80 characters")
+        return clean
 
     @field_validator("discord_token", "database_url", "openai_api_key")
     @classmethod

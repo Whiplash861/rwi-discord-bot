@@ -1,9 +1,15 @@
-# RWI Discord Bot
+# ERIN — RWI Discord Bot
 
-The Redwing Initiative bot is a source-backed, conversational Discord assistant for
+ERIN (Enhanced Reconnaissance, Intelligence, and Navigation) is The Redwing Initiative's
+source-backed, conversational Discord assistant for
 Tom Clancy's The Division 2. It combines a versioned community knowledge library,
 deterministic game calculations, Technician governance, and tightly budgeted OpenAI
 Responses API calls.
+
+The current catalog target is **Y8S3 Red Horizon**. ERIN can search structured claim
+content—not only item titles—and can locally reference privacy-sanitized starter posts
+from the server's Community Builds forum before considering an OpenAI request. Community
+loadouts are always labeled as player submissions rather than verified game truth.
 
 This repository is under active private-alpha development.
 

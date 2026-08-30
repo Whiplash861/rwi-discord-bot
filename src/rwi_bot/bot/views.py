@@ -61,7 +61,7 @@ class PlatformButton(discord.ui.Button[discord.ui.View]):
     async def callback(self, interaction: discord.Interaction) -> None:
         if self._halted():
             await interaction.response.send_message(
-                "RWI is in maintenance mode. Platform roles will be available after resume.",
+                "ERIN is in maintenance mode. Platform roles will be available after resume.",
                 ephemeral=True,
             )
             return

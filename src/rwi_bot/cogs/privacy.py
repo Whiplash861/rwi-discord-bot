@@ -15,22 +15,23 @@ from rwi_bot.domain.schemas import AuditRecord
 class PrivacyCog(commands.Cog):
     privacy = app_commands.Group(
         name="privacy",
-        description="Inspect and control your private RWI member data",
+        description="Inspect and control your private ERIN member data",
     )
 
     def __init__(self, bot: RwiBot) -> None:
         self.bot = bot
 
-    @privacy.command(name="status", description="Show your RWI learning preference")
+    @privacy.command(name="status", description="Show your ERIN learning preference")
     async def status(self, interaction: discord.Interaction) -> None:
         if not await self._allowed(interaction):
             return
         opted_out = await self.bot.services.profiles.learning_opted_out(interaction.user.id)
         await interaction.response.send_message(
-            "**RWI privacy status**\n"
+            "**ERIN privacy status**\n"
             f"Shared answer learning: **{'disabled' if opted_out else 'enabled'}**\n\n"
             "Learning opt-out prevents your new answers and feedback from becoming shared "
             "cache material and removes your requester attribution from new review tickets. "
+            "It also prevents ERIN from indexing your Community Builds submissions. "
             "It does not prevent a question you ask from being processed to answer you.",
             ephemeral=True,
         )
@@ -43,7 +44,7 @@ class PrivacyCog(commands.Cog):
     async def learning(self, interaction: discord.Interaction, enabled: bool) -> None:
         if not await self._allowed(interaction):
             return
-        await self.bot.services.profiles.set_learning_opt_out(
+        loadouts_removed = await self.bot.services.profiles.set_learning_opt_out(
             interaction.user.id,
             opted_out=not enabled,
         )
@@ -54,16 +55,25 @@ class PrivacyCog(commands.Cog):
                 target_type="user_profile",
                 target_id="self",
                 reason="Member privacy preference",
-                details={"learning_enabled": enabled},
+                details={
+                    "learning_enabled": enabled,
+                    "community_loadout_index_entries_removed": loadouts_removed,
+                },
             )
+        )
+        removal_note = (
+            f" Removed {loadouts_removed} indexed Community Builds submission(s); the "
+            "original Discord posts were not changed."
+            if loadouts_removed
+            else ""
         )
         await interaction.response.send_message(
             f"Shared answer learning is now **{'enabled' if enabled else 'disabled'}** for "
-            "your future interactions.",
+            f"your future interactions.{removal_note}",
             ephemeral=True,
         )
 
-    @privacy.command(name="export", description="Download a private export of your RWI data")
+    @privacy.command(name="export", description="Download a private export of your ERIN data")
     async def export(self, interaction: discord.Interaction) -> None:
         if not await self._allowed(interaction):
             return
@@ -71,7 +81,7 @@ class PrivacyCog(commands.Cog):
         payload = json.dumps(data, indent=2, sort_keys=True, ensure_ascii=False).encode("utf-8")
         attachment = discord.File(io.BytesIO(payload), filename="rwi-private-data.json")
         await interaction.response.send_message(
-            "Here is your private RWI data export. It intentionally excludes security, "
+            "Here is your private ERIN data export. It intentionally excludes security, "
             "moderation, and immutable operational audit records.",
             file=attachment,
             ephemeral=True,
@@ -87,10 +97,11 @@ class PrivacyCog(commands.Cog):
         view = ConfirmationView(interaction.user.id)
         await interaction.response.send_message(
             "Confirm private-state reset. This clears your saved profile preferences, "
-            "persisted conversation summaries, and feedback; anonymizes your requester ID on "
+            "persisted conversation summaries, feedback, and indexed copies of Community "
+            "Builds submissions; anonymizes your requester ID on "
             "review tickets and cost records; and clears this process's conversation memory. "
             "Your current learning opt-out choice is preserved. Security, moderation, and "
-            "immutable audit records are retained.",
+            "immutable audit records are retained. Original Discord forum posts are unchanged.",
             ephemeral=True,
             view=view,
         )
@@ -102,7 +113,7 @@ class PrivacyCog(commands.Cog):
             return
         if self.bot.services.maintenance.halted:
             await interaction.edit_original_response(
-                content="RWI entered maintenance mode; no private state was changed.",
+                content="ERIN entered maintenance mode; no private state was changed.",
                 view=None,
             )
             return
@@ -123,13 +134,17 @@ class PrivacyCog(commands.Cog):
                     "feedback_deleted": result.feedback_deleted,
                     "review_tickets_anonymized": result.tickets_anonymized,
                     "usage_records_anonymized": result.usage_records_anonymized,
+                    "community_loadouts_deleted": result.community_loadouts_deleted,
                     "in_memory_sessions_cleared": cleared_memory,
                     "learning_opt_out_preserved": result.learning_opt_out_preserved,
                 },
             )
         )
         await interaction.edit_original_response(
-            content="Your private RWI profile, conversation, and feedback state was reset.",
+            content=(
+                "Your private ERIN profile, conversation, feedback, and indexed Community "
+                "Builds state was reset. Original Discord posts were not changed."
+            ),
             view=None,
         )
 
@@ -142,7 +157,7 @@ class PrivacyCog(commands.Cog):
             return False
         if self.bot.services.maintenance.halted:
             await interaction.response.send_message(
-                "RWI privacy controls are temporarily unavailable during maintenance mode.",
+                "ERIN privacy controls are temporarily unavailable during maintenance mode.",
                 ephemeral=True,
             )
             return False

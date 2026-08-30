@@ -7,6 +7,7 @@ from sqlalchemy import delete, select, update
 
 from rwi_bot.db.models import (
     ApiUsage,
+    CommunityLoadout,
     ConversationSession,
     Feedback,
     UnansweredTicket,
@@ -21,6 +22,7 @@ class PrivacyResetResult:
     feedback_deleted: int
     tickets_anonymized: int
     usage_records_anonymized: int
+    community_loadouts_deleted: int
     learning_opt_out_preserved: bool
 
 
@@ -35,7 +37,7 @@ class ProfileRepository:
             )
             return bool(value)
 
-    async def set_learning_opt_out(self, user_id: int, *, opted_out: bool) -> None:
+    async def set_learning_opt_out(self, user_id: int, *, opted_out: bool) -> int:
         async with self.database.session() as session:
             profile = await session.get(UserProfile, user_id, with_for_update=True)
             if profile is None:
@@ -46,6 +48,12 @@ class ProfileRepository:
                 session.add(profile)
             else:
                 profile.learning_opt_out = opted_out
+            if not opted_out:
+                return 0
+            result = await session.execute(
+                delete(CommunityLoadout).where(CommunityLoadout.author_user_id == user_id)
+            )
+            return self._rowcount(result)
 
     async def export_data(self, user_id: int) -> dict[str, Any]:
         async with self.database.session() as session:
@@ -62,6 +70,13 @@ class ProfileRepository:
                     select(Feedback)
                     .where(Feedback.discord_user_id == user_id)
                     .order_by(Feedback.created_at.asc())
+                )
+            )
+            community_loadouts = list(
+                await session.scalars(
+                    select(CommunityLoadout)
+                    .where(CommunityLoadout.author_user_id == user_id)
+                    .order_by(CommunityLoadout.submitted_at.asc())
                 )
             )
         return {
@@ -99,6 +114,19 @@ class ProfileRepository:
                 }
                 for item in feedback
             ],
+            "community_loadouts": [
+                {
+                    "title": item.title,
+                    "content": item.content,
+                    "tags": item.tags,
+                    "source_url": item.source_url,
+                    "game_version": item.game_version,
+                    "verification_status": item.verification_status,
+                    "submitted_at": item.submitted_at.isoformat(),
+                    "updated_at": item.updated_at.isoformat(),
+                }
+                for item in community_loadouts
+            ],
             "retained_categories": [
                 "security and moderation records",
                 "immutable operational audit events",
@@ -128,6 +156,9 @@ class ProfileRepository:
                 .where(ApiUsage.discord_user_id == user_id)
                 .values(discord_user_id=None)
             )
+            loadout_result = await session.execute(
+                delete(CommunityLoadout).where(CommunityLoadout.author_user_id == user_id)
+            )
 
             if profile is not None:
                 profile.detail_tier = "standard"
@@ -142,6 +173,7 @@ class ProfileRepository:
                 feedback_deleted=self._rowcount(feedback_result),
                 tickets_anonymized=self._rowcount(ticket_result),
                 usage_records_anonymized=self._rowcount(usage_result),
+                community_loadouts_deleted=self._rowcount(loadout_result),
                 learning_opt_out_preserved=opted_out,
             )
 

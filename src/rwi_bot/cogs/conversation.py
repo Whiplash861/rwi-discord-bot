@@ -40,7 +40,7 @@ class ConversationCog(commands.Cog):
             member = await self._live_member(message.author.id)
             if member is None:
                 await message.channel.send(
-                    "RWI direct-message access is available only while you are a current "
+                    "ERIN direct-message access is available only while you are a current "
                     "member of The Redwing Initiative server."
                 )
                 return
@@ -126,7 +126,7 @@ class ConversationCog(commands.Cog):
             return None
         parts: list[str] = []
         for turn in turns:
-            parts.append(f"Member: {turn.member}\nRWI: {turn.assistant}")
+            parts.append(f"Member: {turn.member}\nERIN: {turn.assistant}")
         return "\n\n".join(parts)[:6000]
 
     def clear_user_memory(self, user_id: int) -> int:

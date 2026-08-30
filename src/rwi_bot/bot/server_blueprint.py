@@ -89,7 +89,7 @@ CATEGORY_CHANNELS: dict[str, tuple[ChannelSpec, ...]] = {
         ChannelSpec(
             names.ASK_RWI,
             ChannelKind.TEXT,
-            "Ask RWI anything about The Division 2. The bot answers here and in member DMs.",
+            "Ask ERIN anything about The Division 2. The bot answers here and in member DMs.",
             access_roles=(names.AGENT, names.ROGUE_AGENT),
             bot_access=True,
         ),

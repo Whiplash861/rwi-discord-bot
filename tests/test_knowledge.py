@@ -19,6 +19,7 @@ from rwi_bot.services.knowledge import (
     KnowledgeRevisionConflictError,
     TicketRepository,
     TicketStateConflictError,
+    knowledge_search_text,
     normalized_confidence,
     sanitize_for_technicians,
 )
@@ -28,6 +29,22 @@ def test_knowledge_confidence_is_bounded_and_normalized() -> None:
     assert normalized_confidence(0.87654) == Decimal("0.877")
     with pytest.raises(ValueError, match="between 0 and 1"):
         normalized_confidence(1.01)
+
+
+def test_knowledge_search_text_covers_structured_values_and_version() -> None:
+    text = knowledge_search_text(
+        subject="Fafnir",
+        entity_type="exotic_weapon",
+        claim_key="talent",
+        content={"talent": "Dragon's Breath", "burn_chance": 0.4},
+        context={"mode": "pve"},
+        game_version="Y8S3 Red Horizon",
+    )
+
+    assert "fafnir" in text
+    assert "dragon's breath" in text
+    assert "burn_chance" in text
+    assert "y8s3 red horizon" in text
 
 
 class FakeDatabase:
@@ -45,6 +62,9 @@ async def test_revise_snapshots_metadata_and_invalidates_previous_cache_dependen
     previous_revision_id = uuid4()
     entry = SimpleNamespace(
         id=entry_id,
+        subject="Test item",
+        entity_type="test",
+        claim_key="stats",
         content={"value": 1},
         context={"mode": "pve"},
         context_hash="old",
@@ -114,6 +134,9 @@ async def test_rollback_creates_a_new_revision_instead_of_rewriting_history() ->
     current_revision_id = uuid4()
     entry = SimpleNamespace(
         id=entry_id,
+        subject="Test item",
+        entity_type="test",
+        claim_key="stats",
         content={"value": 2},
         context={"mode": "pvp"},
         context_hash="new",

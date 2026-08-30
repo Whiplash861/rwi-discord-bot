@@ -1,5 +1,8 @@
 from __future__ import annotations
 
+BOT_DISPLAY_NAME = "ERIN"
+BOT_EXPANDED_NAME = "Enhanced Reconnaissance, Intelligence, and Navigation"
+
 DIVISION_COMMANDER = "Division Commander"
 DIVISION_COORDINATOR = "Division Coordinator"
 TECHNICIAN = "Technician"
@@ -18,6 +21,7 @@ WELCOME = "welcome"
 GENERAL_CHAT = "general-chat"
 ASK_RWI = "ask-rwi"
 COMMUNITY_BUILDS = "community-builds"
+COMMUNITY_LOADOUT_CHANNELS = (COMMUNITY_BUILDS, "community-loadouts")
 GALLERY = "gallery"
 NSFW_CHAT = "nsfw-chat"
 XBOX_MATCHMAKING = "xbox-matchmaking"

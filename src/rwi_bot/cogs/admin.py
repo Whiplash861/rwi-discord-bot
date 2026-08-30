@@ -10,6 +10,11 @@ from rwi_bot.bot.checks import is_commander, is_maintenance_operator
 from rwi_bot.bot.client import RwiBot
 from rwi_bot.bot.server_blueprint import ServerReconciler
 from rwi_bot.bot.views import ConfirmationView
+from rwi_bot.data.red_horizon import (
+    GAME_VERSION,
+    OFFICIAL_SOURCE_URL,
+    RED_HORIZON_SEEDS,
+)
 from rwi_bot.db.models import CacheState, KnowledgeStatus, TicketStatus
 from rwi_bot.domain.schemas import AuditRecord
 from rwi_bot.services.knowledge import (
@@ -20,6 +25,7 @@ from rwi_bot.services.knowledge import (
     TicketStateConflictError,
     sanitize_for_technicians,
 )
+from rwi_bot.services.seeding import apply_red_horizon_seed, preview_red_horizon_seed
 from rwi_bot.services.technician import (
     KnowledgeAction,
     KnowledgeChangeProposal,
@@ -73,7 +79,7 @@ class AdminCog(commands.Cog):
             )
         )
         await interaction.edit_original_response(
-            content="RWI is halted and displaying **Do Not Disturb — RWI Maintenance Mode**.",
+            content="ERIN is halted and displaying **Do Not Disturb — ERIN Maintenance Mode**.",
             view=None,
         )
 
@@ -87,7 +93,7 @@ class AdminCog(commands.Cog):
         breaker = await self.bot.services.ai.breaker.snapshot()
         status = "HALTED (Do Not Disturb)" if state.halted else "ONLINE"
         await interaction.response.send_message(
-            f"**RWI status:** {status}\n"
+            f"**ERIN status:** {status}\n"
             f"**Reason:** {state.reason or 'None'}\n"
             f"**Changed:** {discord.utils.format_dt(state.changed_at, style='R')}\n"
             f"**State revision:** `{state.revision}`\n"
@@ -118,9 +124,9 @@ class AdminCog(commands.Cog):
             f"{'✅' if check.passed else '❌'} **{check.name}:** {check.detail}" for check in checks
         ]
         if state.halted:
-            heading = "RWI remains halted because one or more critical checks failed."
+            heading = "ERIN remains halted because one or more critical checks failed."
         else:
-            heading = "RWI resumed successfully. Old queued requests were not replayed."
+            heading = "ERIN resumed successfully. Old queued requests were not replayed."
             await self.bot.set_operating_presence()
             await self.bot.services.audit.record(
                 AuditRecord(
@@ -248,7 +254,7 @@ class AdminCog(commands.Cog):
             f"{status}: `{count}`" for status, count in sorted(report.status_counts.items())
         )
         await interaction.response.send_message(
-            "**RWI knowledge integrity report**\n\n"
+            "**ERIN knowledge integrity report**\n\n"
             f"Total entries: `{report.total_entries}`\n"
             f"Statuses: {statuses or 'none'}\n"
             f"Active without linked sources: `{report.active_without_sources}`\n"
@@ -322,6 +328,86 @@ class AdminCog(commands.Cog):
             await interaction.response.send_message(str(exc), ephemeral=True)
             return
         await self._confirm_knowledge_create(interaction, proposal)
+
+    @rwi.command(
+        name="seed-red-horizon",
+        description="Preview and confirm the official Red Horizon knowledge baseline",
+    )
+    async def seed_red_horizon(self, interaction: discord.Interaction) -> None:
+        if not await self._knowledge_change_allowed(interaction):
+            return
+        preview = await preview_red_horizon_seed(self.bot.services.knowledge)
+        if preview.missing == 0:
+            await interaction.response.send_message(
+                f"All `{preview.total}` official `{GAME_VERSION}` baseline entries already "
+                "exist. Nothing was changed.",
+                ephemeral=True,
+            )
+            return
+
+        subjects = ", ".join(seed.subject for seed in RED_HORIZON_SEEDS)
+        view = ConfirmationView(interaction.user.id)
+        await interaction.response.send_message(
+            f"Confirm the official **{GAME_VERSION}** baseline import.\n\n"
+            f"- Source: [Ubisoft launch notes]({OFFICIAL_SOURCE_URL})\n"
+            f"- Baseline entries: `{preview.total}`\n"
+            f"- New entries: `{preview.missing}`\n"
+            f"- Existing entries skipped: `{preview.existing}`\n"
+            "- Policy: create-only; existing identities are never overwritten\n"
+            "- Initial state: active, revision 1, source-backed\n\n"
+            f"**Subjects:** {subjects}"[:1950],
+            ephemeral=True,
+            allowed_mentions=discord.AllowedMentions.none(),
+            view=view,
+        )
+        await view.wait()
+        if view.confirmed is not True:
+            await interaction.edit_original_response(
+                content="Red Horizon baseline import cancelled or confirmation expired.",
+                view=None,
+            )
+            return
+        if self.bot.services.maintenance.halted:
+            await interaction.edit_original_response(
+                content="ERIN entered maintenance mode; no baseline entries were imported.",
+                view=None,
+            )
+            return
+
+        try:
+            result = await apply_red_horizon_seed(
+                self.bot.services.knowledge,
+                actor_id=interaction.user.id,
+            )
+        except (SourceMetadataConflictError, ValueError) as exc:
+            message = str(exc.args[0]) if exc.args else "The baseline import could not finish."
+            await interaction.edit_original_response(
+                content=f"{message} Run the command again to review the remaining entries.",
+                view=None,
+            )
+            return
+        await self.bot.services.audit.record(
+            AuditRecord(
+                event_type="knowledge.red_horizon_seeded",
+                actor_id=interaction.user.id,
+                target_type="knowledge_catalog",
+                target_id=GAME_VERSION,
+                reason="Confirmed official Red Horizon launch baseline import",
+                details={
+                    "source_url": OFFICIAL_SOURCE_URL,
+                    "created_count": len(result.created_entry_ids),
+                    "created_entry_ids": [str(entry_id) for entry_id in result.created_entry_ids],
+                    "skipped_existing": result.skipped_existing,
+                },
+            )
+        )
+        await interaction.edit_original_response(
+            content=(
+                f"Imported `{len(result.created_entry_ids)}` official `{GAME_VERSION}` "
+                f"entries; skipped `{result.skipped_existing}` identities that already existed."
+            ),
+            view=None,
+        )
 
     @rwi.command(
         name="knowledge-revise",
@@ -569,7 +655,7 @@ class AdminCog(commands.Cog):
             return
         if self.bot.services.maintenance.halted:
             await interaction.edit_original_response(
-                content="RWI entered maintenance mode; the review ticket was not changed.",
+                content="ERIN entered maintenance mode; the review ticket was not changed.",
                 view=None,
             )
             return
@@ -698,7 +784,7 @@ class AdminCog(commands.Cog):
             return
         if self.bot.services.maintenance.halted:
             await interaction.edit_original_response(
-                content="RWI entered maintenance mode; the cache state was not changed.",
+                content="ERIN entered maintenance mode; the cache state was not changed.",
                 view=None,
             )
             return
@@ -751,7 +837,7 @@ class AdminCog(commands.Cog):
             return
         if self.bot.services.maintenance.halted:
             await interaction.edit_original_response(
-                content="RWI entered maintenance mode; the knowledge entry was not created.",
+                content="ERIN entered maintenance mode; the knowledge entry was not created.",
                 view=None,
             )
             return
@@ -828,7 +914,7 @@ class AdminCog(commands.Cog):
             return
         if self.bot.services.maintenance.halted:
             await interaction.edit_original_response(
-                content="RWI entered maintenance mode; the knowledge change was not applied.",
+                content="ERIN entered maintenance mode; the knowledge change was not applied.",
                 view=None,
             )
             return
@@ -899,7 +985,7 @@ class AdminCog(commands.Cog):
             return False
         if self.bot.services.maintenance.halted:
             await interaction.response.send_message(
-                "Knowledge changes are disabled while RWI is in maintenance mode.",
+                "Knowledge changes are disabled while ERIN is in maintenance mode.",
                 ephemeral=True,
             )
             return False

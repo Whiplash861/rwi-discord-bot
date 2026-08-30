@@ -39,6 +39,7 @@ class RwiBot(commands.Bot):
 
     async def setup_hook(self) -> None:
         from rwi_bot.cogs.admin import AdminCog
+        from rwi_bot.cogs.community import CommunityLoadoutsCog
         from rwi_bot.cogs.conversation import ConversationCog
         from rwi_bot.cogs.moderation import ModerationCog
         from rwi_bot.cogs.onboarding import OnboardingCog
@@ -53,6 +54,7 @@ class RwiBot(commands.Bot):
         await self.add_cog(AdminCog(self))
         await self.add_cog(OnboardingCog(self))
         await self.add_cog(ModerationCog(self))
+        await self.add_cog(CommunityLoadoutsCog(self))
         await self.add_cog(ConversationCog(self))
         await self.add_cog(PrivacyCog(self))
 
@@ -66,6 +68,7 @@ class RwiBot(commands.Bot):
         if guild is None:
             self.log.error("target_guild_missing", guild_id=self.services.settings.discord_guild_id)
             return
+        await self.ensure_server_identity(guild)
         await self.set_operating_presence()
         if self.services.settings.auto_bootstrap_server and not self._auto_bootstrap_complete:
             try:
@@ -107,12 +110,29 @@ class RwiBot(commands.Bot):
         onboarding = self.get_cog("OnboardingCog")
         if onboarding is not None:
             await onboarding.ensure_platform_panel()  # type: ignore[attr-defined]
+        community = self.get_cog("CommunityLoadoutsCog")
+        if community is not None:
+            community.schedule_sync()  # type: ignore[attr-defined]
+
+    async def ensure_server_identity(self, guild: discord.Guild) -> None:
+        member = guild.me
+        if member is None or member.display_name == names.BOT_DISPLAY_NAME:
+            return
+        try:
+            await member.edit(
+                nick=names.BOT_DISPLAY_NAME,
+                reason=f"Use the canonical {names.BOT_EXPANDED_NAME} server identity",
+            )
+        except (discord.Forbidden, discord.HTTPException) as exc:
+            self.log.warning("server_identity_update_failed", error_type=type(exc).__name__)
+        else:
+            self.log.info("server_identity_updated", display_name=names.BOT_DISPLAY_NAME)
 
     async def set_operating_presence(self) -> None:
         if self.services.maintenance.halted:
             await self.change_presence(
                 status=discord.Status.dnd,
-                activity=discord.Game(name="RWI Maintenance Mode"),
+                activity=discord.Game(name="ERIN Maintenance Mode"),
             )
         else:
             await self.change_presence(
