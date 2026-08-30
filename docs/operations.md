@@ -117,6 +117,23 @@ user-bound confirmation. Quarantine takes effect immediately, is conflict-safe a
 audited, and does not change any knowledge entry. Cache writes are disabled during
 maintenance mode.
 
+## Member privacy controls
+
+Members use `/privacy status` to inspect whether future interactions may contribute to
+shared answer learning and `/privacy learning` to change that reversible preference.
+Opted-out interactions may use existing cache entries but do not create shared cache
+candidates, expose feedback controls, or attach the requester identity to new review
+tickets. Questions still have to be processed—including by the configured external
+provider when required—to answer the member.
+
+`/privacy export` privately attaches a JSON export of the member profile, persisted
+conversation summaries, and feedback. `/privacy reset` requires user-bound confirmation,
+then resets profile preferences, deletes persisted conversation and feedback state,
+anonymizes review-ticket and API-usage associations, and clears in-process conversation
+memory. The learning preference is preserved. Security, moderation, and immutable audit
+records are retained for integrity and are disclosed in both the confirmation and export.
+Privacy controls fail closed during emergency maintenance mode with no data change.
+
 ## Backup
 
 Database backups must be written outside the container and runtime volume. Create the

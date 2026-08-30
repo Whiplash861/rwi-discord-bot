@@ -60,6 +60,7 @@ class AnswerResult(BaseModel):
     cache_hit: bool = False
     used_web_search: bool = False
     ticket_id: UUID | None = None
+    learning_opt_out: bool = False
     generated_at: datetime = Field(default_factory=lambda: datetime.now(UTC))
 
 

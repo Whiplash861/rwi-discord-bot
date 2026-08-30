@@ -42,6 +42,7 @@ class RwiBot(commands.Bot):
         from rwi_bot.cogs.conversation import ConversationCog
         from rwi_bot.cogs.moderation import ModerationCog
         from rwi_bot.cogs.onboarding import OnboardingCog
+        from rwi_bot.cogs.privacy import PrivacyCog
 
         self.add_view(
             PlatformRoleView(
@@ -53,6 +54,7 @@ class RwiBot(commands.Bot):
         await self.add_cog(OnboardingCog(self))
         await self.add_cog(ModerationCog(self))
         await self.add_cog(ConversationCog(self))
+        await self.add_cog(PrivacyCog(self))
 
         if self.services.settings.sync_commands:
             guild = discord.Object(id=self.services.settings.discord_guild_id)

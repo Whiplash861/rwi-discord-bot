@@ -129,6 +129,12 @@ class ConversationCog(commands.Cog):
             parts.append(f"Member: {turn.member}\nRWI: {turn.assistant}")
         return "\n\n".join(parts)[:6000]
 
+    def clear_user_memory(self, user_id: int) -> int:
+        keys = [key for key in self._memory if key[0] == user_id]
+        for key in keys:
+            del self._memory[key]
+        return len(keys)
+
     async def _send_answer(
         self,
         destination: discord.abc.Messageable,
@@ -155,7 +161,7 @@ class ConversationCog(commands.Cog):
         chunks = split_discord_message(body)
 
         view: FeedbackView | None = None
-        if result.cache_entry_id is not None:
+        if result.cache_entry_id is not None and not result.learning_opt_out:
             cache_id = result.cache_entry_id
 
             async def helpful() -> None:

@@ -11,6 +11,7 @@ from rwi_bot.services.audit import AuditService
 from rwi_bot.services.budget import BudgetGuard
 from rwi_bot.services.knowledge import CacheRepository, KnowledgeRepository, TicketRepository
 from rwi_bot.services.maintenance import MaintenanceManager
+from rwi_bot.services.privacy import ProfileRepository
 from rwi_bot.services.qa import QuestionAnsweringService
 
 
@@ -26,6 +27,7 @@ class AppServices:
     cache: CacheRepository
     tickets: TicketRepository
     discipline: DisciplineRepository
+    profiles: ProfileRepository
     ai: RwiOpenAIClient
     qa: QuestionAnsweringService
 
@@ -47,6 +49,7 @@ async def build_services(settings: Settings) -> AppServices:
     cache = CacheRepository(database)
     tickets = TicketRepository(database)
     discipline = DisciplineRepository(database)
+    profiles = ProfileRepository(database)
     ai = RwiOpenAIClient(
         api_key=settings.openai_api_key.get_secret_value(),
         maintenance=maintenance,
@@ -62,6 +65,7 @@ async def build_services(settings: Settings) -> AppServices:
         knowledge=knowledge,
         cache=cache,
         tickets=tickets,
+        profiles=profiles,
         ai=ai,
         audit=audit,
         web_search_enabled=settings.web_search_enabled,
@@ -77,6 +81,7 @@ async def build_services(settings: Settings) -> AppServices:
         cache=cache,
         tickets=tickets,
         discipline=discipline,
+        profiles=profiles,
         ai=ai,
         qa=qa,
     )

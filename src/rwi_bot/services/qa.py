@@ -24,6 +24,7 @@ from rwi_bot.services.knowledge import (
 )
 from rwi_bot.services.language import interpret_locally, question_signature
 from rwi_bot.services.maintenance import MaintenanceManager
+from rwi_bot.services.privacy import ProfileRepository
 
 MAINTENANCE_MESSAGE = (
     "RWI is in maintenance mode. I'm not accepting questions or starting external checks "
@@ -39,6 +40,7 @@ class QuestionAnsweringService:
         knowledge: KnowledgeRepository,
         cache: CacheRepository,
         tickets: TicketRepository,
+        profiles: ProfileRepository,
         ai: RwiOpenAIClient,
         audit: AuditService,
         web_search_enabled: bool,
@@ -47,6 +49,7 @@ class QuestionAnsweringService:
         self.knowledge = knowledge
         self.cache = cache
         self.tickets = tickets
+        self.profiles = profiles
         self.ai = ai
         self.audit = audit
         self.web_search_enabled = web_search_enabled
@@ -57,6 +60,7 @@ class QuestionAnsweringService:
         if self.maintenance.halted:
             return AnswerResult(text=MAINTENANCE_MESSAGE, confidence=ConfidenceLabel.UNKNOWN)
 
+        learning_opt_out = await self.profiles.learning_opted_out(request.user_id)
         interpreted = interpret_locally(request.question)
         assumptions_dict = request.assumptions.model_dump(mode="json")
         signature = question_signature(
@@ -73,7 +77,11 @@ class QuestionAnsweringService:
                     target_type="answer_cache",
                     target_id=str(cached.id),
                     correlation_id=correlation_id,
-                    details={"is_dm": request.is_dm, "tier": request.tier.value},
+                    details={
+                        "is_dm": request.is_dm,
+                        "tier": request.tier.value,
+                        "learning_opt_out": learning_opt_out,
+                    },
                 )
             )
             return AnswerResult(
@@ -83,6 +91,7 @@ class QuestionAnsweringService:
                 confidence=ConfidenceLabel.VERIFIED,
                 cache_entry_id=cached.id,
                 cache_hit=True,
+                learning_opt_out=learning_opt_out,
             )
 
         hits = await self.knowledge.search(interpreted.normalized_question)
@@ -138,7 +147,13 @@ class QuestionAnsweringService:
             else:
                 raise OpenAIUnavailableError("Web fallback is disabled and no knowledge matched.")
         except OpenAIUnavailableError as exc:
-            ticket_id = await self._open_ticket(request, signature, correlation_id, str(exc))
+            ticket_id = await self._open_ticket(
+                request,
+                signature,
+                correlation_id,
+                str(exc),
+                learning_opt_out=learning_opt_out,
+            )
             return AnswerResult(
                 text=(
                     "I couldn't verify that answer from the RWI library right now. "
@@ -147,11 +162,16 @@ class QuestionAnsweringService:
                 assumptions=request.assumptions,
                 confidence=ConfidenceLabel.UNKNOWN,
                 ticket_id=ticket_id,
+                learning_opt_out=learning_opt_out,
             )
 
         if not generated.text.strip():
             ticket_id = await self._open_ticket(
-                request, signature, correlation_id, "The response contained no usable answer."
+                request,
+                signature,
+                correlation_id,
+                "The response contained no usable answer.",
+                learning_opt_out=learning_opt_out,
             )
             return AnswerResult(
                 text=(
@@ -161,27 +181,30 @@ class QuestionAnsweringService:
                 assumptions=request.assumptions,
                 confidence=ConfidenceLabel.UNKNOWN,
                 ticket_id=ticket_id,
+                learning_opt_out=learning_opt_out,
             )
 
-        cache_entry_id = await self.cache.create_candidate(
-            signature=signature,
-            normalized_intent=interpreted.intent.value,
-            entities=interpreted.entities,
-            constraints=interpreted.constraints,
-            assumptions=assumptions_dict,
-            answer_text=generated.text,
-            tier=request.tier,
-            dependency_revision_ids=revision_ids,
-            citations=citations,
-            model_name=self.ai._select_model(complexity),
-            prompt_version=SYSTEM_PROMPT_VERSION,
-        )
+        cache_entry_id = None
+        if not learning_opt_out:
+            cache_entry_id = await self.cache.create_candidate(
+                signature=signature,
+                normalized_intent=interpreted.intent.value,
+                entities=interpreted.entities,
+                constraints=interpreted.constraints,
+                assumptions=assumptions_dict,
+                answer_text=generated.text,
+                tier=request.tier,
+                dependency_revision_ids=revision_ids,
+                citations=citations,
+                model_name=self.ai._select_model(complexity),
+                prompt_version=SYSTEM_PROMPT_VERSION,
+            )
         await self.audit.record(
             AuditRecord(
                 event_type="answer.completed",
                 actor_id=request.user_id,
-                target_type="answer_cache",
-                target_id=str(cache_entry_id),
+                target_type="answer_cache" if cache_entry_id is not None else "answer",
+                target_id=str(cache_entry_id) if cache_entry_id is not None else None,
                 correlation_id=correlation_id,
                 details={
                     "cache_hit": False,
@@ -189,6 +212,7 @@ class QuestionAnsweringService:
                     "citation_count": len(citations),
                     "knowledge_revision_count": len(revision_ids),
                     "is_dm": request.is_dm,
+                    "learning_opt_out": learning_opt_out,
                 },
             )
         )
@@ -200,6 +224,7 @@ class QuestionAnsweringService:
             knowledge_revision_ids=revision_ids,
             cache_entry_id=cache_entry_id,
             used_web_search=used_web,
+            learning_opt_out=learning_opt_out,
         )
 
     async def _open_ticket(
@@ -208,11 +233,13 @@ class QuestionAnsweringService:
         signature: str,
         correlation_id: UUID,
         reason: str,
+        *,
+        learning_opt_out: bool,
     ) -> UUID:
         ticket_id = await self.tickets.open_or_increment(
             signature=signature,
             sanitized_question=sanitize_for_technicians(request.question),
-            requester_user_id=request.user_id,
+            requester_user_id=None if learning_opt_out else request.user_id,
         )
         self.log.info(
             "unanswered_ticket",
@@ -228,7 +255,7 @@ class QuestionAnsweringService:
                 target_id=str(ticket_id),
                 correlation_id=correlation_id,
                 reason=reason,
-                details={"is_dm": request.is_dm},
+                details={"is_dm": request.is_dm, "learning_opt_out": learning_opt_out},
             )
         )
         return ticket_id

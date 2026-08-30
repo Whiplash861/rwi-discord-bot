@@ -17,6 +17,7 @@ This repository is under active private-alpha development.
 - `/rwi halt` enters durable Do Not Disturb maintenance mode and blocks new paid calls.
 - Normal answers are limited to DMs from current RWI members and `#ask-rwi`.
 - Raw DMs, secrets, and unnecessary personal information are excluded from audit logs.
+- Members can opt out of shared answer learning and privately export or reset profile data.
 
 ## Local quick start
 

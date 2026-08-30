@@ -9,6 +9,18 @@ RWI is organized around three trust domains that must not be merged:
 3. **Private member state** contains individual preferences, inventory, saved builds,
    and conversation context. Private state is never copied into shared cache entries.
 
+Members control this boundary with `/privacy`. Learning opt-out is checked before each
+answer: opted-out interactions can consume existing verified/shared answers but cannot
+create shared cache candidates, submit cache feedback, or attach the requester identity
+to new review tickets. It does not prevent the member's current question from being
+processed to answer them.
+
+Private export includes the member's profile, persisted conversation summaries, and
+feedback. Confirmed reset clears those records, anonymizes review-ticket and usage
+associations, and clears in-process conversation memory while preserving the learning
+preference. Security, moderation, and immutable audit records remain retained and are
+identified as such before reset.
+
 PostgreSQL is authoritative for versioned application data. Discord is an interaction
 and review surface. The local runtime volume holds the emergency maintenance state so a
 database outage cannot silently reactivate paid or automated work.
