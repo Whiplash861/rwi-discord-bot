@@ -110,6 +110,10 @@ class KnowledgeRevision(UUIDPrimaryKeyMixin, Base):
     content: Mapped[dict[str, Any]] = mapped_column(JSONB, nullable=False)
     context: Mapped[dict[str, Any]] = mapped_column(JSONB, nullable=False)
     status: Mapped[str] = mapped_column(String(30), nullable=False)
+    game_version: Mapped[str | None] = mapped_column(String(80))
+    confidence: Mapped[Decimal] = mapped_column(
+        Numeric(4, 3), default=Decimal("0.500"), nullable=False
+    )
     source_snapshot: Mapped[list[dict[str, Any]]] = mapped_column(JSONB, default=list)
     actor_id: Mapped[int | None] = mapped_column(BigInteger)
     reason: Mapped[str] = mapped_column(Text, nullable=False)

@@ -43,6 +43,7 @@ packages = ["src/rwi_bot"]
 addopts = "-ra --strict-markers --strict-config"
 asyncio_mode = "auto"
 testpaths = ["tests"]
+markers = ["integration: requires an explicitly enabled disposable database test run"]
 
 [tool.ruff]
 line-length = 100

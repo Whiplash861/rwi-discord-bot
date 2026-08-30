@@ -35,6 +35,12 @@ The answer path is:
 An answer produced from the web remains externally sourced. It is not promoted to
 verified knowledge automatically.
 
+Every knowledge change creates an immutable revision snapshot containing its content,
+context, status, game version, confidence, actor, reason, and timestamp. Revising or
+rolling back a record transactionally marks caches that depend on the former current
+revision stale. Rollback never rewrites history; it copies the selected snapshot into a
+new current revision.
+
 ## Emergency boundary
 
 `MaintenanceManager` serializes a durable JSON state file using atomic replacement. A

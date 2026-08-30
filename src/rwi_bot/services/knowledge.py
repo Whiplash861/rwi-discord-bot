@@ -10,6 +10,7 @@ from typing import Any, cast
 from uuid import UUID, uuid4
 
 from sqlalchemy import desc, func, select, update
+from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
 from rwi_bot.db.models import (
@@ -36,6 +37,13 @@ class KnowledgeHit:
 def stable_context_hash(context: dict[str, Any]) -> str:
     payload = json.dumps(context, sort_keys=True, separators=(",", ":"), default=str)
     return hashlib.sha256(payload.encode()).hexdigest()
+
+
+def normalized_confidence(value: float | Decimal) -> Decimal:
+    confidence = Decimal(str(value)).quantize(Decimal("0.001"))
+    if not Decimal("0") <= confidence <= Decimal("1"):
+        raise ValueError("Knowledge confidence must be between 0 and 1.")
+    return confidence
 
 
 class KnowledgeRepository:
@@ -99,7 +107,7 @@ class KnowledgeRepository:
             context=context,
             context_hash=stable_context_hash(context),
             status=status.value,
-            confidence=Decimal(str(round(confidence, 3))),
+            confidence=normalized_confidence(confidence),
             game_version=game_version,
             verified_at=now if status == KnowledgeStatus.ACTIVE else None,
             created_by=actor_id,
@@ -114,6 +122,8 @@ class KnowledgeRepository:
             content=content,
             context=context,
             status=status.value,
+            game_version=game_version,
+            confidence=entry.confidence,
             source_snapshot=[],
             actor_id=actor_id,
             reason=reason,
@@ -133,35 +143,123 @@ class KnowledgeRepository:
         status: KnowledgeStatus,
         reason: str,
         game_version: str | None,
+        confidence: float | None = None,
     ) -> UUID:
         now = datetime.now(UTC)
         async with self.database.session() as session:
             entry = await session.get(KnowledgeEntry, entry_id, with_for_update=True)
             if entry is None:
                 raise KeyError(f"Knowledge entry {entry_id} does not exist.")
-            next_revision = entry.current_revision + 1
-            revision = KnowledgeRevision(
-                entry_id=entry.id,
-                revision_number=next_revision,
+            next_confidence = (
+                entry.confidence if confidence is None else normalized_confidence(confidence)
+            )
+            return await self._commit_revision(
+                session,
+                entry=entry,
+                actor_id=actor_id,
                 content=content,
                 context=context,
-                status=status.value,
-                source_snapshot=[],
-                actor_id=actor_id,
+                status=status,
                 reason=reason,
-                created_at=now,
+                game_version=game_version,
+                confidence=next_confidence,
+                now=now,
             )
-            entry.content = content
-            entry.context = context
-            entry.context_hash = stable_context_hash(context)
-            entry.status = status.value
-            entry.game_version = game_version
-            entry.current_revision = next_revision
-            entry.verified_at = now if status == KnowledgeStatus.ACTIVE else entry.verified_at
-            entry.updated_at = now
-            session.add(revision)
-            await session.flush()
-            return revision.id
+
+    async def rollback(
+        self,
+        *,
+        entry_id: UUID,
+        target_revision_number: int,
+        actor_id: int,
+        reason: str,
+    ) -> UUID:
+        if target_revision_number < 1:
+            raise ValueError("target_revision_number must be positive")
+        reason = reason.strip()
+        if not reason:
+            raise ValueError("A rollback reason is required.")
+
+        now = datetime.now(UTC)
+        async with self.database.session() as session:
+            entry = await session.get(KnowledgeEntry, entry_id, with_for_update=True)
+            if entry is None:
+                raise KeyError(f"Knowledge entry {entry_id} does not exist.")
+            target = await session.scalar(
+                select(KnowledgeRevision)
+                .where(KnowledgeRevision.entry_id == entry_id)
+                .where(KnowledgeRevision.revision_number == target_revision_number)
+            )
+            if target is None:
+                raise KeyError(
+                    f"Knowledge entry {entry_id} has no revision {target_revision_number}."
+                )
+            if target_revision_number == entry.current_revision:
+                raise ValueError("The requested revision is already current.")
+            return await self._commit_revision(
+                session,
+                entry=entry,
+                actor_id=actor_id,
+                content=target.content,
+                context=target.context,
+                status=KnowledgeStatus(target.status),
+                reason=f"Rollback to revision {target_revision_number}: {reason[:900]}",
+                game_version=target.game_version,
+                confidence=target.confidence,
+                now=now,
+            )
+
+    @staticmethod
+    async def _commit_revision(
+        session: AsyncSession,
+        *,
+        entry: KnowledgeEntry,
+        actor_id: int,
+        content: dict[str, Any],
+        context: dict[str, Any],
+        status: KnowledgeStatus,
+        reason: str,
+        game_version: str | None,
+        confidence: Decimal,
+        now: datetime,
+    ) -> UUID:
+        current_revision_id = await session.scalar(
+            select(KnowledgeRevision.id)
+            .where(KnowledgeRevision.entry_id == entry.id)
+            .where(KnowledgeRevision.revision_number == entry.current_revision)
+        )
+        if current_revision_id is None:
+            raise RuntimeError(
+                f"Knowledge entry {entry.id} is missing current revision {entry.current_revision}."
+            )
+
+        next_revision = entry.current_revision + 1
+        revision = KnowledgeRevision(
+            entry_id=entry.id,
+            revision_number=next_revision,
+            content=content,
+            context=context,
+            status=status.value,
+            game_version=game_version,
+            confidence=confidence,
+            source_snapshot=[],
+            actor_id=actor_id,
+            reason=reason[:1000],
+            created_at=now,
+        )
+        entry.content = content
+        entry.context = context
+        entry.context_hash = stable_context_hash(context)
+        entry.status = status.value
+        entry.game_version = game_version
+        entry.confidence = confidence
+        entry.current_revision = next_revision
+        entry.verified_at = now if status == KnowledgeStatus.ACTIVE else entry.verified_at
+        entry.updated_at = now
+        session.add(revision)
+        await session.flush()
+        await _invalidate_cache_dependencies(session, current_revision_id)
+        return revision.id
 
 
 class CacheRepository:
@@ -213,6 +311,8 @@ class CacheRepository:
         prompt_version: str,
         ttl: timedelta = timedelta(days=7),
     ) -> UUID:
+        if len(set(dependency_revision_ids)) != len(dependency_revision_ids):
+            raise ValueError("Cache dependencies must not contain duplicate revisions.")
         cache = AnswerCache(
             question_signature=signature,
             normalized_intent=normalized_intent,
@@ -229,6 +329,21 @@ class CacheRepository:
             expires_at=datetime.now(UTC) + ttl,
         )
         async with self.database.session() as session:
+            if dependency_revision_ids:
+                current_dependencies = set(
+                    await session.scalars(
+                        select(KnowledgeRevision.id)
+                        .join(KnowledgeEntry, KnowledgeEntry.id == KnowledgeRevision.entry_id)
+                        .where(KnowledgeRevision.id.in_(dependency_revision_ids))
+                        .where(KnowledgeRevision.revision_number == KnowledgeEntry.current_revision)
+                        .where(KnowledgeEntry.status == KnowledgeStatus.ACTIVE.value)
+                        .with_for_update(read=True, of=KnowledgeEntry)
+                    )
+                )
+                if current_dependencies != set(dependency_revision_ids):
+                    raise ValueError(
+                        "Cache dependencies must be current revisions of active knowledge."
+                    )
             session.add(cache)
             await session.flush()
             return cache.id
@@ -249,15 +364,19 @@ class CacheRepository:
             return CacheState(cache.state)
 
     async def invalidate_revision(self, revision_id: UUID) -> int:
-        statement = (
-            update(AnswerCache)
-            .where(AnswerCache.dependency_revision_ids.contains([str(revision_id)]))
-            .where(AnswerCache.state.in_([CacheState.ACTIVE.value, CacheState.CANDIDATE.value]))
-            .values(state=CacheState.STALE.value)
-        )
         async with self.database.session() as session:
-            result = await session.execute(statement)
-            return int(cast(Any, result).rowcount or 0)
+            return await _invalidate_cache_dependencies(session, revision_id)
+
+
+async def _invalidate_cache_dependencies(session: AsyncSession, revision_id: UUID) -> int:
+    statement = (
+        update(AnswerCache)
+        .where(AnswerCache.dependency_revision_ids.contains([str(revision_id)]))
+        .where(AnswerCache.state.in_([CacheState.ACTIVE.value, CacheState.CANDIDATE.value]))
+        .values(state=CacheState.STALE.value)
+    )
+    result = await session.execute(statement)
+    return int(cast(Any, result).rowcount or 0)
 
 
 class TicketRepository:
