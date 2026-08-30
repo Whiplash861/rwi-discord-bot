@@ -2,15 +2,22 @@ from __future__ import annotations
 
 import os
 from datetime import timedelta
+from decimal import Decimal
 from uuid import uuid4
 
 import pytest
 from sqlalchemy import delete
 
-from rwi_bot.db.models import AnswerCache, CacheState, KnowledgeEntry, KnowledgeStatus
+from rwi_bot.db.models import (
+    AnswerCache,
+    CacheState,
+    KnowledgeEntry,
+    KnowledgeStatus,
+    SourceType,
+)
 from rwi_bot.db.session import Database
 from rwi_bot.domain.schemas import AnswerTier
-from rwi_bot.services.knowledge import CacheRepository, KnowledgeRepository
+from rwi_bot.services.knowledge import CacheRepository, KnowledgeRepository, SourceEvidence
 
 
 @pytest.mark.integration
@@ -37,10 +44,24 @@ async def test_revision_invalidation_and_rollback_are_transactional() -> None:
             game_version="1.0-test",
             confidence=0.8,
             status=KnowledgeStatus.ACTIVE,
+            sources=(
+                SourceEvidence(
+                    url=f"https://example.test/integration/{test_suffix}",
+                    title="Integration evidence",
+                    source_type=SourceType.REPRODUCIBLE_TEST,
+                    trust_score=Decimal("0.900"),
+                    publisher="RWI tests",
+                    content_hash="a" * 64,
+                    note="Disposable transaction test",
+                ),
+            ),
         )
         entry = await knowledge.get(entry_id)
         assert entry is not None
         revision_one = next(item for item in entry.revisions if item.revision_number == 1)
+        assert len(entry.sources) == 1
+        assert revision_one.source_snapshot[0]["url"].endswith(test_suffix)
+        assert revision_one.source_snapshot[0]["supports_claim"] is True
         cache_id = await cache.create_candidate(
             signature=test_suffix,
             normalized_intent="integration revision",

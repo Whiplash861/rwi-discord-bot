@@ -60,12 +60,16 @@ timestamp. Revising or rolling back a record transactionally marks caches that d
 on the former current revision stale. Rollback never rewrites history; it copies the
 selected snapshot into a new current revision.
 
-Technician changes use typed `/rwi knowledge-revise` and `/rwi knowledge-rollback`
-controls. The bot parses structured JSON locally, checks the exact authorized staff
-roles, displays a deterministic field-level diff, and binds confirmation to the user
-who opened it. The proposal records its expected current revision; a concurrent change
-causes a conflict instead of silently overwriting newer knowledge. Confirmed changes
-take effect immediately and write a separate audit event containing the diff.
+Technician changes use typed `/rwi knowledge-create`, `/rwi knowledge-revise`, and
+`/rwi knowledge-rollback` controls. Creation requires typed HTTPS source evidence and
+atomically writes the entry, source links, and immutable initial snapshot. It rejects
+duplicate knowledge identities, conflicting metadata for a known source URL, credential-
+bearing URLs, and active claims without supporting evidence. The bot parses structured
+JSON locally, checks the exact authorized staff roles, displays a deterministic proposal
+or field-level diff, and binds confirmation to the user who opened it. A revision proposal
+records its expected current revision; a concurrent change causes a conflict instead of
+silently overwriting newer knowledge. Confirmed changes take effect immediately and write
+a separate audit event containing the source summary or diff.
 
 Unanswered questions and member-reported incorrect answers enter one deduplicated
 Technician review queue. Before persistence, the queue text redacts Discord identifiers,

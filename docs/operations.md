@@ -84,7 +84,24 @@ halt file is active; the restarted bot will correctly remain halted.
 ## Technician knowledge changes
 
 Exact Technicians, Division Commanders, and the configured owner can inspect an entry
-with `/rwi knowledge-history`. Use `/rwi knowledge-revise` with the entry UUID, a full
+with `/rwi knowledge-history`. Create the first source-backed revision with
+`/rwi knowledge-create`. It requires a subject, stable `entity_type` and `claim_key`,
+object-valued content and context JSON, a reason, and a JSON array of one to eight source
+objects. Each source object requires `url`, `title`, `source_type`, and `trust_score`;
+optional fields are `publisher`, `content_hash`, `supports_claim`, and `note`. URLs must
+use HTTPS, cannot contain credentials or recognizable secret query parameters, and must
+be unique in the proposal. Valid source types are `official`, `reproducible_test`,
+`technician`, `community`, and `unverified`. An active entry must have at least one
+supporting source.
+
+The creation proposal privately shows the complete identity, status, content/context,
+and source evidence. Confirmation atomically creates the entry, source links, and
+immutable revision-1 source snapshot. A duplicate subject/claim/context identity or a
+conflicting description of an already-known source URL is rejected instead of silently
+overwriting data. Source URLs containing access tokens or other credentials must never
+be submitted.
+
+Use `/rwi knowledge-revise` with the entry UUID, a full
 replacement `content_json` object, and a reason. Optional `context_json`, status, game
 version, and confidence fields replace their current values; omitted fields are
 preserved. Use `clear_game_version:true` to remove version scope explicitly.

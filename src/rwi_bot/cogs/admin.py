@@ -14,16 +14,22 @@ from rwi_bot.db.models import CacheState, KnowledgeStatus, TicketStatus
 from rwi_bot.domain.schemas import AuditRecord
 from rwi_bot.services.knowledge import (
     CacheStateConflictError,
+    KnowledgeIdentityConflictError,
     KnowledgeRevisionConflictError,
+    SourceMetadataConflictError,
     TicketStateConflictError,
     sanitize_for_technicians,
 )
 from rwi_bot.services.technician import (
     KnowledgeAction,
     KnowledgeChangeProposal,
+    KnowledgeCreateProposal,
     parse_json_object,
+    parse_source_evidence,
+    propose_create,
     propose_revision,
     propose_rollback,
+    render_create_proposal,
     render_proposal,
 )
 
@@ -256,6 +262,66 @@ class AdminCog(commands.Cog):
             f"Quarantined answer caches: `{report.quarantined_caches}`",
             ephemeral=True,
         )
+
+    @rwi.command(
+        name="knowledge-create",
+        description="Propose and confirm a source-backed knowledge entry",
+    )
+    @app_commands.describe(
+        subject="Human-readable item, system, activity, or topic name",
+        entity_type="Stable type such as gear, weapon, talent, activity, or mechanic",
+        claim_key="Stable claim key such as stats, acquisition, or interaction",
+        content_json="Verified claim content as a JSON object",
+        sources_json="JSON array of typed HTTPS source evidence objects",
+        reason="Why this source-backed entry is being added",
+        context_json="Scope such as mode or activity as a JSON object",
+        status="Initial lifecycle status",
+        game_version="Applicable patch or game version, when version-scoped",
+        confidence="Initial confidence from 0 to 1",
+    )
+    @app_commands.choices(
+        status=[
+            app_commands.Choice(name=status.value.title(), value=status.value)
+            for status in (
+                KnowledgeStatus.ACTIVE,
+                KnowledgeStatus.CANDIDATE,
+                KnowledgeStatus.DISPUTED,
+            )
+        ]
+    )
+    async def knowledge_create(
+        self,
+        interaction: discord.Interaction,
+        subject: str,
+        entity_type: str,
+        claim_key: str,
+        content_json: str,
+        sources_json: str,
+        reason: str,
+        context_json: str = "{}",
+        status: str = KnowledgeStatus.ACTIVE.value,
+        game_version: str | None = None,
+        confidence: app_commands.Range[float, 0.0, 1.0] = 0.9,
+    ) -> None:
+        if not await self._knowledge_change_allowed(interaction):
+            return
+        try:
+            proposal = propose_create(
+                subject=subject,
+                entity_type=entity_type,
+                claim_key=claim_key,
+                content=parse_json_object(content_json, field_name="content_json"),
+                context=parse_json_object(context_json, field_name="context_json"),
+                status=KnowledgeStatus(status),
+                game_version=game_version,
+                confidence=confidence,
+                sources=parse_source_evidence(sources_json),
+                reason=reason,
+            )
+        except ValueError as exc:
+            await interaction.response.send_message(str(exc), ephemeral=True)
+            return
+        await self._confirm_knowledge_create(interaction, proposal)
 
     @rwi.command(
         name="knowledge-revise",
@@ -662,6 +728,84 @@ class AdminCog(commands.Cog):
         )
         await interaction.edit_original_response(
             content="Answer cache quarantined. Verified knowledge was not changed.",
+            view=None,
+        )
+
+    async def _confirm_knowledge_create(
+        self,
+        interaction: discord.Interaction,
+        proposal: KnowledgeCreateProposal,
+    ) -> None:
+        view = ConfirmationView(interaction.user.id)
+        await interaction.response.send_message(
+            discord.utils.escape_mentions(render_create_proposal(proposal)),
+            ephemeral=True,
+            allowed_mentions=discord.AllowedMentions.none(),
+            view=view,
+        )
+        await view.wait()
+        if view.confirmed is not True:
+            await interaction.edit_original_response(
+                content="Knowledge creation cancelled or confirmation expired.", view=None
+            )
+            return
+        if self.bot.services.maintenance.halted:
+            await interaction.edit_original_response(
+                content="RWI entered maintenance mode; the knowledge entry was not created.",
+                view=None,
+            )
+            return
+        try:
+            entry_id = await self.bot.services.knowledge.add_candidate(
+                subject=proposal.subject,
+                entity_type=proposal.entity_type,
+                claim_key=proposal.claim_key,
+                content=proposal.content,
+                context=proposal.context,
+                actor_id=interaction.user.id,
+                reason=proposal.reason,
+                game_version=proposal.game_version,
+                confidence=float(proposal.confidence),
+                status=proposal.status,
+                sources=proposal.sources,
+            )
+        except (
+            KnowledgeIdentityConflictError,
+            SourceMetadataConflictError,
+            ValueError,
+        ) as exc:
+            message = str(exc.args[0]) if exc.args else "The knowledge entry could not be created."
+            await interaction.edit_original_response(content=message, view=None)
+            return
+        await self.bot.services.audit.record(
+            AuditRecord(
+                event_type="knowledge.created",
+                actor_id=interaction.user.id,
+                target_type="knowledge_entry",
+                target_id=str(entry_id),
+                reason=proposal.reason,
+                details={
+                    "revision": 1,
+                    "entity_type": proposal.entity_type,
+                    "claim_key": proposal.claim_key,
+                    "status": proposal.status.value,
+                    "game_version": proposal.game_version,
+                    "confidence": str(proposal.confidence),
+                    "source_count": len(proposal.sources),
+                    "supporting_source_count": sum(
+                        source.supports_claim for source in proposal.sources
+                    ),
+                    "source_types": sorted(
+                        {source.source_type.value for source in proposal.sources}
+                    ),
+                },
+            )
+        )
+        await interaction.edit_original_response(
+            content=(
+                f"Knowledge entry `{entry_id}` created at revision `1` with "
+                f"{len(proposal.sources)} immutable source snapshot(s)."
+            ),
             view=None,
         )
 

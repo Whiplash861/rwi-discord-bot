@@ -10,6 +10,7 @@ from typing import Any, cast
 from uuid import UUID, uuid4
 
 from sqlalchemy import desc, func, select, update
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
@@ -21,6 +22,7 @@ from rwi_bot.db.models import (
     KnowledgeSource,
     KnowledgeStatus,
     Source,
+    SourceType,
     TicketStatus,
     UnansweredTicket,
 )
@@ -43,6 +45,18 @@ class KnowledgeRevisionConflictError(RuntimeError):
             f"Knowledge changed while confirmation was pending "
             f"(expected revision {expected}, found {actual})."
         )
+
+
+class KnowledgeIdentityConflictError(RuntimeError):
+    def __init__(self) -> None:
+        super().__init__(
+            "A knowledge entry already exists for this subject, claim key, and context."
+        )
+
+
+class SourceMetadataConflictError(RuntimeError):
+    def __init__(self) -> None:
+        super().__init__("A submitted source conflicts with the existing metadata for that URL.")
 
 
 class TicketStateConflictError(RuntimeError):
@@ -78,6 +92,18 @@ class KnowledgeIntegrityReport:
     open_review_tickets: int
     quarantined_caches: int
     stale_after_days: int
+
+
+@dataclass(frozen=True, slots=True)
+class SourceEvidence:
+    url: str
+    title: str
+    source_type: SourceType
+    trust_score: Decimal
+    publisher: str | None = None
+    content_hash: str | None = None
+    supports_claim: bool = True
+    note: str | None = None
 
 
 def stable_context_hash(context: dict[str, Any]) -> str:
@@ -240,19 +266,24 @@ class KnowledgeRepository:
         game_version: str | None,
         confidence: float,
         status: KnowledgeStatus = KnowledgeStatus.CANDIDATE,
+        sources: tuple[SourceEvidence, ...] = (),
     ) -> UUID:
+        normalized_subject = normalize_text(subject)
+        context_hash = stable_context_hash(context)
+        if len({source.url for source in sources}) != len(sources):
+            raise ValueError("Source URLs must be unique within one knowledge entry.")
         now = datetime.now(UTC)
         entry_id = uuid4()
         revision_id = uuid4()
         entry = KnowledgeEntry(
             id=entry_id,
             subject=subject,
-            normalized_subject=normalize_text(subject),
+            normalized_subject=normalized_subject,
             entity_type=entity_type,
             claim_key=claim_key,
             content=content,
             context=context,
-            context_hash=stable_context_hash(context),
+            context_hash=context_hash,
             status=status.value,
             confidence=normalized_confidence(confidence),
             game_version=game_version,
@@ -262,23 +293,111 @@ class KnowledgeRepository:
             created_at=now,
             updated_at=now,
         )
-        revision = KnowledgeRevision(
-            id=revision_id,
-            entry_id=entry_id,
-            revision_number=1,
-            content=content,
-            context=context,
-            status=status.value,
-            game_version=game_version,
-            confidence=entry.confidence,
-            source_snapshot=[],
-            actor_id=actor_id,
-            reason=reason,
-            created_at=now,
-        )
         async with self.database.session() as session:
-            session.add_all([entry, revision])
+            existing_entry_id = await session.scalar(
+                select(KnowledgeEntry.id)
+                .where(KnowledgeEntry.normalized_subject == normalized_subject)
+                .where(KnowledgeEntry.claim_key == claim_key)
+                .where(KnowledgeEntry.context_hash == context_hash)
+            )
+            if existing_entry_id is not None:
+                raise KnowledgeIdentityConflictError
+
+            session.add(entry)
+            source_snapshot: list[dict[str, Any]] = []
+            for evidence in sources:
+                source = await session.scalar(select(Source).where(Source.url == evidence.url))
+                if source is None:
+                    source = Source(
+                        url=evidence.url,
+                        title=evidence.title,
+                        source_type=evidence.source_type.value,
+                        publisher=evidence.publisher,
+                        retrieved_at=now,
+                        content_hash=evidence.content_hash,
+                        trust_score=evidence.trust_score,
+                        active=True,
+                        metadata_json={},
+                        created_at=now,
+                        updated_at=now,
+                    )
+                    session.add(source)
+                    try:
+                        await session.flush()
+                    except IntegrityError as exc:
+                        raise SourceMetadataConflictError from exc
+                else:
+                    self._check_source_metadata(source, evidence)
+                session.add(
+                    KnowledgeSource(
+                        entry_id=entry_id,
+                        source_id=source.id,
+                        supports_claim=evidence.supports_claim,
+                        note=evidence.note,
+                    )
+                )
+                source_snapshot.append(
+                    self._source_evidence_snapshot(source=source, evidence=evidence)
+                )
+
+            revision = KnowledgeRevision(
+                id=revision_id,
+                entry_id=entry_id,
+                revision_number=1,
+                content=content,
+                context=context,
+                status=status.value,
+                game_version=game_version,
+                confidence=entry.confidence,
+                source_snapshot=sorted(
+                    source_snapshot, key=lambda item: (item["url"], item["source_id"])
+                ),
+                actor_id=actor_id,
+                reason=reason,
+                created_at=now,
+            )
+            session.add(revision)
+            try:
+                await session.flush()
+            except IntegrityError as exc:
+                raise KnowledgeIdentityConflictError from exc
         return entry_id
+
+    @staticmethod
+    def _check_source_metadata(source: Source, evidence: SourceEvidence) -> None:
+        if not source.active:
+            raise SourceMetadataConflictError
+        existing = (
+            source.title,
+            source.source_type,
+            source.publisher,
+            source.content_hash,
+            Decimal(source.trust_score),
+        )
+        proposed = (
+            evidence.title,
+            evidence.source_type.value,
+            evidence.publisher,
+            evidence.content_hash,
+            evidence.trust_score,
+        )
+        if existing != proposed:
+            raise SourceMetadataConflictError
+
+    @staticmethod
+    def _source_evidence_snapshot(*, source: Source, evidence: SourceEvidence) -> dict[str, Any]:
+        return {
+            "source_id": str(source.id),
+            "url": source.url,
+            "title": source.title,
+            "source_type": source.source_type,
+            "publisher": source.publisher,
+            "retrieved_at": source.retrieved_at.isoformat(),
+            "content_hash": source.content_hash,
+            "trust_score": str(source.trust_score),
+            "supports_claim": evidence.supports_claim,
+            "note": evidence.note,
+        }
 
     async def revise(
         self,

@@ -14,6 +14,7 @@ from rwi_bot.db.models import CacheState, KnowledgeRevision, KnowledgeStatus, Ti
 from rwi_bot.services.knowledge import (
     CacheRepository,
     CacheStateConflictError,
+    KnowledgeIdentityConflictError,
     KnowledgeRepository,
     KnowledgeRevisionConflictError,
     TicketRepository,
@@ -82,6 +83,29 @@ async def test_revise_snapshots_metadata_and_invalidates_previous_cache_dependen
     assert entry.current_revision == 2
     assert entry.confidence == Decimal("0.95")
     session.execute.assert_awaited_once()
+
+
+@pytest.mark.asyncio
+async def test_create_rejects_duplicate_identity_before_any_write() -> None:
+    session = AsyncMock()
+    session.add = Mock()
+    session.scalar.return_value = uuid4()
+    repository = KnowledgeRepository(FakeDatabase(session))  # type: ignore[arg-type]
+
+    with pytest.raises(KnowledgeIdentityConflictError, match="already exists"):
+        await repository.add_candidate(
+            subject="Existing item",
+            entity_type="gear",
+            claim_key="stats",
+            content={"value": 1},
+            context={"mode": "pve"},
+            actor_id=7,
+            reason="Duplicate test",
+            game_version="TU23",
+            confidence=0.9,
+        )
+
+    session.add.assert_not_called()
 
 
 @pytest.mark.asyncio
