@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from datetime import date
+from urllib.parse import urlparse
 from uuid import UUID, uuid4
 
 import structlog
@@ -163,6 +164,8 @@ class QuestionAnsweringService:
         cached = (
             None if community_claim_hits else await self.cache.get_valid(signature, request.tier)
         )
+        if cached is not None and getattr(cached, "prompt_version", None) != SYSTEM_PROMPT_VERSION:
+            cached = None
         if cached is not None:
             await self.audit.record(
                 AuditRecord(
@@ -221,7 +224,7 @@ class QuestionAnsweringService:
                     complexity=complexity,
                 )
                 citations = _merge_citations(knowledge_citations, generated.citations)
-                confidence = ConfidenceLabel.HIGH
+                confidence = _declared_confidence(generated)
                 used_web = False
             elif self.web_search_enabled:
                 generated = await self.ai.answer(
@@ -234,7 +237,7 @@ class QuestionAnsweringService:
                     spending_class=SpendingClass.MEMBER_ANSWER,
                 )
                 citations = generated.citations
-                if not citations:
+                if _web_evidence_confidence(citations) is ConfidenceLabel.LOW:
                     generated = await self.ai.answer(
                         input_text=input_text,
                         user_id=request.user_id,
@@ -245,7 +248,10 @@ class QuestionAnsweringService:
                         spending_class=SpendingClass.MEMBER_ANSWER,
                     )
                     citations = generated.citations
-                confidence = ConfidenceLabel.MEDIUM if citations else ConfidenceLabel.LOW
+                confidence = _minimum_confidence(
+                    _declared_confidence(generated),
+                    _web_evidence_confidence(citations),
+                )
                 used_web = True
             else:
                 raise OpenAIUnavailableError("Web fallback is disabled and no knowledge matched.")
@@ -268,6 +274,27 @@ class QuestionAnsweringService:
                 learning_opt_out=learning_opt_out,
             )
 
+        if not getattr(generated, "complete", True):
+            reason = getattr(generated, "incomplete_reason", None) or "unknown cutoff"
+            ticket_id = await self._open_ticket(
+                request,
+                signature,
+                correlation_id,
+                f"Provider returned an incomplete answer after completion retry: {reason}",
+                learning_opt_out=learning_opt_out,
+            )
+            return AnswerResult(
+                text=(
+                    "I stopped an incomplete draft instead of sending or saving a cut-off "
+                    "answer. I opened Technician ticket "
+                    f"`{ticket_id}` so the request can be reviewed."
+                ),
+                assumptions=request.assumptions,
+                confidence=ConfidenceLabel.UNKNOWN,
+                ticket_id=ticket_id,
+                learning_opt_out=learning_opt_out,
+            )
+
         if not generated.text.strip():
             ticket_id = await self._open_ticket(
                 request,
@@ -280,6 +307,26 @@ class QuestionAnsweringService:
                 text=(
                     "I couldn't verify a usable answer. "
                     f"Technician ticket `{ticket_id}` has been opened."
+                ),
+                assumptions=request.assumptions,
+                confidence=ConfidenceLabel.UNKNOWN,
+                ticket_id=ticket_id,
+                learning_opt_out=learning_opt_out,
+            )
+
+        if confidence in {ConfidenceLabel.LOW, ConfidenceLabel.UNKNOWN}:
+            ticket_id = await self._open_ticket(
+                request,
+                signature,
+                correlation_id,
+                "Available evidence did not meet ERIN's answer-confidence threshold.",
+                learning_opt_out=learning_opt_out,
+            )
+            return AnswerResult(
+                text=(
+                    "I don't have enough current, corroborated evidence to answer that "
+                    "confidently, so I won't guess. I opened Technician ticket "
+                    f"`{ticket_id}` for review."
                 ),
                 assumptions=request.assumptions,
                 confidence=ConfidenceLabel.UNKNOWN,
@@ -366,6 +413,37 @@ class QuestionAnsweringService:
 
 def _format_assumptions(values: dict[str, object]) -> str:
     return ", ".join(f"{key}={value}" for key, value in values.items())
+
+
+def _declared_confidence(generated: object) -> ConfidenceLabel:
+    value = getattr(generated, "evidence_confidence", ConfidenceLabel.MEDIUM)
+    try:
+        return ConfidenceLabel(value)
+    except (TypeError, ValueError):
+        return ConfidenceLabel.UNKNOWN
+
+
+def _web_evidence_confidence(citations: list[SourceCitation]) -> ConfidenceLabel:
+    if any(citation.official for citation in citations):
+        return ConfidenceLabel.HIGH
+    independent_hosts = {
+        (urlparse(str(citation.url)).hostname or "").casefold() for citation in citations
+    }
+    independent_hosts.discard("")
+    if len(independent_hosts) >= 2:
+        return ConfidenceLabel.MEDIUM
+    return ConfidenceLabel.LOW
+
+
+def _minimum_confidence(declared: ConfidenceLabel, evidence: ConfidenceLabel) -> ConfidenceLabel:
+    rank = {
+        ConfidenceLabel.UNKNOWN: 0,
+        ConfidenceLabel.LOW: 1,
+        ConfidenceLabel.MEDIUM: 2,
+        ConfidenceLabel.HIGH: 3,
+        ConfidenceLabel.VERIFIED: 4,
+    }
+    return declared if rank[declared] <= rank[evidence] else evidence
 
 
 def _merge_citations(

@@ -232,6 +232,15 @@ explicit feedback such as `thanks`, `that worked`, `that's wrong`, or `that's ou
 is also handled locally and does not consume the member answer limit. Mixed feedback plus
 a new question records the signal and continues through the normal answer path.
 
+ERIN checks provider completion state before sending or caching an answer. A token-limit
+cutoff receives one automatic concise retry. If the retry is also incomplete, the draft is
+discarded and replaced with a Technician ticket message. An `answer_retry` or
+`web_answer_retry` usage operation records the combined cost of both attempts.
+
+ERIN removes its internal evidence-confidence marker before sending. An unknown/low
+assessment, or web support limited to one non-authoritative host after fallback search, is
+not delivered as an answer: ERIN admits uncertainty and opens an unanswered ticket.
+
 Members can update their own answer profile with explicit first-person statements such
 as `I'm SHD 2500 and Expertise 20`, `I play PvP`, or `I prefer technical answers`.
 Profile-only updates and `show my profile` are handled locally without consuming an

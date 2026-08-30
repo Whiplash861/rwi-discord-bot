@@ -31,6 +31,12 @@ community-memory queue. ERIN archives the claim for experienced-member review in
 searchable. Incorrect claims and techniques classified as bugs or exploits are retained
 as review outcomes but excluded from recommendations. Build creation and content-fit
 reviews include tiered Major, Situational, and Minor pros and cons.
+Provider responses are generated completely before Discord delivery. If an answer reaches
+its output limit, ERIN automatically regenerates a concise complete version once; a draft
+that remains incomplete is neither sent nor cached.
+Every generated answer also carries a hidden evidence assessment. ERIN can respectfully
+correct a member when current evidence is strong, while low-confidence answers are
+withheld and opened as Technician tickets instead of being guessed.
 Every deployed application revision is also represented in the community-readable,
 read-only `#erin-patch-notes` index. Authored releases use severity-grouped notes;
 deployment fingerprinting produces a categorized fallback when a release manifest was

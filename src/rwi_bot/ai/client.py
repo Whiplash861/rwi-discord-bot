@@ -15,7 +15,7 @@ from tenacity import retry, retry_if_exception_type, stop_after_attempt, wait_ex
 
 from rwi_bot.ai.prompts import RWI_ANSWER_INSTRUCTIONS
 from rwi_bot.db.repositories import UsageRepository
-from rwi_bot.domain.schemas import SourceCitation
+from rwi_bot.domain.schemas import ConfidenceLabel, SourceCitation
 from rwi_bot.services.budget import (
     BudgetGuard,
     SpendingClass,
@@ -43,6 +43,9 @@ class OpenAIAnswer:
     response_id: str
     usage: UsageAmounts
     web_search_calls: int
+    complete: bool = True
+    incomplete_reason: str | None = None
+    evidence_confidence: ConfidenceLabel = ConfidenceLabel.UNKNOWN
 
 
 class RwiOpenAIClient:
@@ -116,7 +119,14 @@ class RwiOpenAIClient:
         spending_class: SpendingClass,
     ) -> OpenAIAnswer:
         model = self._select_model(complexity)
-        maximum = Decimal("0.25") if web_search else Decimal("0.10")
+        maximum = (
+            Decimal("0.35")
+            if web_search
+            else Decimal("0.20")
+            if complexity == "complex"
+            else Decimal("0.12")
+        )
+        output_token_limit = 3200 if complexity == "complex" else 2200
         tools: list[dict[str, Any]] = []
         include: list[str] = []
         if web_search:
@@ -131,7 +141,7 @@ class RwiOpenAIClient:
             "model": model,
             "instructions": RWI_ANSWER_INSTRUCTIONS,
             "input": input_text,
-            "max_output_tokens": 1800 if complexity == "complex" else 1100,
+            "max_output_tokens": output_token_limit,
             "reasoning": {"effort": "medium" if complexity == "complex" else "low"},
             "store": False,
         }
@@ -148,8 +158,64 @@ class RwiOpenAIClient:
                     raise OpenAIUnavailableError(
                         "RWI entered maintenance mode before the request began."
                     )
+                retried_for_completion = False
                 try:
                     response = await self._create_response(kwargs)
+                    text, citations, search_calls = _extract_output(
+                        response,
+                        official_domains=self.official_domains,
+                        official_urls=self.official_urls,
+                        community_domains=self.community_domains,
+                    )
+                    text, evidence_confidence = _extract_evidence_confidence(text)
+                    usage = _extract_usage(response, search_calls)
+                    complete, incomplete_reason = _completion_state(
+                        response,
+                        output_tokens=usage.output_tokens,
+                        output_token_limit=output_token_limit,
+                    )
+                    if not complete and incomplete_reason == "max_output_tokens":
+                        retried_for_completion = True
+                        self.log.info(
+                            "openai_incomplete_answer_retry",
+                            correlation_id=str(correlation_id),
+                            output_tokens=usage.output_tokens,
+                            initial_limit=output_token_limit,
+                        )
+                        retry_limit = 2400 if complexity == "complex" else 1600
+                        retry_kwargs = {
+                            **kwargs,
+                            "instructions": (
+                                f"{RWI_ANSWER_INSTRUCTIONS}\n\n"
+                                "Completion retry: the prior draft reached its token limit. "
+                                "Regenerate the complete answer from the beginning, prioritize "
+                                "the direct result, omit nonessential detail, close all Markdown "
+                                f"constructs, and stay under {retry_limit - 150} output tokens."
+                            ),
+                            "max_output_tokens": retry_limit,
+                        }
+                        retry_response = await self._create_response(retry_kwargs)
+                        retry_text, retry_citations, retry_search_calls = _extract_output(
+                            retry_response,
+                            official_domains=self.official_domains,
+                            official_urls=self.official_urls,
+                            community_domains=self.community_domains,
+                        )
+                        retry_text, retry_evidence_confidence = _extract_evidence_confidence(
+                            retry_text
+                        )
+                        retry_usage = _extract_usage(retry_response, retry_search_calls)
+                        complete, incomplete_reason = _completion_state(
+                            retry_response,
+                            output_tokens=retry_usage.output_tokens,
+                            output_token_limit=retry_limit,
+                        )
+                        response = retry_response
+                        text = retry_text
+                        evidence_confidence = retry_evidence_confidence
+                        citations = retry_citations
+                        search_calls = retry_search_calls
+                        usage = _combine_usage(usage, retry_usage)
                 except Exception as exc:
                     snapshot = await self.breaker.failure()
                     self.log.warning(
@@ -163,16 +229,17 @@ class RwiOpenAIClient:
                     ) from exc
 
                 await self.breaker.success()
-                text, citations, search_calls = _extract_output(
-                    response,
-                    official_domains=self.official_domains,
-                    official_urls=self.official_urls,
-                    community_domains=self.community_domains,
-                )
-                usage = _extract_usage(response, search_calls)
                 cost = estimate_cost(model, usage)
                 await self.usage_repository.append(
-                    operation="web_answer" if web_search else "answer",
+                    operation=(
+                        "web_answer_retry"
+                        if web_search and retried_for_completion
+                        else "answer_retry"
+                        if retried_for_completion
+                        else "web_answer"
+                        if web_search
+                        else "answer"
+                    ),
                     model=model,
                     input_tokens=usage.input_tokens,
                     cached_input_tokens=usage.cached_input_tokens,
@@ -188,7 +255,10 @@ class RwiOpenAIClient:
             citations=citations,
             response_id=str(getattr(response, "id", "unknown")),
             usage=usage,
-            web_search_calls=search_calls,
+            web_search_calls=usage.web_search_calls,
+            complete=complete,
+            incomplete_reason=incomplete_reason,
+            evidence_confidence=evidence_confidence,
         )
 
     @retry(
@@ -306,3 +376,47 @@ def _extract_usage(response: Any, web_search_calls: int) -> UsageAmounts:
         output_tokens=int(getattr(usage, "output_tokens", 0) or 0),
         web_search_calls=web_search_calls,
     )
+
+
+def _completion_state(
+    response: Any,
+    *,
+    output_tokens: int,
+    output_token_limit: int,
+) -> tuple[bool, str | None]:
+    status = str(getattr(response, "status", "") or "").casefold()
+    details = getattr(response, "incomplete_details", None)
+    reason = str(getattr(details, "reason", "") or "").casefold() or None
+    if status == "incomplete":
+        return False, reason or "incomplete"
+    if status in {"failed", "cancelled"}:
+        return False, status
+    if not status and output_tokens >= output_token_limit:
+        return False, "max_output_tokens"
+    return True, None
+
+
+def _combine_usage(first: UsageAmounts, second: UsageAmounts) -> UsageAmounts:
+    return UsageAmounts(
+        input_tokens=first.input_tokens + second.input_tokens,
+        cached_input_tokens=first.cached_input_tokens + second.cached_input_tokens,
+        cache_write_tokens=first.cache_write_tokens + second.cache_write_tokens,
+        output_tokens=first.output_tokens + second.output_tokens,
+        web_search_calls=first.web_search_calls + second.web_search_calls,
+    )
+
+
+def _extract_evidence_confidence(text: str) -> tuple[str, ConfidenceLabel]:
+    lines = text.lstrip().splitlines()
+    if not lines:
+        return "", ConfidenceLabel.UNKNOWN
+    marker = lines[0].strip().casefold()
+    values = {
+        "erin_evidence: high": ConfidenceLabel.HIGH,
+        "erin_evidence: medium": ConfidenceLabel.MEDIUM,
+        "erin_evidence: insufficient": ConfidenceLabel.UNKNOWN,
+    }
+    confidence = values.get(marker)
+    if confidence is None:
+        return text.strip(), ConfidenceLabel.UNKNOWN
+    return "\n".join(lines[1:]).strip(), confidence

@@ -65,6 +65,19 @@ The answer path is:
    community forums. Community pages remain corroborative rather than first-party truth.
 12. Open a sanitized Technician ticket when no answer can be verified.
 
+The provider response is inspected for `incomplete` status and token-limit metadata before
+Discord delivery or cache persistence. Normal and complex answers have separate output
+envelopes. A token-limit cutoff triggers one full concise regeneration with closed Markdown;
+usage from both attempts is combined for cost accounting. If that retry is still
+incomplete, its text is discarded, no cache record is created, and a sanitized Technician
+ticket replaces the broken draft.
+
+Generated text begins with an internal evidence marker that is removed before Discord
+delivery. The answer path requires high/medium model confidence plus authoritative web
+evidence or independent-source corroboration; otherwise it abstains and opens a ticket.
+Changing this contract changes the prompt version, so caches from weaker contracts are
+not reused.
+
 Profile writes require explicit self-reference such as `I'm SHD 2500`, `my Expertise is
 20`, or `I play PvP`. A statement about another member never updates either profile.
 Profile-only acknowledgements and `show my profile` queries are deterministic local

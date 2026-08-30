@@ -180,4 +180,43 @@ RELEASES: tuple[Release, ...] = (
             ),
         ),
     ),
+    Release(
+        release_id="erin-update-6",
+        update_number=6,
+        version="V0.1.5",
+        released_on=date(2026, 8, 30),
+        notes=(
+            ReleaseNote(
+                ReleaseSection.HIGH_IMPACT,
+                "ERIN now challenges incorrect member premises when strong current "
+                "evidence supports the correction, instead of agreeing for helpfulness.",
+            ),
+            ReleaseNote(
+                ReleaseSection.FIXES,
+                "Fixed answers stopping mid-sentence or mid-Markdown when the language "
+                "provider reached ERIN's output-token ceiling.",
+            ),
+            ReleaseNote(
+                ReleaseSection.MAINTENANCE,
+                "Raised normal and complex response envelopes and added one automatic "
+                "concise regeneration when a provider response reports a token-limit cutoff.",
+            ),
+            ReleaseNote(
+                ReleaseSection.PRIVACY_SAFETY,
+                "Incomplete drafts that survive the retry are now discarded instead of "
+                "being sent or cached, and a Technician ticket is opened for review.",
+            ),
+            ReleaseNote(
+                ReleaseSection.PRIVACY_SAFETY,
+                "Answers without authoritative or independently corroborated current "
+                "evidence are now withheld and sent to the Technician review queue rather "
+                "than filled with a plausible guess.",
+            ),
+            ReleaseNote(
+                ReleaseSection.IMPROVEMENTS,
+                "Limited tiered pros and cons to actual build creation, build review, and "
+                "content-fit requests so narrow factual answers remain focused.",
+            ),
+        ),
+    ),
 )
