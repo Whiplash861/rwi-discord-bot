@@ -74,7 +74,9 @@ Production releases are declared in `src/rwi_bot/data/releases.py`. Add one immu
 `Release` record per authored update with a unique lowercase release ID, the next ERIN
 Update number, a `Vmajor.minor.patch` version, release date, and one or more categorized
 notes. Notes render in severity/significance order regardless of declaration order. The
-initial public entry is **ERIN Update 1 — V1.22.333**.
+initial public entry is **ERIN Update 1 — V0.1.0**, matching the package's current
+private-alpha version. Maintenance releases advance the patch component chronologically
+(`V0.1.1`, `V0.1.2`, and so on); authored milestones may advance the minor component.
 
 After an image containing a new release is deployed, startup automatically creates or
 repairs `#erin-patch-notes` and publishes every entry not yet recorded in that channel.

@@ -56,6 +56,7 @@ class Release:
     released_on: date
     notes: tuple[ReleaseNote, ...]
     automatic: bool = False
+    legacy_release_ids: tuple[str, ...] = ()
 
     def __post_init__(self) -> None:
         if not re.fullmatch(r"[a-z0-9][a-z0-9._-]{2,79}", self.release_id):
@@ -66,6 +67,15 @@ class Release:
             raise ValueError("Release versions must use Vmajor.minor.patch.")
         if not self.notes:
             raise ValueError("A release must contain at least one patch note.")
+        if any(
+            not re.fullmatch(r"[a-z0-9][a-z0-9._-]{2,79}", release_id)
+            for release_id in self.legacy_release_ids
+        ):
+            raise ValueError("legacy_release_ids must be stable lowercase identifiers.")
+
+    @property
+    def all_release_ids(self) -> tuple[str, ...]:
+        return (self.release_id, *self.legacy_release_ids)
 
 
 @dataclass(frozen=True, slots=True)
@@ -97,6 +107,26 @@ class ReleaseHistoryRepository:
         async with self.database.session() as session:
             rows = list(await session.scalars(statement))
         return any(str(details.get("channel_id")) == str(channel_id) for details in rows)
+
+    async def published_version_in_channel(
+        self,
+        release_ids: tuple[str, ...],
+        channel_id: int,
+    ) -> str | None:
+        statement = (
+            select(AuditEvent.details)
+            .where(AuditEvent.event_type == "release.published")
+            .where(AuditEvent.target_id.in_(release_ids))
+            .order_by(AuditEvent.created_at.desc())
+        )
+        async with self.database.session() as session:
+            rows = list(await session.scalars(statement))
+        for details in rows:
+            if str(details.get("channel_id")) != str(channel_id):
+                continue
+            version = details.get("version")
+            return version if isinstance(version, str) else None
+        return None
 
     async def latest_deployment(self) -> PublishedDeployment | None:
         statement = (

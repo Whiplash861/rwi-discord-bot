@@ -6,9 +6,9 @@ from rwi_bot.services.releases import Release, ReleaseNote, ReleaseSection
 
 RELEASES: tuple[Release, ...] = (
     Release(
-        release_id="erin-update-1-v1.22.333",
+        release_id="erin-update-1",
         update_number=1,
-        version="V1.22.333",
+        version="V0.1.0",
         released_on=date(2026, 8, 30),
         notes=(
             ReleaseNote(
@@ -42,5 +42,6 @@ RELEASES: tuple[Release, ...] = (
                 "deployed changes still receive an update entry.",
             ),
         ),
+        legacy_release_ids=("erin-update-1-v1.22.333",),
     ),
 )

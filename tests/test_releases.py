@@ -24,16 +24,17 @@ def test_authored_release_catalog_is_unique_and_uses_requested_format() -> None:
     assert len(numbers) == len(RELEASES)
     assert len(versions) == len(RELEASES)
     assert release.update_number == 1
-    assert release.version == "V1.22.333"
+    assert release.version == "V0.1.0"
     assert release.released_on == date(2026, 8, 30)
 
     description = render_release_description(release)
     embed = release_embed(release)
     assert embed.title == "ERIN Update 1"
-    assert description.startswith("V1.22.333\n\nAugust 30, 2026\n\n__Patch Notes__")
+    assert description.startswith("V0.1.0\n\nAugust 30, 2026\n\n__Patch Notes__")
     assert description.index("**Privacy & Safety**") < description.index("**High Impact**")
     assert description.index("**High Impact**") < description.index("**New Features**")
-    assert embed.footer.text == "ERIN_RELEASE:erin-update-1-v1.22.333"
+    assert embed.footer.text == "ERIN_RELEASE:erin-update-1"
+    assert release.legacy_release_ids == ("erin-update-1-v1.22.333",)
 
 
 def test_deployment_snapshot_changes_with_application_source(tmp_path) -> None:
@@ -52,9 +53,9 @@ def test_deployment_snapshot_changes_with_application_source(tmp_path) -> None:
 
 def test_automatic_release_increments_version_and_classifies_changed_components() -> None:
     previous = PublishedDeployment(
-        release_id="erin-update-1-v1.22.333",
+        release_id="erin-update-1",
         update_number=1,
-        version="V1.22.333",
+        version="V0.1.0",
         fingerprint="a" * 64,
         module_hashes={
             "src/rwi_bot/db/models.py": "old-db",
@@ -74,7 +75,7 @@ def test_automatic_release_increments_version_and_classifies_changed_components(
 
     assert release.release_id == "automatic-bbbbbbbbbbbbbbbb"
     assert release.update_number == 2
-    assert release.version == "V1.22.334"
+    assert release.version == "V0.1.1"
     assert release.automatic
     sections = {note.section for note in release.notes}
     assert ReleaseSection.PRIVACY_SAFETY in sections

@@ -64,13 +64,16 @@ class ReleaseNotesCog(commands.Cog):
 
             snapshot = deployment_snapshot()
             published = 0
-            pending = [
-                release
-                for release in RELEASES
-                if not await self.bot.services.release_history.published_in_channel(
-                    release.release_id, channel.id
+            pending: list[Release] = []
+            for release in RELEASES:
+                published_version = (
+                    await self.bot.services.release_history.published_version_in_channel(
+                        release.all_release_ids,
+                        channel.id,
+                    )
                 )
-            ]
+                if published_version != release.version:
+                    pending.append(release)
             if pending:
                 for release in pending:
                     if await self._publish(channel, release, snapshot):
@@ -100,14 +103,20 @@ class ReleaseNotesCog(commands.Cog):
         release: Release,
         snapshot: DeploymentSnapshot,
     ) -> bool:
-        marker = release_marker(release.release_id)
-        existing = await self._find_existing(channel, marker)
+        markers = tuple(release_marker(release_id) for release_id in release.all_release_ids)
+        existing = await self._find_existing(channel, markers)
         message = existing
+        changed = False
+        embed = release_embed(release)
         if message is None:
             message = await channel.send(
-                embed=release_embed(release),
+                embed=embed,
                 allowed_mentions=discord.AllowedMentions.none(),
             )
+            changed = True
+        elif not _message_matches_release(message, embed):
+            await message.edit(embed=embed)
+            changed = True
         await self.bot.services.audit.record(
             AuditRecord(
                 event_type="release.published",
@@ -128,18 +137,18 @@ class ReleaseNotesCog(commands.Cog):
                 },
             )
         )
-        return existing is None
+        return changed
 
     async def _find_existing(
         self,
         channel: discord.TextChannel,
-        marker: str,
+        markers: tuple[str, ...],
     ) -> discord.Message | None:
         try:
             async for message in channel.history(limit=250):
                 if message.author != self.bot.user:
                     continue
-                if any((embed.footer.text or "") == marker for embed in message.embeds):
+                if any((embed.footer.text or "") in markers for embed in message.embeds):
                     return message
         except (discord.Forbidden, discord.HTTPException):
             self.log.warning("patch_notes_history_unavailable")
@@ -159,6 +168,18 @@ def release_embed(release: Release) -> discord.Embed:
     )
     embed.set_footer(text=release_marker(release.release_id))
     return embed
+
+
+def _message_matches_release(message: discord.Message, expected: discord.Embed) -> bool:
+    if len(message.embeds) != 1:
+        return False
+    actual = message.embeds[0]
+    return (
+        actual.title == expected.title
+        and actual.description == expected.description
+        and actual.colour == expected.colour
+        and actual.footer.text == expected.footer.text
+    )
 
 
 def _patch_notes_spec() -> ChannelSpec:
