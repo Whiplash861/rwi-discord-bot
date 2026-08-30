@@ -9,6 +9,18 @@ with the database service settings.
 
 `RWI_CURRENT_GAME_VERSION` selects the exact season/patch scope used for new Community
 Builds index records and local retrieval; the default is `Y8S3 Red Horizon`.
+`RWI_CURRENT_GAME_VERSION_STARTED_ON` sets the hard freshness boundary; the deployed
+value is `2026-08-27`. Older material is historical only and cannot support current-game
+stats, acquisition routes, system behavior, bugs, or fixes.
+
+`RWI_OFFICIAL_SEARCH_DOMAINS` contains first-party domains. `RWI_OFFICIAL_SEARCH_URLS`
+contains exact first-party pages hosted on otherwise multi-tenant domains; the default is
+Ubisoft's linked Division 2 Known Issues Trello board. `RWI_COMMUNITY_SEARCH_DOMAINS`
+controls curated discovery across Wikipedia, Division wikis, Reddit, Steam, and selected
+Q&A/community forums. Adding a domain expands discovery but does not elevate community
+content to first-party evidence. Do not replace the exact Trello URL with a domain-wide
+trust rule.
+
 `RWI_COMMUNITY_LOADOUT_INDEXING_ENABLED` controls whether new and edited public forum
 starter posts are indexed. ERIN's server nickname is reconciled idempotently on each
 Discord connection and does not change the application ID, credentials, or permissions.
@@ -74,8 +86,8 @@ Production releases are declared in `src/rwi_bot/data/releases.py`. Add one immu
 `Release` record per authored update with a unique lowercase release ID, the next ERIN
 Update number, a `Vmajor.minor.patch` version, release date, and one or more categorized
 notes. Notes render in severity/significance order regardless of declaration order. The
-initial public entry is **ERIN Update 1 — V0.1.0**, matching the package's current
-private-alpha version. Maintenance releases advance the patch component chronologically
+initial public entry is **ERIN Update 1 — V0.1.0**. The package version follows the
+latest authored private-alpha release. Maintenance releases advance the patch component chronologically
 (`V0.1.1`, `V0.1.2`, and so on); authored milestones may advance the minor component.
 
 After an image containing a new release is deployed, startup automatically creates or
@@ -184,9 +196,16 @@ maintenance mode.
 Members use `/privacy status` to inspect whether future interactions may contribute to
 shared answer learning and `/privacy learning` to change that reversible preference.
 Opted-out interactions may use existing cache entries but do not create shared cache
-candidates, expose feedback controls, or attach the requester identity to new review
+candidates, persist positive cache feedback, or attach the requester identity to new review
 tickets. Questions still have to be processed—including by the configured external
 provider when required—to answer the member.
+
+Normal answers contain no Sources section or explicit links. A member can reply with a
+source-only request such as `sources?` or `where did you get that?` to receive the stored
+citations for ERIN's immediately preceding answer without another OpenAI request. Simple
+explicit feedback such as `thanks`, `that worked`, `that's wrong`, or `that's outdated`
+is also handled locally and does not consume the member answer limit. Mixed feedback plus
+a new question records the signal and continues through the normal answer path.
 
 `/privacy export` privately attaches a JSON export of the member profile, persisted
 conversation summaries, feedback, and indexed Community Builds starter posts.

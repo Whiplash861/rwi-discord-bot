@@ -65,6 +65,8 @@ async def build_services(settings: Settings) -> AppServices:
         complex_model=settings.model_complex,
         economy_model=settings.model_economy,
         official_domains=settings.official_search_domains,
+        official_urls=settings.official_search_urls,
+        community_domains=settings.community_search_domains,
     )
     qa = QuestionAnsweringService(
         maintenance=maintenance,
@@ -77,6 +79,7 @@ async def build_services(settings: Settings) -> AppServices:
         audit=audit,
         web_search_enabled=settings.web_search_enabled,
         current_game_version=settings.current_game_version,
+        current_game_version_started_on=settings.current_game_version_started_on,
     )
     return AppServices(
         settings=settings,

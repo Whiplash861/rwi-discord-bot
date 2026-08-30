@@ -6,14 +6,14 @@ ERIN is organized around four trust domains that must not be merged:
 2. **Community loadouts** are public player submissions indexed locally for retrieval.
    They are useful examples, not verified claims, and remain visibly labeled as such.
 3. **Adaptive answer cache** stores reusable answer text and the exact knowledge
-   revisions, assumptions, citations, model, prompt version, freshness, and feedback
+   revisions, assumptions, citations, model, prompt version, freshness, and inferred feedback
    state that support it.
 4. **Private member state** contains individual preferences, inventory, saved builds,
    and conversation context. Private state is never copied into shared cache entries.
 
 Members control this boundary with `/privacy`. Learning opt-out is checked before each
 answer: opted-out interactions can consume existing verified/shared answers but cannot
-create shared cache candidates, submit cache feedback, or attach the requester identity
+create shared cache candidates, persist positive cache feedback, or attach the requester identity
 to new review tickets. It does not prevent the member's current question from being
 processed to answer them.
 
@@ -46,9 +46,25 @@ The answer path is:
 6. Use deterministic code for values and build legality as coverage is added.
 7. Reserve budget before an external request can start.
 8. Use OpenAI without web search when verified context is sufficient.
-9. Use source-backed web fallback only when local coverage is missing and web search is
-   enabled.
+9. Use curated web fallback only when local coverage is missing and web search is enabled.
+   The target set combines current Ubisoft material, the exact official Division 2 Known
+   Issues Trello board, Wikipedia and Division wikis, Reddit, Steam, and selected Q&A and
+   community forums. Community pages remain corroborative rather than first-party truth.
 10. Open a sanitized Technician ticket when no answer can be verified.
+
+All current-game paths share the `Y8S3 Red Horizon` version in their cache signature.
+Local knowledge and Community Builds retrieval are constrained to that version, and the
+August 27, 2026 launch date is passed to the answer model as a hard freshness boundary.
+Older material may explain history but cannot support present-day stats, acquisition
+routes, system behavior, bugs, or fixes.
+
+Normal Discord answers omit explicit citations and source links. Citations remain attached
+to the in-process conversation turn, and a source-only follow-up returns that stored list
+without another provider request. Explicit feedback-only follow-ups are also handled
+locally. High-confidence helpful signals update reusable answers; explicit incorrect or
+outdated signals open or increment a review ticket and count against a reusable answer
+when applicable. Signals are deduplicated per answer, negative cues take precedence over
+mixed politeness, and ambiguous questions such as “could this be outdated?” are not scored.
 
 The built-in current-season baseline is scoped to `Y8S3 Red Horizon` and uses
 [Ubisoft's official launch notes](https://www.ubisoft.com/en-us/game/the-division/the-division-2/news-updates/4mrYiFPIyKpzpoqshDQk80/the-division-2-red-horizon).

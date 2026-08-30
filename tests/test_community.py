@@ -47,8 +47,8 @@ def test_community_answer_is_labeled_and_links_to_the_original_post() -> None:
 
     rendered = render_community_loadouts([hit], game_version="Y8S3 Red Horizon")
 
-    assert "player submissions, not verified game truth" in rendered
-    assert "Community Submitted" in rendered
+    assert "player-submitted builds" in rendered
+    assert "Tags:" in rendered
     assert "https://discord.com/channels/1/2/2" in rendered
     assert "Match: 81%" in rendered
 

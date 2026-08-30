@@ -69,6 +69,8 @@ def test_settings_parse_comma_separated_domains_from_dotenv(tmp_path: Path) -> N
                 "RWI_DATABASE_URL=postgresql+asyncpg://user:password@localhost/database",
                 "OPENAI_API_KEY=openai-placeholder",
                 "RWI_OFFICIAL_SEARCH_DOMAINS=ubisoft.com, example.com",
+                "RWI_OFFICIAL_SEARCH_URLS=https://trello.com/b/example, https://example.com/live",
+                "RWI_COMMUNITY_SEARCH_DOMAINS=wikipedia.org, reddit.com",
             )
         ),
         encoding="utf-8",
@@ -77,3 +79,8 @@ def test_settings_parse_comma_separated_domains_from_dotenv(tmp_path: Path) -> N
     settings = Settings(_env_file=env_file)
 
     assert settings.official_search_domains == ("ubisoft.com", "example.com")
+    assert settings.official_search_urls == (
+        "https://trello.com/b/example",
+        "https://example.com/live",
+    )
+    assert settings.community_search_domains == ("wikipedia.org", "reddit.com")

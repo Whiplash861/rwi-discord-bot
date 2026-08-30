@@ -122,7 +122,13 @@ class KnowledgeRepository:
     def __init__(self, database: Database) -> None:
         self.database = database
 
-    async def search(self, query: str, *, limit: int = 8) -> list[KnowledgeHit]:
+    async def search(
+        self,
+        query: str,
+        *,
+        limit: int = 8,
+        game_version: str | None = None,
+    ) -> list[KnowledgeHit]:
         normalized = normalize_text(query)
         subject_similarity = func.similarity(KnowledgeEntry.normalized_subject, normalized)
         content_similarity = func.word_similarity(normalized, KnowledgeEntry.search_text)
@@ -138,6 +144,8 @@ class KnowledgeRepository:
             .order_by(desc("score"), KnowledgeEntry.verified_at.desc().nullslast())
             .limit(limit)
         )
+        if game_version is not None:
+            statement = statement.where(KnowledgeEntry.game_version == game_version)
         async with self.database.session() as session:
             rows = (await session.execute(statement)).all()
             return [KnowledgeHit(entry=row[0], similarity=float(row[1])) for row in rows]

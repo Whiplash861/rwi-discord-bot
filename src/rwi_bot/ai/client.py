@@ -3,7 +3,9 @@ from __future__ import annotations
 import asyncio
 from dataclasses import dataclass
 from decimal import Decimal
+from enum import StrEnum
 from typing import Any
+from urllib.parse import urlparse
 from uuid import UUID
 
 import structlog
@@ -28,6 +30,12 @@ class OpenAIUnavailableError(RuntimeError):
     pass
 
 
+class WebSearchScope(StrEnum):
+    OFFICIAL = "official"
+    CURATED = "curated"
+    OPEN = "open"
+
+
 @dataclass(slots=True)
 class OpenAIAnswer:
     text: str
@@ -49,6 +57,8 @@ class RwiOpenAIClient:
         complex_model: str,
         economy_model: str,
         official_domains: tuple[str, ...],
+        official_urls: tuple[str, ...] = (),
+        community_domains: tuple[str, ...] = (),
         max_concurrency: int = 4,
     ) -> None:
         self.client = AsyncOpenAI(api_key=api_key, timeout=45.0, max_retries=0)
@@ -59,6 +69,8 @@ class RwiOpenAIClient:
         self.complex_model = complex_model
         self.economy_model = economy_model
         self.official_domains = official_domains
+        self.official_urls = official_urls
+        self.community_domains = community_domains
         self.breaker = SlidingCircuitBreaker("openai")
         self._semaphore = asyncio.Semaphore(max_concurrency)
         self.log = structlog.get_logger("openai")
@@ -71,7 +83,7 @@ class RwiOpenAIClient:
         correlation_id: UUID,
         complexity: str = "normal",
         web_search: bool = False,
-        official_only: bool = False,
+        search_scope: WebSearchScope = WebSearchScope.OPEN,
         spending_class: SpendingClass = SpendingClass.MEMBER_ANSWER,
     ) -> OpenAIAnswer:
         if self.maintenance.halted:
@@ -86,7 +98,7 @@ class RwiOpenAIClient:
                 correlation_id=correlation_id,
                 complexity=complexity,
                 web_search=web_search,
-                official_only=official_only,
+                search_scope=search_scope,
                 spending_class=spending_class,
             )
         finally:
@@ -100,7 +112,7 @@ class RwiOpenAIClient:
         correlation_id: UUID,
         complexity: str,
         web_search: bool,
-        official_only: bool,
+        search_scope: WebSearchScope,
         spending_class: SpendingClass,
     ) -> OpenAIAnswer:
         model = self._select_model(complexity)
@@ -109,8 +121,9 @@ class RwiOpenAIClient:
         include: list[str] = []
         if web_search:
             web_tool: dict[str, Any] = {"type": "web_search"}
-            if official_only and self.official_domains:
-                web_tool["filters"] = {"allowed_domains": list(self.official_domains)}
+            allowed_domains = self._search_domains(search_scope)
+            if allowed_domains:
+                web_tool["filters"] = {"allowed_domains": list(allowed_domains)}
             tools.append(web_tool)
             include.append("web_search_call.action.sources")
 
@@ -150,7 +163,12 @@ class RwiOpenAIClient:
                     ) from exc
 
                 await self.breaker.success()
-                text, citations, search_calls = _extract_output(response)
+                text, citations, search_calls = _extract_output(
+                    response,
+                    official_domains=self.official_domains,
+                    official_urls=self.official_urls,
+                    community_domains=self.community_domains,
+                )
                 usage = _extract_usage(response, search_calls)
                 cost = estimate_cost(model, usage)
                 await self.usage_repository.append(
@@ -189,8 +207,30 @@ class RwiOpenAIClient:
             return self.economy_model
         return self.normal_model
 
+    def _search_domains(self, scope: WebSearchScope) -> tuple[str, ...]:
+        official_url_domains = tuple(
+            hostname
+            for url in self.official_urls
+            if (hostname := urlparse(url).hostname) is not None
+        )
+        if scope == WebSearchScope.OFFICIAL:
+            return tuple(dict.fromkeys((*self.official_domains, *official_url_domains)))
+        if scope == WebSearchScope.CURATED:
+            return tuple(
+                dict.fromkeys(
+                    (*self.official_domains, *official_url_domains, *self.community_domains)
+                )
+            )
+        return ()
 
-def _extract_output(response: Any) -> tuple[str, list[SourceCitation], int]:
+
+def _extract_output(
+    response: Any,
+    *,
+    official_domains: tuple[str, ...] = ("ubisoft.com",),
+    official_urls: tuple[str, ...] = (),
+    community_domains: tuple[str, ...] = (),
+) -> tuple[str, list[SourceCitation], int]:
     text = str(getattr(response, "output_text", "") or "").strip()
     citations: list[SourceCitation] = []
     seen_urls: set[str] = set()
@@ -211,15 +251,47 @@ def _extract_output(response: Any) -> tuple[str, list[SourceCitation], int]:
                     continue
                 seen_urls.add(url)
                 title = str(getattr(annotation, "title", "Source") or "Source")
+                source_type, official = classify_external_source(
+                    url,
+                    official_domains=official_domains,
+                    official_urls=official_urls,
+                    community_domains=community_domains,
+                )
                 citations.append(
                     SourceCitation(
                         title=title,
                         url=HttpUrl(url),
-                        source_type="external_web",
-                        official="ubisoft.com" in url.lower(),
+                        source_type=source_type,
+                        official=official,
                     )
                 )
     return text, citations, search_calls
+
+
+def classify_external_source(
+    url: str,
+    *,
+    official_domains: tuple[str, ...],
+    official_urls: tuple[str, ...] = (),
+    community_domains: tuple[str, ...],
+) -> tuple[str, bool]:
+    normalized_url = url.split("?", maxsplit=1)[0].rstrip("/").casefold()
+    if any(normalized_url == trusted.rstrip("/").casefold() for trusted in official_urls):
+        return "official_live_service", True
+    hostname = (urlparse(url).hostname or "").casefold()
+    if any(_hostname_matches(hostname, domain) for domain in official_domains):
+        return "official_web", True
+    wiki_domains = ("wikipedia.org", "fandom.com", "prototrack.gg")
+    if any(_hostname_matches(hostname, domain) for domain in wiki_domains):
+        return "community_wiki", False
+    if any(_hostname_matches(hostname, domain) for domain in community_domains):
+        return "community_forum", False
+    return "external_web", False
+
+
+def _hostname_matches(hostname: str, domain: str) -> bool:
+    clean_domain = domain.casefold().strip().lstrip(".")
+    return hostname == clean_domain or hostname.endswith(f".{clean_domain}")
 
 
 def _extract_usage(response: Any, web_search_calls: int) -> UsageAmounts:

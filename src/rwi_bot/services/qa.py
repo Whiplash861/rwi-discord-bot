@@ -1,10 +1,11 @@
 from __future__ import annotations
 
+from datetime import date
 from uuid import UUID, uuid4
 
 import structlog
 
-from rwi_bot.ai.client import OpenAIUnavailableError, RwiOpenAIClient
+from rwi_bot.ai.client import OpenAIUnavailableError, RwiOpenAIClient, WebSearchScope
 from rwi_bot.ai.prompts import SYSTEM_PROMPT_VERSION, compose_answer_input
 from rwi_bot.domain.schemas import (
     AnswerRequest,
@@ -48,6 +49,7 @@ class QuestionAnsweringService:
         web_search_enabled: bool,
         community_loadouts: CommunityLoadoutRepository | None = None,
         current_game_version: str = "Y8S3 Red Horizon",
+        current_game_version_started_on: date = date(2026, 8, 27),
     ) -> None:
         self.maintenance = maintenance
         self.knowledge = knowledge
@@ -59,6 +61,7 @@ class QuestionAnsweringService:
         self.web_search_enabled = web_search_enabled
         self.community_loadouts = community_loadouts
         self.current_game_version = current_game_version
+        self.current_game_version_started_on = current_game_version_started_on
         self.log = structlog.get_logger("qa")
 
     async def answer(self, request: AnswerRequest) -> AnswerResult:
@@ -114,10 +117,14 @@ class QuestionAnsweringService:
                         learning_opt_out=learning_opt_out,
                     )
         assumptions_dict = request.assumptions.model_dump(mode="json")
+        effective_constraints = {
+            **interpreted.constraints,
+            "current_game_version": self.current_game_version,
+        }
         signature = question_signature(
             interpreted.normalized_question,
             assumptions=assumptions_dict,
-            constraints=interpreted.constraints,
+            constraints=effective_constraints,
         )
         cached = await self.cache.get_valid(signature, request.tier)
         if cached is not None:
@@ -145,7 +152,10 @@ class QuestionAnsweringService:
                 learning_opt_out=learning_opt_out,
             )
 
-        hits = await self.knowledge.search(interpreted.normalized_question)
+        hits = await self.knowledge.search(
+            interpreted.normalized_question,
+            game_version=self.current_game_version,
+        )
         context, revision_ids, knowledge_citations = knowledge_context(hits)
         complexity = (
             "complex"
@@ -156,6 +166,8 @@ class QuestionAnsweringService:
             question=request.question,
             detail_tier=request.tier.value,
             assumptions=_format_assumptions(assumptions_dict),
+            current_game_version=self.current_game_version,
+            freshness_boundary=self.current_game_version_started_on.isoformat(),
             knowledge_context=context,
             conversation_summary=request.conversation_summary,
         )
@@ -178,7 +190,7 @@ class QuestionAnsweringService:
                     correlation_id=correlation_id,
                     complexity=complexity,
                     web_search=True,
-                    official_only=True,
+                    search_scope=WebSearchScope.CURATED,
                     spending_class=SpendingClass.MEMBER_ANSWER,
                 )
                 citations = generated.citations
@@ -189,7 +201,7 @@ class QuestionAnsweringService:
                         correlation_id=correlation_id,
                         complexity=complexity,
                         web_search=True,
-                        official_only=False,
+                        search_scope=WebSearchScope.OPEN,
                         spending_class=SpendingClass.MEMBER_ANSWER,
                     )
                     citations = generated.citations
@@ -241,7 +253,7 @@ class QuestionAnsweringService:
                 signature=signature,
                 normalized_intent=interpreted.intent.value,
                 entities=interpreted.entities,
-                constraints=interpreted.constraints,
+                constraints=effective_constraints,
                 assumptions=assumptions_dict,
                 answer_text=generated.text,
                 tier=request.tier,
@@ -332,15 +344,9 @@ def _merge_citations(
 def render_community_loadouts(hits: list[CommunityLoadoutHit], *, game_version: str) -> str:
     lines = [
         f"I found {len(hits)} locally indexed community loadout(s) matching that description "
-        f"for **{game_version}**. These are player submissions, not verified game truth.",
+        f"for **{game_version}**. These are player-submitted builds.",
         "",
     ]
-    labels = {
-        "community_submitted": "Community Submitted",
-        "technician_verified": "Technician Verified",
-        "rwi_tested": "RWI Tested",
-        "mathematically_validated": "Mathematically Validated",
-    }
     for index, hit in enumerate(hits, start=1):
         loadout = hit.loadout
         title = loadout.title.replace("[", "\\[").replace("]", "\\]")
@@ -348,17 +354,15 @@ def render_community_loadouts(hits: list[CommunityLoadoutHit], *, game_version: 
         excerpt = " ".join(loadout.content.split())
         if len(excerpt) > 420:
             excerpt = excerpt[:419].rstrip() + "…"
-        label = labels.get(loadout.verification_status, "Community Submitted")
         lines.extend(
             (
                 f"**{index}. [{title}]({loadout.source_url})**",
-                f"Label: **{label}** · Tags: {tags} · Match: {hit.similarity:.0%}",
+                f"Tags: {tags} · Match: {hit.similarity:.0%}",
                 f"> {excerpt}",
                 "",
             )
         )
     lines.append(
-        "I can use one of these as a starting point, while keeping its community status "
-        "separate from source-backed item statistics and legality rules."
+        "I can use one of these as a starting point and adapt it to your inventory or role."
     )
     return "\n".join(lines)

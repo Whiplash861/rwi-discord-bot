@@ -9,7 +9,15 @@ Responses API calls.
 The current catalog target is **Y8S3 Red Horizon**. ERIN can search structured claim
 content—not only item titles—and can locally reference privacy-sanitized starter posts
 from the server's Community Builds forum before considering an OpenAI request. Community
-loadouts are always labeled as player submissions rather than verified game truth.
+loadouts are presented as player submissions. Red Horizon's August 27, 2026 launch is
+the current-game freshness boundary: older material can provide history but cannot
+support a claim about how the game works now. When local coverage is missing, curated
+discovery includes Ubisoft, the exact Division 2 Known Issues Trello board linked by
+Ubisoft, Wikipedia and Division wikis, Reddit, Steam, and selected Q&A/community forums.
+Normal answers keep citations out of the message; a member can ask for the sources from
+ERIN's immediately preceding answer. Explicit natural follow-ups such as “thanks,” “that
+worked,” “that's wrong,” or “that's outdated” replace rating buttons and are inferred
+locally at high confidence.
 Every deployed application revision is also represented in the community-readable,
 read-only `#erin-patch-notes` index. Authored releases use severity-grouped notes;
 deployment fingerprinting produces a categorized fallback when a release manifest was

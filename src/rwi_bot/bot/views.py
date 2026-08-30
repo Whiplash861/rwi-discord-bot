@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from collections.abc import Awaitable, Callable
+from collections.abc import Callable
 
 import discord
 
@@ -135,41 +135,3 @@ class PlatformRoleView(discord.ui.View):
                 halted=halted,
             )
         )
-
-
-class FeedbackView(discord.ui.View):
-    def __init__(
-        self,
-        *,
-        user_id: int,
-        helpful: Callable[[], Awaitable[None]],
-        incorrect: Callable[[], Awaitable[None]],
-    ) -> None:
-        super().__init__(timeout=60 * 60 * 24)
-        self.user_id = user_id
-        self._helpful = helpful
-        self._incorrect = incorrect
-
-    async def interaction_check(self, interaction: discord.Interaction) -> bool:
-        if interaction.user.id != self.user_id:
-            await interaction.response.send_message(
-                "Only the member who asked this question can rate this answer.", ephemeral=True
-            )
-            return False
-        return True
-
-    @discord.ui.button(label="Helpful", emoji="✅", style=discord.ButtonStyle.success)
-    async def helpful_button(
-        self, interaction: discord.Interaction, button: discord.ui.Button[FeedbackView]
-    ) -> None:
-        await self._helpful()
-        button.disabled = True
-        await interaction.response.edit_message(view=self)
-
-    @discord.ui.button(label="Incorrect / Outdated", emoji="⚠️", style=discord.ButtonStyle.danger)
-    async def incorrect_button(
-        self, interaction: discord.Interaction, button: discord.ui.Button[FeedbackView]
-    ) -> None:
-        await self._incorrect()
-        button.disabled = True
-        await interaction.response.edit_message(view=self)

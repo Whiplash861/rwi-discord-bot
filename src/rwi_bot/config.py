@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from datetime import date
 from functools import lru_cache
 from pathlib import Path
 from typing import Annotated
@@ -34,7 +35,22 @@ class Settings(BaseSettings):
     member_reserve_usd: float = 5.0
     web_search_enabled: bool = True
     official_search_domains: Annotated[tuple[str, ...], NoDecode] = ("ubisoft.com",)
+    official_search_urls: Annotated[tuple[str, ...], NoDecode] = (
+        "https://trello.com/b/F2RU9ia9/the-division-2-known-issues",
+    )
+    community_search_domains: Annotated[tuple[str, ...], NoDecode] = (
+        "wikipedia.org",
+        "thedivision.fandom.com",
+        "reddit.com",
+        "gaming.stackexchange.com",
+        "gamefaqs.gamespot.com",
+        "steamcommunity.com",
+        "thedivisionforums.com",
+        "prototrack.gg",
+        "rubenalamina.mx",
+    )
     current_game_version: str = "Y8S3 Red Horizon"
+    current_game_version_started_on: date = date(2026, 8, 27)
     community_loadout_indexing_enabled: bool = True
 
     log_level: str = "INFO"
@@ -51,11 +67,23 @@ class Settings(BaseSettings):
     spam_history_hours: int = Field(default=24, ge=1, le=720)
     spam_timeout_minutes: int = Field(default=10, ge=1, le=10080)
 
-    @field_validator("official_search_domains", mode="before")
+    @field_validator(
+        "official_search_domains",
+        "official_search_urls",
+        "community_search_domains",
+        mode="before",
+    )
     @classmethod
     def split_domains(cls, value: object) -> object:
         if isinstance(value, str):
             return tuple(part.strip() for part in value.split(",") if part.strip())
+        return value
+
+    @field_validator("official_search_urls")
+    @classmethod
+    def valid_official_search_urls(cls, value: tuple[str, ...]) -> tuple[str, ...]:
+        if any(not item.startswith("https://") for item in value):
+            raise ValueError("official search URLs must use HTTPS")
         return value
 
     @field_validator("openai_hard_budget_usd", "member_reserve_usd")
