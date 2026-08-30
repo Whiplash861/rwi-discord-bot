@@ -3,6 +3,7 @@ from __future__ import annotations
 from collections.abc import Mapping
 from dataclasses import dataclass, field
 from enum import StrEnum
+from typing import cast
 
 import discord
 import structlog
@@ -208,27 +209,54 @@ class ServerReconciler:
         if bot_member is None:
             raise RuntimeError("The bot member is not available in the target guild.")
         roles = await self._ensure_roles(report, bot_member)
+        known_channels = [
+            cast(discord.abc.GuildChannel, channel) for channel in await self.guild.fetch_channels()
+        ]
 
         for category_name, channel_specs in CATEGORY_CHANNELS.items():
-            category = discord.utils.get(self.guild.categories, name=category_name)
+            category = next(
+                (
+                    channel
+                    for channel in known_channels
+                    if isinstance(channel, discord.CategoryChannel)
+                    and channel.name == category_name
+                ),
+                None,
+            )
             if category is None:
                 category = await self.guild.create_category(
                     category_name,
-                    overwrites={
-                        self.guild.default_role: discord.PermissionOverwrite(view_channel=False)
-                    },
+                    overwrites=self._new_category_overwrites(bot_member),
                     reason="RWI canonical server bootstrap",
                 )
+                known_channels.append(category)
                 report.created_categories.append(category_name)
+            else:
+                await self._ensure_category_overwrites(category, bot_member)
 
             for spec in channel_specs:
                 overwrites = self._channel_overwrites(spec, roles, bot_member)
-                channel: discord.abc.GuildChannel | None = discord.utils.get(
-                    category.channels, name=spec.name
+                channel: discord.abc.GuildChannel | None = next(
+                    (
+                        candidate
+                        for candidate in known_channels
+                        if getattr(candidate, "category_id", None) == category.id
+                        and candidate.name == spec.name
+                    ),
+                    None,
                 )
                 if channel is None:
                     channel = await self._create_channel(category, spec, overwrites)
+                    known_channels.append(channel)
                     report.created_channels.append(f"{category_name}/{spec.name}")
+                elif not self._channel_is_editable(channel, bot_member):
+                    if spec.bot_access:
+                        report.warnings.append(
+                            f"{category_name}/{spec.name} should be bot-managed, but RWI Bot "
+                            "cannot currently view and manage it."
+                        )
+                elif not self._channel_needs_update(channel, spec, overwrites):
+                    continue
                 elif isinstance(channel, (discord.TextChannel, discord.ForumChannel)):
                     await channel.edit(
                         overwrites=overwrites,
@@ -313,6 +341,78 @@ class ServerReconciler:
                 )
             roles[spec.name] = role
         return roles
+
+    def _new_category_overwrites(
+        self,
+        bot_member: discord.Member,
+    ) -> dict[
+        discord.Role | discord.Member | discord.Object,
+        discord.PermissionOverwrite,
+    ]:
+        return {
+            self.guild.default_role: discord.PermissionOverwrite(view_channel=False),
+            bot_member: discord.PermissionOverwrite(view_channel=True, manage_channels=True),
+        }
+
+    async def _ensure_category_overwrites(
+        self,
+        category: discord.CategoryChannel,
+        bot_member: discord.Member,
+    ) -> None:
+        default_overwrite = category.overwrites_for(self.guild.default_role)
+        if default_overwrite.view_channel is not False:
+            default_overwrite.update(view_channel=False)
+            await category.set_permissions(
+                self.guild.default_role,
+                overwrite=default_overwrite,
+                reason="Reconcile canonical RWI category privacy",
+            )
+
+        bot_overwrite = category.overwrites_for(bot_member)
+        if bot_overwrite.view_channel is not True or bot_overwrite.manage_channels is not True:
+            bot_overwrite.update(view_channel=True, manage_channels=True)
+            await category.set_permissions(
+                bot_member,
+                overwrite=bot_overwrite,
+                reason="Retain RWI bootstrap access to its managed category",
+            )
+
+    @staticmethod
+    def _channel_is_editable(
+        channel: discord.abc.GuildChannel,
+        bot_member: discord.Member,
+    ) -> bool:
+        permissions = channel.permissions_for(bot_member)
+        return permissions.view_channel and permissions.manage_channels
+
+    @classmethod
+    def _channel_needs_update(
+        cls,
+        channel: discord.abc.GuildChannel,
+        spec: ChannelSpec,
+        overwrites: Mapping[
+            discord.Role | discord.Member | discord.Object,
+            discord.PermissionOverwrite,
+        ],
+    ) -> bool:
+        if cls._overwrite_signature(channel.overwrites) != cls._overwrite_signature(overwrites):
+            return True
+        if isinstance(channel, (discord.TextChannel, discord.ForumChannel)):
+            return channel.topic != (spec.topic or "") or channel.nsfw != spec.nsfw
+        return False
+
+    @staticmethod
+    def _overwrite_signature(
+        overwrites: Mapping[
+            discord.Role | discord.Member | discord.Object,
+            discord.PermissionOverwrite,
+        ],
+    ) -> dict[int, tuple[int, int]]:
+        signature: dict[int, tuple[int, int]] = {}
+        for target, overwrite in overwrites.items():
+            allow, deny = overwrite.pair()
+            signature[target.id] = (allow.value, deny.value)
+        return signature
 
     @staticmethod
     def _grantable_permissions(
