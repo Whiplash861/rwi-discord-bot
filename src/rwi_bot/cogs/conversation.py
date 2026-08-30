@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import asyncio
+import re
 from collections import defaultdict, deque
 from dataclasses import dataclass
 from uuid import UUID
@@ -13,13 +14,19 @@ from rwi_bot.bot.client import RwiBot
 from rwi_bot.domain.schemas import (
     AnswerRequest,
     AnswerResult,
-    AnswerTier,
     AuditRecord,
     SourceCitation,
 )
 from rwi_bot.services.feedback import FeedbackSentiment, InferredFeedback, infer_feedback
 from rwi_bot.services.knowledge import sanitize_for_technicians
 from rwi_bot.services.language import interpret_locally, question_signature
+from rwi_bot.services.member_profiles import (
+    InferredMemberProfileUpdate,
+    MemberAnswerProfile,
+    infer_member_profile_update,
+    is_profile_query,
+    render_member_profile,
+)
 from rwi_bot.services.rate_limit import MemberRateLimiter
 from rwi_bot.services.sources import hide_source_links, is_source_request, render_sources
 
@@ -28,6 +35,9 @@ from rwi_bot.services.sources import hide_source_links, is_source_request, rende
 class ConversationTurn:
     member: str
     assistant: str
+    author_id: int | None = None
+    member_label: str | None = None
+    answer_kind: str = "answer"
     citations: tuple[SourceCitation, ...] = ()
     cache_entry_id: UUID | None = None
     learning_opt_out: bool = False
@@ -40,6 +50,7 @@ class ConversationTurn:
 class FeedbackOutcome:
     recorded: bool
     ticket_id: UUID | None = None
+    eligible: bool = False
 
 
 class ConversationCog(commands.Cog):
@@ -49,6 +60,9 @@ class ConversationCog(commands.Cog):
         self._locks: defaultdict[tuple[int, int], asyncio.Lock] = defaultdict(asyncio.Lock)
         self._memory: defaultdict[tuple[int, int], deque[ConversationTurn]] = defaultdict(
             lambda: deque(maxlen=4)
+        )
+        self._public_memory: defaultdict[int, deque[ConversationTurn]] = defaultdict(
+            lambda: deque(maxlen=6)
         )
 
     @commands.Cog.listener()
@@ -79,6 +93,7 @@ class ConversationCog(commands.Cog):
 
         destination = await self._destination(message)
         session_key = (message.author.id, destination.id)
+        member_label = self._member_label(message.author.display_name)
         async with self._locks[session_key]:
             prior_turn = self._memory[session_key][-1] if self._memory[session_key] else None
             inferred = infer_feedback(message.content)
@@ -93,6 +108,11 @@ class ConversationCog(commands.Cog):
                     await destination.send(
                         "I don't have a previous answer in this conversation to source yet."
                     )
+                elif prior_turn.answer_kind == "profile":
+                    await destination.send(
+                        "That was a local profile response based on settings you supplied; "
+                        "it didn't use an external source."
+                    )
                 else:
                     for chunk in split_discord_message(render_sources(prior_turn.citations)):
                         await destination.send(chunk)
@@ -100,6 +120,61 @@ class ConversationCog(commands.Cog):
 
             if inferred is not None and inferred.feedback_only:
                 await destination.send(self._feedback_reply(inferred, prior_turn, outcome))
+                return
+
+            profile: MemberAnswerProfile | None = None
+            profile_update = infer_member_profile_update(message.content)
+            if profile_update is not None:
+                if profile_update.update.fields:
+                    profile = await self.bot.services.profiles.update_answer_profile(
+                        message.author.id,
+                        profile_update.update,
+                    )
+                    await self.bot.services.audit.record(
+                        AuditRecord(
+                            event_type="profile.answer_preferences_updated",
+                            actor_id=message.author.id,
+                            target_type="user_profile",
+                            target_id="self",
+                            reason="Explicit member self-report",
+                            details={
+                                "fields": list(profile_update.update.fields),
+                                "is_dm": is_dm,
+                            },
+                        )
+                    )
+                else:
+                    profile = await self.bot.services.profiles.get_answer_profile(message.author.id)
+                profile_reply = self._profile_update_reply(profile, profile_update)
+                if profile_update.profile_only:
+                    await destination.send(profile_reply)
+                    self._remember_local_exchange(
+                        session_key=session_key,
+                        destination_id=destination.id,
+                        is_dm=is_dm,
+                        author_id=message.author.id,
+                        member_label=member_label,
+                        member_text=message.content,
+                        assistant_text=profile_reply,
+                    )
+                    return
+                await destination.send(profile_reply)
+
+            if is_profile_query(message.content):
+                profile = profile or await self.bot.services.profiles.get_answer_profile(
+                    message.author.id
+                )
+                profile_reply = render_member_profile(profile)
+                await destination.send(profile_reply)
+                self._remember_local_exchange(
+                    session_key=session_key,
+                    destination_id=destination.id,
+                    is_dm=is_dm,
+                    author_id=message.author.id,
+                    member_label=member_label,
+                    member_text=message.content,
+                    assistant_text=profile_reply,
+                )
                 return
 
             retry_after = await self.rate_limiter.acquire(message.author.id)
@@ -110,13 +185,22 @@ class ConversationCog(commands.Cog):
                 )
                 return
 
-            summary = self._conversation_summary(session_key)
+            profile = profile or await self.bot.services.profiles.get_answer_profile(
+                message.author.id
+            )
+            summary = self._conversation_summary(
+                session_key,
+                destination_id=destination.id,
+                is_dm=is_dm,
+            )
             request = AnswerRequest(
                 user_id=message.author.id,
                 guild_id=self.bot.services.settings.discord_guild_id,
                 channel_id=message.channel.id,
+                member_name=member_label,
                 question=message.content,
-                tier=AnswerTier.STANDARD,
+                tier=profile.detail_tier,
+                assumptions=profile.assumptions,
                 conversation_summary=summary,
                 is_dm=is_dm,
             )
@@ -124,17 +208,20 @@ class ConversationCog(commands.Cog):
                 result = await self.bot.services.qa.answer(request)
             await self._send_answer(destination, result)
             signature = self._question_signature(request)
-            self._memory[session_key].append(
-                ConversationTurn(
-                    member=message.content[:1200],
-                    assistant=hide_source_links(result.text, tuple(result.citations))[:1800],
-                    citations=tuple(result.citations),
-                    cache_entry_id=result.cache_entry_id,
-                    learning_opt_out=result.learning_opt_out,
-                    question_signature=signature,
-                    is_dm=is_dm,
-                )
+            turn = ConversationTurn(
+                member=message.content[:1200],
+                assistant=hide_source_links(result.text, tuple(result.citations))[:1800],
+                author_id=message.author.id,
+                member_label=member_label,
+                citations=tuple(result.citations),
+                cache_entry_id=result.cache_entry_id,
+                learning_opt_out=result.learning_opt_out,
+                question_signature=signature,
+                is_dm=is_dm,
             )
+            self._memory[session_key].append(turn)
+            if not is_dm:
+                self._public_memory[destination.id].append(turn)
 
     async def _live_member(self, user_id: int) -> discord.Member | None:
         guild = self.bot.get_guild(self.bot.services.settings.discord_guild_id)
@@ -171,20 +258,78 @@ class ConversationCog(commands.Cog):
         except (discord.Forbidden, discord.HTTPException):
             return message.channel
 
-    def _conversation_summary(self, session_key: tuple[int, int]) -> str | None:
-        turns = self._memory[session_key]
+    def _conversation_summary(
+        self,
+        session_key: tuple[int, int],
+        *,
+        destination_id: int | None = None,
+        is_dm: bool = True,
+    ) -> str | None:
+        turns = (
+            self._memory[session_key]
+            if is_dm or destination_id is None
+            else self._public_memory[destination_id]
+        )
         if not turns:
             return None
         parts: list[str] = []
         for turn in turns:
-            parts.append(f"Member: {turn.member}\nERIN: {turn.assistant}")
+            label = turn.member_label or "Member"
+            parts.append(f"Member {label}: {turn.member}\nERIN answering {label}: {turn.assistant}")
         return "\n\n".join(parts)[:6000]
 
     def clear_user_memory(self, user_id: int) -> int:
         keys = [key for key in self._memory if key[0] == user_id]
         for key in keys:
             del self._memory[key]
+        for destination_id, turns in list(self._public_memory.items()):
+            retained = [turn for turn in turns if turn.author_id != user_id]
+            if retained:
+                self._public_memory[destination_id] = deque(retained, maxlen=6)
+            else:
+                del self._public_memory[destination_id]
         return len(keys)
+
+    def _remember_local_exchange(
+        self,
+        *,
+        session_key: tuple[int, int],
+        destination_id: int,
+        is_dm: bool,
+        author_id: int,
+        member_label: str,
+        member_text: str,
+        assistant_text: str,
+    ) -> None:
+        turn = ConversationTurn(
+            member=member_text[:1200],
+            assistant=assistant_text[:1800],
+            author_id=author_id,
+            member_label=member_label,
+            answer_kind="profile",
+        )
+        self._memory[session_key].append(turn)
+        if not is_dm:
+            self._public_memory[destination_id].append(turn)
+
+    @staticmethod
+    def _member_label(display_name: str) -> str:
+        clean = re.sub(r"[\r\n\t]+", " ", display_name)
+        clean = " ".join(clean.split())[:80]
+        return clean or "Member"
+
+    @staticmethod
+    def _profile_update_reply(
+        profile: MemberAnswerProfile,
+        inference: InferredMemberProfileUpdate,
+    ) -> str:
+        if inference.update.fields:
+            response = render_member_profile(profile, updated=True)
+        else:
+            response = "I couldn't update your ERIN profile."
+        if inference.rejected:
+            response += "\n\nSkipped:\n" + "\n".join(f"- {reason}" for reason in inference.rejected)
+        return response
 
     async def _apply_inferred_feedback(
         self,
@@ -194,11 +339,13 @@ class ConversationCog(commands.Cog):
         user_id: int,
     ) -> FeedbackOutcome:
         if turn is None or inferred is None:
-            return FeedbackOutcome(recorded=False)
+            return FeedbackOutcome(recorded=False, eligible=False)
+        if turn.answer_kind != "answer":
+            return FeedbackOutcome(recorded=False, eligible=False)
         if turn.feedback_sentiment is inferred.sentiment:
-            return FeedbackOutcome(recorded=False)
+            return FeedbackOutcome(recorded=False, eligible=True)
         if turn.feedback_sentiment is FeedbackSentiment.INCORRECT:
-            return FeedbackOutcome(recorded=False)
+            return FeedbackOutcome(recorded=False, eligible=True)
 
         cache_state: str | None = None
         ticket_id: UUID | None = None
@@ -249,7 +396,7 @@ class ConversationCog(commands.Cog):
                 )
             )
         turn.feedback_sentiment = inferred.sentiment
-        return FeedbackOutcome(recorded=True, ticket_id=ticket_id)
+        return FeedbackOutcome(recorded=True, ticket_id=ticket_id, eligible=True)
 
     @staticmethod
     def _feedback_reply(
@@ -259,7 +406,7 @@ class ConversationCog(commands.Cog):
     ) -> str:
         if inferred.sentiment is FeedbackSentiment.HELPFUL:
             return "Glad that helped."
-        if turn is None:
+        if turn is None or not outcome.eligible:
             return "Tell me which answer was wrong or outdated, and I'll take another look."
         if not outcome.recorded:
             return "I already recorded that concern."
@@ -287,10 +434,16 @@ class ConversationCog(commands.Cog):
         result: AnswerResult,
     ) -> None:
         body = hide_source_links(result.text, tuple(result.citations))
+        roll_text = (
+            "maximum rolls" if result.assumptions.maximum_item_rolls else "current item rolls"
+        )
+        conditional_text = (
+            " · conditional buffs included" if result.assumptions.include_conditional_buffs else ""
+        )
         body += (
-            "\n\n**Assumptions:** Level 40 · SHD "
+            f"\n\n**Assumptions:** Level {result.assumptions.level} · SHD "
             f"{result.assumptions.shd} · Expertise {result.assumptions.expertise} · "
-            f"{result.assumptions.mode} · maximum rolls"
+            f"{result.assumptions.mode} · {roll_text}{conditional_text}"
         )
         chunks = split_discord_message(body)
         for chunk in chunks:

@@ -43,6 +43,7 @@ class AnswerRequest(BaseModel):
     user_id: int
     guild_id: int
     channel_id: int | None
+    member_name: str | None = Field(default=None, max_length=80)
     question: str = Field(min_length=1, max_length=4000)
     tier: AnswerTier = AnswerTier.STANDARD
     assumptions: AnswerAssumptions = Field(default_factory=AnswerAssumptions)

@@ -164,6 +164,7 @@ class QuestionAnsweringService:
         )
         input_text = compose_answer_input(
             question=request.question,
+            member_name=request.member_name,
             detail_tier=request.tier.value,
             assumptions=_format_assumptions(assumptions_dict),
             current_game_version=self.current_game_version,

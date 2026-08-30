@@ -10,6 +10,7 @@ from discord.ext import commands
 from rwi_bot.bot.client import RwiBot
 from rwi_bot.bot.views import ConfirmationView
 from rwi_bot.domain.schemas import AuditRecord
+from rwi_bot.services.member_profiles import render_member_profile
 
 
 class PrivacyCog(commands.Cog):
@@ -26,13 +27,15 @@ class PrivacyCog(commands.Cog):
         if not await self._allowed(interaction):
             return
         opted_out = await self.bot.services.profiles.learning_opted_out(interaction.user.id)
+        profile = await self.bot.services.profiles.get_answer_profile(interaction.user.id)
         await interaction.response.send_message(
             "**ERIN privacy status**\n"
             f"Shared answer learning: **{'disabled' if opted_out else 'enabled'}**\n\n"
             "Learning opt-out prevents your new answers and feedback from becoming shared "
             "cache material and removes your requester attribution from new review tickets. "
             "It also prevents ERIN from indexing your Community Builds submissions. "
-            "It does not prevent a question you ask from being processed to answer you.",
+            "It does not prevent a question you ask from being processed to answer you.\n\n"
+            f"{render_member_profile(profile)}",
             ephemeral=True,
         )
 

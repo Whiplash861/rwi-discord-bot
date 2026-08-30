@@ -8,8 +8,9 @@ ERIN is organized around four trust domains that must not be merged:
 3. **Adaptive answer cache** stores reusable answer text and the exact knowledge
    revisions, assumptions, citations, model, prompt version, freshness, and inferred feedback
    state that support it.
-4. **Private member state** contains individual preferences, inventory, saved builds,
-   and conversation context. Private state is never copied into shared cache entries.
+4. **Private member state** contains individual answer assumptions, preferences,
+   inventory, saved builds, and DM conversation context. Private state is never copied
+   into another member's request or into shared cache entries.
 
 Members control this boundary with `/privacy`. Learning opt-out is checked before each
 answer: opted-out interactions can consume existing verified/shared answers but cannot
@@ -31,26 +32,38 @@ database outage cannot silently reactivate paid or automated work.
 ## Request path
 
 A member request is accepted only from the configured guild's `ask-rwi` space or from a
-DM whose sender is still a guild member. Each member/channel or member/thread pair has
-an isolated in-process conversation session.
+DM whose sender is still a guild member. DM context remains isolated by member. Public
+thread context is shared because the messages are already visible there, but every
+member message and ERIN response is author-labeled. Only the current author's private
+profile is loaded into an answer request.
 
 The answer path is:
 
-1. Reject immediately when durable maintenance mode is active.
-2. Normalize aliases and common language locally.
-3. For build advice, search the current-version Community Builds index and return a
+1. Recognize explicit first-person profile updates and profile queries locally. Profile-
+   only messages never call OpenAI or web search.
+2. Load the current author's saved answer assumptions and detail tier. Reject immediately
+   when durable maintenance mode blocks a normal answer.
+3. Normalize aliases and common language locally.
+4. For build advice, search the current-version Community Builds index and return a
    clearly labeled local match with links to the original posts when one is relevant.
-4. Look for a fresh, dependency-valid shared cache entry.
-5. Search active verified knowledge across subject, identity, structured content,
+5. Look for a fresh, dependency-valid shared cache entry whose signature includes the
+   current author's assumptions.
+6. Search active verified knowledge across subject, identity, structured content,
    context, and game-version text.
-6. Use deterministic code for values and build legality as coverage is added.
-7. Reserve budget before an external request can start.
-8. Use OpenAI without web search when verified context is sufficient.
-9. Use curated web fallback only when local coverage is missing and web search is enabled.
+7. Use deterministic code for values and build legality as coverage is added.
+8. Reserve budget before an external request can start.
+9. Use OpenAI without web search when verified context is sufficient.
+10. Use curated web fallback only when local coverage is missing and web search is enabled.
    The target set combines current Ubisoft material, the exact official Division 2 Known
    Issues Trello board, Wikipedia and Division wikis, Reddit, Steam, and selected Q&A and
    community forums. Community pages remain corroborative rather than first-party truth.
-10. Open a sanitized Technician ticket when no answer can be verified.
+11. Open a sanitized Technician ticket when no answer can be verified.
+
+Profile writes require explicit self-reference such as `I'm SHD 2500`, `my Expertise is
+20`, or `I play PvP`. A statement about another member never updates either profile.
+Profile-only acknowledgements and `show my profile` queries are deterministic local
+responses. The current member can review the same values privately with `/privacy status`,
+export them, or return them to defaults with the confirmed privacy reset.
 
 All current-game paths share the `Y8S3 Red Horizon` version in their cache signature.
 Local knowledge and Community Builds retrieval are constrained to that version, and the

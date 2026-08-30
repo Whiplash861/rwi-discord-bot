@@ -9,7 +9,7 @@ import pytest
 
 from rwi_bot.cogs.conversation import ConversationCog, ConversationTurn, split_discord_message
 from rwi_bot.db.models import CacheState
-from rwi_bot.domain.schemas import AnswerResult, SourceCitation
+from rwi_bot.domain.schemas import AnswerAssumptions, AnswerResult, SourceCitation
 from rwi_bot.services.feedback import FeedbackSentiment, infer_feedback
 
 
@@ -28,6 +28,14 @@ async def test_normal_answer_has_no_sources_or_feedback_view() -> None:
     cog = ConversationCog(cast(Any, SimpleNamespace()))
     result = AnswerResult(
         text="Read the [guide](https://example.test/guide).",
+        assumptions=AnswerAssumptions(
+            level=40,
+            shd=5000,
+            expertise=30,
+            mode="PvP",
+            maximum_item_rolls=False,
+            include_conditional_buffs=True,
+        ),
         citations=[
             SourceCitation(
                 title="Guide",
@@ -42,7 +50,55 @@ async def test_normal_answer_has_no_sources_or_feedback_view() -> None:
     message = destination.send.call_args.args[0]
     assert "https://" not in message
     assert "**Sources**" not in message
+    assert "SHD 5000" in message
+    assert "Expertise 30" in message
+    assert "PvP" in message
+    assert "current item rolls" in message
+    assert "conditional buffs included" in message
     assert destination.send.call_args.kwargs == {}
+
+
+def test_public_thread_context_keeps_member_authors_distinct() -> None:
+    cog = ConversationCog(cast(Any, SimpleNamespace()))
+    cog._public_memory[99].append(
+        ConversationTurn(
+            member="I am SHD 2500.",
+            assistant="Profile updated.",
+            author_id=1,
+            member_label="User A",
+        )
+    )
+    cog._public_memory[99].append(
+        ConversationTurn(
+            member="What about me?",
+            assistant="Using your own settings.",
+            author_id=2,
+            member_label="User B",
+        )
+    )
+
+    summary = cog._conversation_summary((2, 99), destination_id=99, is_dm=False)
+
+    assert summary is not None
+    assert "Member User A: I am SHD 2500." in summary
+    assert "ERIN answering User A" in summary
+    assert "Member User B: What about me?" in summary
+
+
+def test_private_dm_context_does_not_include_public_thread_memory() -> None:
+    cog = ConversationCog(cast(Any, SimpleNamespace()))
+    cog._public_memory[99].append(
+        ConversationTurn(member="public", assistant="public answer", member_label="Other")
+    )
+    cog._memory[(42, 99)].append(
+        ConversationTurn(member="private", assistant="private answer", member_label="Self")
+    )
+
+    summary = cog._conversation_summary((42, 99), destination_id=99, is_dm=True)
+
+    assert summary is not None
+    assert "private answer" in summary
+    assert "public answer" not in summary
 
 
 @pytest.mark.asyncio
@@ -95,4 +151,29 @@ async def test_repeated_inferred_feedback_is_deduplicated() -> None:
 
     assert outcome.recorded is False
     services.cache.mark_feedback.assert_not_awaited()
+    services.audit.record.assert_not_awaited()
+
+
+@pytest.mark.asyncio
+async def test_profile_exchange_is_not_eligible_for_answer_feedback() -> None:
+    services = SimpleNamespace(
+        cache=SimpleNamespace(mark_feedback=AsyncMock()),
+        tickets=SimpleNamespace(open_or_increment=AsyncMock()),
+        audit=SimpleNamespace(record=AsyncMock()),
+    )
+    cog = ConversationCog(cast(Any, SimpleNamespace(services=services)))
+    turn = ConversationTurn(
+        member="I'm SHD 5000 and Expertise 30.",
+        assistant="Updated your ERIN profile.",
+        answer_kind="profile",
+        cache_entry_id=uuid4(),
+        question_signature="must-not-be-scored",
+    )
+
+    outcome = await cog._apply_inferred_feedback(turn, infer_feedback("Thanks"), user_id=42)
+
+    assert outcome.recorded is False
+    assert outcome.eligible is False
+    services.cache.mark_feedback.assert_not_awaited()
+    services.tickets.open_or_increment.assert_not_awaited()
     services.audit.record.assert_not_awaited()

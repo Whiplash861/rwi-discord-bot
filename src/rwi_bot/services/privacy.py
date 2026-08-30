@@ -14,6 +14,8 @@ from rwi_bot.db.models import (
     UserProfile,
 )
 from rwi_bot.db.session import Database
+from rwi_bot.domain.schemas import AnswerAssumptions, AnswerTier
+from rwi_bot.services.member_profiles import MemberAnswerProfile, MemberProfileUpdate
 
 
 @dataclass(frozen=True, slots=True)
@@ -36,6 +38,52 @@ class ProfileRepository:
                 select(UserProfile.learning_opt_out).where(UserProfile.discord_user_id == user_id)
             )
             return bool(value)
+
+    async def get_answer_profile(self, user_id: int) -> MemberAnswerProfile:
+        async with self.database.session() as session:
+            profile = await session.get(UserProfile, user_id)
+        if profile is None:
+            return MemberAnswerProfile(assumptions=AnswerAssumptions())
+        return self._answer_profile(profile, persisted=True)
+
+    async def update_answer_profile(
+        self,
+        user_id: int,
+        profile_update: MemberProfileUpdate,
+    ) -> MemberAnswerProfile:
+        async with self.database.session() as session:
+            profile = await session.get(UserProfile, user_id, with_for_update=True)
+            if profile is None:
+                profile = UserProfile(
+                    discord_user_id=user_id,
+                    detail_tier=AnswerTier.STANDARD.value,
+                    shd_level=1000,
+                    expertise_level=0,
+                    platform_roles=[],
+                    preferences={},
+                    learning_opt_out=False,
+                )
+                session.add(profile)
+
+            if profile_update.shd is not None:
+                profile.shd_level = profile_update.shd
+            if profile_update.expertise is not None:
+                profile.expertise_level = profile_update.expertise
+            if profile_update.detail_tier is not None:
+                profile.detail_tier = profile_update.detail_tier.value
+
+            preferences = dict(profile.preferences or {})
+            preference_updates = (
+                ("level", profile_update.level),
+                ("mode", profile_update.mode),
+                ("maximum_item_rolls", profile_update.maximum_item_rolls),
+                ("include_conditional_buffs", profile_update.include_conditional_buffs),
+            )
+            for key, value in preference_updates:
+                if value is not None:
+                    preferences[key] = value
+            profile.preferences = preferences
+            return self._answer_profile(profile, persisted=True)
 
     async def set_learning_opt_out(self, user_id: int, *, opted_out: bool) -> int:
         async with self.database.session() as session:
@@ -180,3 +228,41 @@ class ProfileRepository:
     @staticmethod
     def _rowcount(result: Any) -> int:
         return int(cast(Any, result).rowcount or 0)
+
+    @staticmethod
+    def _answer_profile(profile: UserProfile, *, persisted: bool) -> MemberAnswerProfile:
+        preferences = profile.preferences if isinstance(profile.preferences, dict) else {}
+        level = ProfileRepository._bounded_int(preferences.get("level"), 1, 40, 40)
+        shd = ProfileRepository._bounded_int(profile.shd_level, 0, 1_000_000, 1000)
+        expertise = ProfileRepository._bounded_int(profile.expertise_level, 0, 30, 0)
+        mode = preferences.get("mode")
+        if mode not in {"PvE", "PvP"}:
+            mode = "PvE"
+        maximum_item_rolls = preferences.get("maximum_item_rolls")
+        if not isinstance(maximum_item_rolls, bool):
+            maximum_item_rolls = True
+        include_conditional_buffs = preferences.get("include_conditional_buffs")
+        if not isinstance(include_conditional_buffs, bool):
+            include_conditional_buffs = False
+        try:
+            detail_tier = AnswerTier(profile.detail_tier)
+        except (TypeError, ValueError):
+            detail_tier = AnswerTier.STANDARD
+        return MemberAnswerProfile(
+            assumptions=AnswerAssumptions(
+                level=level,
+                shd=shd,
+                expertise=expertise,
+                mode=mode,
+                maximum_item_rolls=maximum_item_rolls,
+                include_conditional_buffs=include_conditional_buffs,
+            ),
+            detail_tier=detail_tier,
+            persisted=persisted,
+        )
+
+    @staticmethod
+    def _bounded_int(value: object, minimum: int, maximum: int, default: int) -> int:
+        if isinstance(value, int) and not isinstance(value, bool) and minimum <= value <= maximum:
+            return value
+        return default

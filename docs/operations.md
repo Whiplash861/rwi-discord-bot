@@ -207,6 +207,20 @@ explicit feedback such as `thanks`, `that worked`, `that's wrong`, or `that's ou
 is also handled locally and does not consume the member answer limit. Mixed feedback plus
 a new question records the signal and continues through the normal answer path.
 
+Members can update their own answer profile with explicit first-person statements such
+as `I'm SHD 2500 and Expertise 20`, `I play PvP`, or `I prefer technical answers`.
+Profile-only updates and `show my profile` are handled locally without consuming an
+answer request. If a profile declaration also contains a question, ERIN writes the new
+values first and answers using them. Supported values are character level 1–40, SHD
+0–1,000,000, Red Horizon Expertise 0–30, PvE/PvP mode, maximum/current item-roll
+assumptions, conditional-buff inclusion, and concise/standard/technical detail.
+
+Only self-reports are accepted; statements about another member cannot update a profile.
+In a public thread, recent public context is author-labeled while the active assumptions
+always come from the current message author's private profile. `/privacy status` displays
+the member's saved answer profile alongside learning status. Export includes the stored
+fields and reset restores their defaults.
+
 `/privacy export` privately attaches a JSON export of the member profile, persisted
 conversation summaries, feedback, and indexed Community Builds starter posts.
 `/privacy reset` requires user-bound confirmation, then resets profile preferences,

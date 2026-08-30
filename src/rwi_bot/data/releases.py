@@ -83,4 +83,38 @@ RELEASES: tuple[Release, ...] = (
             ),
         ),
     ),
+    Release(
+        release_id="erin-update-3",
+        update_number=3,
+        version="V0.1.2",
+        released_on=date(2026, 8, 30),
+        notes=(
+            ReleaseNote(
+                ReleaseSection.HIGH_IMPACT,
+                "Added durable per-member answer profiles so each message uses its author's "
+                "saved level, SHD, Expertise, mode, roll, buff, and detail preferences.",
+            ),
+            ReleaseNote(
+                ReleaseSection.NEW_FEATURES,
+                "ERIN now recognizes explicit first-person profile updates and profile "
+                "queries locally without an OpenAI or web request.",
+            ),
+            ReleaseNote(
+                ReleaseSection.NEW_FEATURES,
+                "Public thread context now labels each member and ERIN response by author, "
+                "allowing multiple agents to converse without exchanging profiles.",
+            ),
+            ReleaseNote(
+                ReleaseSection.PRIVACY_SAFETY,
+                "Only self-reported values update a profile; third-party statements are "
+                "ignored, private profiles stay isolated, and saved values remain covered "
+                "by privacy export and reset.",
+            ),
+            ReleaseNote(
+                ReleaseSection.FIXES,
+                "Fixed answer requests and assumption footers always falling back to SHD "
+                "1000, Expertise 0, Level 40, PvE, and maximum rolls.",
+            ),
+        ),
+    ),
 )

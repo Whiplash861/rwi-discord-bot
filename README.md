@@ -17,7 +17,11 @@ Ubisoft, Wikipedia and Division wikis, Reddit, Steam, and selected Q&A/community
 Normal answers keep citations out of the message; a member can ask for the sources from
 ERIN's immediately preceding answer. Explicit natural follow-ups such as “thanks,” “that
 worked,” “that's wrong,” or “that's outdated” replace rating buttons and are inferred
-locally at high confidence.
+locally at high confidence. Members can also explicitly tell ERIN their level, SHD,
+Expertise, preferred mode, roll/buff assumptions, and answer-detail preference. Those
+private settings persist per Discord user and drive that member's later answers. Public
+thread context labels each author, so multiple agents can participate without one
+member's profile being applied to another.
 Every deployed application revision is also represented in the community-readable,
 read-only `#erin-patch-notes` index. Authored releases use severity-grouped notes;
 deployment fingerprinting produces a categorized fallback when a release manifest was
