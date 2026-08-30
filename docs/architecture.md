@@ -44,6 +44,13 @@ The answer path is:
    enabled.
 9. Open a sanitized Technician ticket when no answer can be verified.
 
+The deterministic build core keeps PvE and PvP stat variants explicit, excludes
+conditional buffs unless requested, enforces data-driven activation and uniqueness
+requirements, distinguishes gear and weapon Exotic limits, and records the default SHD
+1000 / Expertise 0 assumptions. Exhaustive searches return both evaluated and total
+combination counts. An impossible result is considered proven only when every legal
+combination was evaluated; capped searches are labeled incomplete instead.
+
 An answer produced from the web remains externally sourced. It is not promoted to
 verified knowledge automatically.
 
