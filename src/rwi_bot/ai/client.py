@@ -76,9 +76,33 @@ class RwiOpenAIClient:
     ) -> OpenAIAnswer:
         if self.maintenance.halted:
             raise OpenAIUnavailableError("RWI is in maintenance mode.")
-        if not await self.breaker.allow():
+        permit = await self.breaker.acquire()
+        if permit is None:
             raise OpenAIUnavailableError("The OpenAI circuit breaker is open.")
+        try:
+            return await self._answer_with_permit(
+                input_text=input_text,
+                user_id=user_id,
+                correlation_id=correlation_id,
+                complexity=complexity,
+                web_search=web_search,
+                official_only=official_only,
+                spending_class=spending_class,
+            )
+        finally:
+            await self.breaker.abandon(permit)
 
+    async def _answer_with_permit(
+        self,
+        *,
+        input_text: str,
+        user_id: int,
+        correlation_id: UUID,
+        complexity: str,
+        web_search: bool,
+        official_only: bool,
+        spending_class: SpendingClass,
+    ) -> OpenAIAnswer:
         model = self._select_model(complexity)
         maximum = Decimal("0.25") if web_search else Decimal("0.10")
         tools: list[dict[str, Any]] = []

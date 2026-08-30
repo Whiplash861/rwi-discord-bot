@@ -90,6 +90,12 @@ rechecked after it reaches the slot and is rejected if a halt happened while it 
 Budget reservations account for concurrent requests so several individually acceptable
 requests cannot collectively cross the configured cap.
 
+The OpenAI failure breaker uses a sliding failure window and a cooldown. Once cooldown
+expires, exactly one leased half-open probe may run; all other provider work remains
+blocked. A failed probe starts a new full cooldown, a successful probe closes the
+breaker, and cancellation or a maintenance/budget rejection releases only that probe's
+lease. This prevents both half-open request herds and a permanently stuck probe.
+
 An already-started provider request may finish and be charged. No queued provider call
 is allowed to begin after halt activation. Resume checks cannot overwrite a newer halt
 that arrives while those checks are running.

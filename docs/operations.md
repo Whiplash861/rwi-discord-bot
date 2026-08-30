@@ -68,6 +68,10 @@ Use `/rwi status` to inspect the state. `/rwi resume` runs health checks and doe
 replay work that accumulated before the halt. `/rwi resume force` is restricted to the
 configured owner.
 
+Status includes the OpenAI circuit-breaker state and recent failure count. Resume treats
+an open breaker as a failed health check. After its cooldown it becomes half-open, which
+allows resume and exactly one provider probe; a failed probe reopens a full cooldown.
+
 If the minimal Discord control listener is unavailable, stop the containers locally:
 
 ```powershell

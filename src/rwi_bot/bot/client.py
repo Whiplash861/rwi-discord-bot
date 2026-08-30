@@ -186,6 +186,17 @@ class RwiBot(commands.Bot):
                 detail="OpenAI key is present." if key_present else "OpenAI key is missing.",
             )
         )
+        breaker = await self.services.ai.breaker.snapshot()
+        results.append(
+            ResumeCheck(
+                name="openai_breaker",
+                passed=breaker.state.value != "open",
+                detail=(
+                    f"OpenAI breaker is {breaker.state.value} with "
+                    f"{breaker.recent_failures} recent failure(s)."
+                ),
+            )
+        )
         return results
 
     async def send_audit_summary(self, record: AuditRecord, event_id: UUID) -> None:

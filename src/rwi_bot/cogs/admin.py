@@ -78,12 +78,15 @@ class AdminCog(commands.Cog):
             return
         state = self.bot.services.maintenance.state
         spent, limit = await self.bot.services.budget.utilization()
+        breaker = await self.bot.services.ai.breaker.snapshot()
         status = "HALTED (Do Not Disturb)" if state.halted else "ONLINE"
         await interaction.response.send_message(
             f"**RWI status:** {status}\n"
             f"**Reason:** {state.reason or 'None'}\n"
             f"**Changed:** {discord.utils.format_dt(state.changed_at, style='R')}\n"
             f"**State revision:** `{state.revision}`\n"
+            f"**OpenAI breaker:** `{breaker.state.value}` "
+            f"({breaker.recent_failures} recent failure(s))\n"
             f"**Estimated API spend:** `${spent:.2f}` / `${limit:.2f}`",
             ephemeral=True,
         )
