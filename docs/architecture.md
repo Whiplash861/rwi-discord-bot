@@ -1,29 +1,33 @@
 # RWI architecture
 
-ERIN is organized around four trust domains that must not be merged:
+ERIN is organized around five trust domains that must not be merged:
 
 1. **Verified knowledge** is server-wide, source-backed, versioned game truth.
 2. **Community loadouts** are public player submissions indexed locally for retrieval.
    They are useful examples, not verified claims, and remain visibly labeled as such.
-3. **Adaptive answer cache** stores reusable answer text and the exact knowledge
+3. **Reviewed community claims** are substantial public member corrections that have
+   been confirmed or qualified by an authorized experienced reviewer for the current
+   game version. Pending, incorrect, bug, and exploit records are never answer context.
+4. **Adaptive answer cache** stores reusable answer text and the exact knowledge
    revisions, assumptions, citations, model, prompt version, freshness, and inferred feedback
    state that support it.
-4. **Private member state** contains individual answer assumptions, preferences,
+5. **Private member state** contains individual answer assumptions, preferences,
    inventory, saved builds, and DM conversation context. Private state is never copied
    into another member's request or into shared cache entries.
 
 Members control this boundary with `/privacy`. Learning opt-out is checked before each
 answer: opted-out interactions can consume existing verified/shared answers but cannot
-create shared cache candidates, persist positive cache feedback, or attach the requester identity
-to new review tickets. It does not prevent the member's current question from being
-processed to answer them.
+create shared cache candidates or community claims, persist positive cache feedback, or
+attach the requester identity to new review tickets. It does not prevent the member's
+current question from being processed to answer them.
 
 Private export includes the member's profile, persisted conversation summaries,
-feedback, and any indexed Community Builds starter posts they authored. Confirmed reset
-clears those records and indexed copies, anonymizes review-ticket and usage associations,
-and clears in-process conversation memory while preserving the learning preference. It
-does not delete the original Discord forum post. Security, moderation, and immutable
-audit records remain retained and are identified as such before reset.
+feedback, indexed Community Builds starter posts, and community claims they contributed.
+Confirmed reset clears pending claims and indexed copies, anonymizes the contributor on
+already-reviewed claims plus review-ticket and usage associations, and clears in-process
+conversation memory while preserving the learning preference. It does not delete the
+original Discord post. Security, moderation, and immutable audit records remain retained
+and are identified as such before reset.
 
 PostgreSQL is authoritative for versioned application data. Discord is an interaction
 and review surface. The local runtime volume holds the emergency maintenance state so a
@@ -46,24 +50,33 @@ The answer path is:
 3. Normalize aliases and common language locally.
 4. For build advice, search the current-version Community Builds index and return a
    clearly labeled local match with links to the original posts when one is relevant.
-5. Look for a fresh, dependency-valid shared cache entry whose signature includes the
+5. Search current-version community claims that an authorized experienced member has
+   verified or qualified. A qualification controls over the original wording.
+6. Look for a fresh, dependency-valid shared cache entry whose signature includes the
    current author's assumptions.
-6. Search active verified knowledge across subject, identity, structured content,
+7. Search active verified knowledge across subject, identity, structured content,
    context, and game-version text.
-7. Use deterministic code for values and build legality as coverage is added.
-8. Reserve budget before an external request can start.
-9. Use OpenAI without web search when verified context is sufficient.
-10. Use curated web fallback only when local coverage is missing and web search is enabled.
+8. Use deterministic code for values and build legality as coverage is added.
+9. Reserve budget before an external request can start.
+10. Use OpenAI without web search when reviewed or verified context is sufficient.
+11. Use curated web fallback only when local coverage is missing and web search is enabled.
    The target set combines current Ubisoft material, the exact official Division 2 Known
    Issues Trello board, Wikipedia and Division wikis, Reddit, Steam, and selected Q&A and
    community forums. Community pages remain corroborative rather than first-party truth.
-11. Open a sanitized Technician ticket when no answer can be verified.
+12. Open a sanitized Technician ticket when no answer can be verified.
 
 Profile writes require explicit self-reference such as `I'm SHD 2500`, `my Expertise is
 20`, or `I play PvP`. A statement about another member never updates either profile.
 Profile-only acknowledgements and `show my profile` queries are deterministic local
 responses. The current member can review the same values privately with `/privacy status`,
 export them, or return them to defaults with the confirmed privacy reset.
+
+Profiles are keyed only by Discord user ID in PostgreSQL. Thread IDs, channels, and
+process-local conversation sessions do not own the values, so one saved profile follows
+the member across `ask-rwi` threads, bot restarts, and DMs while they remain a server
+member. Answer generation uses those values silently. ERIN mentions a setting only when
+it materially explains a recommendation, resolves an ambiguity, or the member asks; no
+standard assumptions footer is appended.
 
 All current-game paths share the `Y8S3 Red Horizon` version in their cache signature.
 Local knowledge and Community Builds retrieval are constrained to that version, and the
@@ -128,6 +141,21 @@ combination was evaluated; capped searches are labeled incomplete instead.
 
 An answer produced from the web remains externally sourced. It is not promoted to
 verified knowledge automatically.
+
+Substantial factual follow-ups to ERIN's own public answers are detected locally using a
+conservative assertion threshold; questions, short opinions, DMs, and opted-out member
+messages are excluded. A captured claim is durable but remains `pending`, and ERIN tells
+the contributor that it will not be reused before review. `#technician-lab` receives the
+claim, original question, prior-answer excerpt, current game version, and a link to the
+public source message.
+
+Technicians, Division Commanders, and the configured owner can mark the claim Accurate,
+Qualify, Incorrect, Bug, or Exploit with persistent controls, or reply `Yes`, `Yes, but
+…`, or `No, …`. Every non-accurate decision requires an explanation. Only Accurate and
+Qualify states are searchable; qualification text controls over the submitted wording.
+Bug, exploit, incorrect, and pending records can never support an answer or cache entry.
+Reviewed community context is version-filtered and bypasses shared answer caching so a
+later review change cannot leave a stale derived answer active.
 
 Every knowledge change creates an immutable revision snapshot containing its content,
 context, status, game version, confidence, linked-source evidence, actor, reason, and

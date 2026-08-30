@@ -37,10 +37,10 @@ def test_authored_release_catalog_is_unique_and_uses_requested_format() -> None:
     assert release.legacy_release_ids == ("erin-update-1-v1.22.333",)
 
     latest = RELEASES[-1]
-    assert latest.update_number == 3
-    assert latest.version == "V0.1.2"
+    assert latest.update_number == 5
+    assert latest.version == "V0.1.4"
     assert render_release_description(latest).startswith(
-        "V0.1.2\n\nAugust 30, 2026\n\n__Patch Notes__"
+        "V0.1.4\n\nAugust 30, 2026\n\n__Patch Notes__"
     )
 
 

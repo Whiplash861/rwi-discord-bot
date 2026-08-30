@@ -59,6 +59,8 @@ async def test_private_state_reset_preserves_opt_out_and_anonymizes_links() -> N
         SimpleNamespace(rowcount=4),
         SimpleNamespace(rowcount=5),
         SimpleNamespace(rowcount=6),
+        SimpleNamespace(rowcount=7),
+        SimpleNamespace(rowcount=8),
     ]
     repository = ProfileRepository(FakeDatabase(session))  # type: ignore[arg-type]
 
@@ -75,6 +77,8 @@ async def test_private_state_reset_preserves_opt_out_and_anonymizes_links() -> N
     assert result.tickets_anonymized == 4
     assert result.usage_records_anonymized == 5
     assert result.community_loadouts_deleted == 6
+    assert result.pending_claims_deleted == 7
+    assert result.reviewed_claims_anonymized == 8
     assert result.learning_opt_out_preserved is True
 
 

@@ -17,6 +17,7 @@ from rwi_bot.domain.schemas import (
     AuditRecord,
     SourceCitation,
 )
+from rwi_bot.services.community_learning import infer_community_claim
 from rwi_bot.services.feedback import FeedbackSentiment, InferredFeedback, infer_feedback
 from rwi_bot.services.knowledge import sanitize_for_technicians
 from rwi_bot.services.language import interpret_locally, question_signature
@@ -185,6 +186,26 @@ class ConversationCog(commands.Cog):
                 )
                 return
 
+            learning_turn = self._latest_public_answer(destination.id) if not is_dm else None
+            if learning_turn is not None:
+                claim_proposal = infer_community_claim(message.content)
+                learning = self.bot.get_cog("CommunityLearningCog")
+                if claim_proposal is not None and learning is not None:
+                    claim = await learning.submit_candidate(  # type: ignore[attr-defined]
+                        message,
+                        proposal=claim_proposal,
+                        member_label=member_label,
+                        source_question=learning_turn.member,
+                        prior_answer_excerpt=learning_turn.assistant,
+                    )
+                    if claim is not None:
+                        await destination.send(
+                            "Thanks—that is substantial enough to archive for review. I asked "
+                            "experienced members to verify it. I won't reuse it as fact unless "
+                            "they approve or qualify it, and bug or exploit techniques are "
+                            "excluded from recommendations."
+                        )
+
             profile = profile or await self.bot.services.profiles.get_answer_profile(
                 message.author.id
             )
@@ -289,6 +310,16 @@ class ConversationCog(commands.Cog):
             else:
                 del self._public_memory[destination_id]
         return len(keys)
+
+    def _latest_public_answer(self, destination_id: int) -> ConversationTurn | None:
+        return next(
+            (
+                turn
+                for turn in reversed(self._public_memory[destination_id])
+                if turn.answer_kind == "answer"
+            ),
+            None,
+        )
 
     def _remember_local_exchange(
         self,
@@ -434,17 +465,6 @@ class ConversationCog(commands.Cog):
         result: AnswerResult,
     ) -> None:
         body = hide_source_links(result.text, tuple(result.citations))
-        roll_text = (
-            "maximum rolls" if result.assumptions.maximum_item_rolls else "current item rolls"
-        )
-        conditional_text = (
-            " · conditional buffs included" if result.assumptions.include_conditional_buffs else ""
-        )
-        body += (
-            f"\n\n**Assumptions:** Level {result.assumptions.level} · SHD "
-            f"{result.assumptions.shd} · Expertise {result.assumptions.expertise} · "
-            f"{result.assumptions.mode} · {roll_text}{conditional_text}"
-        )
         chunks = split_discord_message(body)
         for chunk in chunks:
             await destination.send(chunk)

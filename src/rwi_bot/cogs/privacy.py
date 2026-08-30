@@ -33,7 +33,8 @@ class PrivacyCog(commands.Cog):
             f"Shared answer learning: **{'disabled' if opted_out else 'enabled'}**\n\n"
             "Learning opt-out prevents your new answers and feedback from becoming shared "
             "cache material and removes your requester attribution from new review tickets. "
-            "It also prevents ERIN from indexing your Community Builds submissions. "
+            "It also prevents ERIN from indexing your Community Builds submissions or "
+            "archiving your public factual follow-ups as community claims. "
             "It does not prevent a question you ask from being processed to answer you.\n\n"
             f"{render_member_profile(profile)}",
             ephemeral=True,
@@ -47,7 +48,7 @@ class PrivacyCog(commands.Cog):
     async def learning(self, interaction: discord.Interaction, enabled: bool) -> None:
         if not await self._allowed(interaction):
             return
-        loadouts_removed = await self.bot.services.profiles.set_learning_opt_out(
+        result = await self.bot.services.profiles.set_learning_opt_out(
             interaction.user.id,
             opted_out=not enabled,
         )
@@ -60,14 +61,27 @@ class PrivacyCog(commands.Cog):
                 reason="Member privacy preference",
                 details={
                     "learning_enabled": enabled,
-                    "community_loadout_index_entries_removed": loadouts_removed,
+                    "community_loadout_index_entries_removed": (result.community_loadouts_deleted),
+                    "pending_community_claims_removed": result.pending_claims_deleted,
+                    "reviewed_community_claims_anonymized": (result.reviewed_claims_anonymized),
                 },
             )
         )
+        removals = []
+        if result.community_loadouts_deleted:
+            removals.append(
+                f"removed {result.community_loadouts_deleted} indexed Community Builds "
+                "submission(s)"
+            )
+        if result.pending_claims_deleted:
+            removals.append(f"removed {result.pending_claims_deleted} pending community claim(s)")
+        if result.reviewed_claims_anonymized:
+            removals.append(
+                f"anonymized {result.reviewed_claims_anonymized} reviewed community claim(s)"
+            )
         removal_note = (
-            f" Removed {loadouts_removed} indexed Community Builds submission(s); the "
-            "original Discord posts were not changed."
-            if loadouts_removed
+            f" I also {', and '.join(removals)}; original Discord posts were not changed."
+            if removals
             else ""
         )
         await interaction.response.send_message(
@@ -101,7 +115,8 @@ class PrivacyCog(commands.Cog):
         await interaction.response.send_message(
             "Confirm private-state reset. This clears your saved profile preferences, "
             "persisted conversation summaries, feedback, and indexed copies of Community "
-            "Builds submissions; anonymizes your requester ID on "
+            "Builds submissions; removes pending community claims; anonymizes reviewed "
+            "claims and your requester ID on "
             "review tickets and cost records; and clears this process's conversation memory. "
             "Your current learning opt-out choice is preserved. Security, moderation, and "
             "immutable audit records are retained. Original Discord forum posts are unchanged.",
@@ -138,6 +153,8 @@ class PrivacyCog(commands.Cog):
                     "review_tickets_anonymized": result.tickets_anonymized,
                     "usage_records_anonymized": result.usage_records_anonymized,
                     "community_loadouts_deleted": result.community_loadouts_deleted,
+                    "pending_community_claims_deleted": result.pending_claims_deleted,
+                    "reviewed_community_claims_anonymized": (result.reviewed_claims_anonymized),
                     "in_memory_sessions_cleared": cleared_memory,
                     "learning_opt_out_preserved": result.learning_opt_out_preserved,
                 },
@@ -146,7 +163,8 @@ class PrivacyCog(commands.Cog):
         await interaction.edit_original_response(
             content=(
                 "Your private ERIN profile, conversation, feedback, and indexed Community "
-                "Builds state was reset. Original Discord posts were not changed."
+                "Builds state was reset. Pending claims were removed and reviewed claims "
+                "were anonymized. Original Discord posts were not changed."
             ),
             view=None,
         )

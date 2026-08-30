@@ -57,6 +57,15 @@ class TicketStatus(StrEnum):
     CLOSED = "closed"
 
 
+class CommunityClaimStatus(StrEnum):
+    PENDING = "pending"
+    VERIFIED = "verified"
+    QUALIFIED = "qualified"
+    INCORRECT = "incorrect"
+    BUG = "bug"
+    EXPLOIT = "exploit"
+
+
 class KnowledgeEntry(UUIDPrimaryKeyMixin, TimestampMixin, Base):
     __tablename__ = "knowledge_entries"
     __table_args__ = (
@@ -239,6 +248,43 @@ class CommunityLoadout(UUIDPrimaryKeyMixin, TimestampMixin, Base):
     )
     active: Mapped[bool] = mapped_column(Boolean, default=True, nullable=False, index=True)
     submitted_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+
+
+class CommunityClaim(UUIDPrimaryKeyMixin, TimestampMixin, Base):
+    __tablename__ = "community_claims"
+    __table_args__ = (
+        UniqueConstraint(
+            "guild_id",
+            "source_message_id",
+            name="uq_community_claims_guild_source_message",
+        ),
+        Index(
+            "ix_community_claims_search_text_trgm",
+            "search_text",
+            postgresql_using="gin",
+            postgresql_ops={"search_text": "gin_trgm_ops"},
+        ),
+    )
+
+    guild_id: Mapped[int] = mapped_column(BigInteger, nullable=False, index=True)
+    source_channel_id: Mapped[int] = mapped_column(BigInteger, nullable=False)
+    source_message_id: Mapped[int] = mapped_column(BigInteger, nullable=False)
+    submitter_user_id: Mapped[int | None] = mapped_column(BigInteger, index=True)
+    member_label: Mapped[str] = mapped_column(String(80), nullable=False)
+    source_question: Mapped[str] = mapped_column(Text, nullable=False)
+    prior_answer_excerpt: Mapped[str] = mapped_column(Text, nullable=False)
+    claim_text: Mapped[str] = mapped_column(Text, nullable=False)
+    search_text: Mapped[str] = mapped_column(Text, nullable=False)
+    source_url: Mapped[str] = mapped_column(Text, nullable=False)
+    game_version: Mapped[str] = mapped_column(String(80), nullable=False, index=True)
+    risk_flag: Mapped[str | None] = mapped_column(String(40))
+    status: Mapped[str] = mapped_column(
+        String(30), default=CommunityClaimStatus.PENDING, nullable=False, index=True
+    )
+    review_message_id: Mapped[int | None] = mapped_column(BigInteger, index=True)
+    reviewed_by_user_id: Mapped[int | None] = mapped_column(BigInteger)
+    review_note: Mapped[str | None] = mapped_column(Text)
+    reviewed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
 
 
 class Feedback(UUIDPrimaryKeyMixin, Base):

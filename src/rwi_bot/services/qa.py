@@ -18,6 +18,10 @@ from rwi_bot.domain.schemas import (
 from rwi_bot.services.audit import AuditService
 from rwi_bot.services.budget import SpendingClass
 from rwi_bot.services.community import CommunityLoadoutHit, CommunityLoadoutRepository
+from rwi_bot.services.community_learning import (
+    CommunityClaimRepository,
+    community_claim_context,
+)
 from rwi_bot.services.knowledge import (
     CacheRepository,
     KnowledgeRepository,
@@ -48,6 +52,7 @@ class QuestionAnsweringService:
         audit: AuditService,
         web_search_enabled: bool,
         community_loadouts: CommunityLoadoutRepository | None = None,
+        community_claims: CommunityClaimRepository | None = None,
         current_game_version: str = "Y8S3 Red Horizon",
         current_game_version_started_on: date = date(2026, 8, 27),
     ) -> None:
@@ -60,6 +65,7 @@ class QuestionAnsweringService:
         self.audit = audit
         self.web_search_enabled = web_search_enabled
         self.community_loadouts = community_loadouts
+        self.community_claims = community_claims
         self.current_game_version = current_game_version
         self.current_game_version_started_on = current_game_version_started_on
         self.log = structlog.get_logger("qa")
@@ -126,7 +132,37 @@ class QuestionAnsweringService:
             assumptions=assumptions_dict,
             constraints=effective_constraints,
         )
-        cached = await self.cache.get_valid(signature, request.tier)
+        community_claim_hits = []
+        if self.community_claims is not None:
+            try:
+                community_claim_hits = await self.community_claims.search(
+                    interpreted.normalized_question,
+                    guild_id=request.guild_id,
+                    game_version=self.current_game_version,
+                )
+            except Exception:
+                self.log.exception("community_claim_search_failed")
+            else:
+                if community_claim_hits:
+                    await self.audit.record(
+                        AuditRecord(
+                            event_type="answer.reviewed_community_claim_match",
+                            actor_id=request.user_id,
+                            target_type="community_claim",
+                            correlation_id=correlation_id,
+                            details={
+                                "is_dm": request.is_dm,
+                                "game_version": self.current_game_version,
+                                "claim_ids": [str(hit.claim.id) for hit in community_claim_hits],
+                                "similarities": [
+                                    round(hit.similarity, 3) for hit in community_claim_hits
+                                ],
+                            },
+                        )
+                    )
+        cached = (
+            None if community_claim_hits else await self.cache.get_valid(signature, request.tier)
+        )
         if cached is not None:
             await self.audit.record(
                 AuditRecord(
@@ -157,6 +193,9 @@ class QuestionAnsweringService:
             game_version=self.current_game_version,
         )
         context, revision_ids, knowledge_citations = knowledge_context(hits)
+        reviewed_context = community_claim_context(community_claim_hits)
+        if reviewed_context:
+            context = f"{context}\n\n{reviewed_context}" if context else reviewed_context
         complexity = (
             "complex"
             if interpreted.intent.value in {"build_advice", "build_rating", "mission_guide"}
@@ -174,7 +213,7 @@ class QuestionAnsweringService:
         )
 
         try:
-            if hits:
+            if hits or community_claim_hits:
                 generated = await self.ai.answer(
                     input_text=input_text,
                     user_id=request.user_id,
@@ -249,7 +288,7 @@ class QuestionAnsweringService:
             )
 
         cache_entry_id = None
-        if not learning_opt_out:
+        if not learning_opt_out and not community_claim_hits:
             cache_entry_id = await self.cache.create_candidate(
                 signature=signature,
                 normalized_intent=interpreted.intent.value,

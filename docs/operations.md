@@ -129,6 +129,31 @@ halt file is active; the restarted bot will correctly remain halted.
 
 ## Technician knowledge changes
 
+### Community claim review
+
+When a member makes a substantial factual correction or addition after an ERIN answer in
+a public `ask-rwi` thread, ERIN stores it as pending and posts a private review card in
+`#technician-lab`. DMs, low-substance comments, ordinary questions, and members with
+shared learning disabled are excluded. A warning is added when the submission itself
+mentions a possible bug, glitch, or exploit.
+
+Technicians, Division Commanders, and the configured owner can use the persistent
+**Accurate**, **Qualify**, **Incorrect**, **Bug**, or **Exploit** buttons. Qualify and all
+negative decisions open a required explanation field. Reviewers can instead reply to the
+card with `Yes`, `Yes, but <limitation>`, or `No, <reason>`; `No` without an explanation
+does not resolve the record. Mention `bug` or `exploit` in a negative reply to select the
+corresponding prohibited state.
+
+Accurate and qualified claims immediately become searchable only for their recorded game
+version. The qualification is controlling context. Pending, incorrect, bug, and exploit
+claims are never used in answers, and ERIN is instructed to recommend a legitimate
+alternative rather than an unintended mechanic. All decisions are permission-checked,
+single-resolution, and audited. Claim writes stop during maintenance mode.
+
+If a contributor later disables shared learning, their pending claims are removed and
+their identity is anonymized on already-reviewed claims. `/privacy export` includes their
+claim records; confirmed reset applies the same deletion/anonymization boundary.
+
 Use `/rwi seed-red-horizon` to preview the built-in current-season baseline sourced from
 [Ubisoft's official Red Horizon launch notes](https://www.ubisoft.com/en-us/game/the-division/the-division-2/news-updates/4mrYiFPIyKpzpoqshDQk80/the-division-2-red-horizon).
 The private preview lists the total, new, and already-existing identities and requires
@@ -196,9 +221,9 @@ maintenance mode.
 Members use `/privacy status` to inspect whether future interactions may contribute to
 shared answer learning and `/privacy learning` to change that reversible preference.
 Opted-out interactions may use existing cache entries but do not create shared cache
-candidates, persist positive cache feedback, or attach the requester identity to new review
-tickets. Questions still have to be processed—including by the configured external
-provider when required—to answer the member.
+candidates or community claims, persist positive cache feedback, or attach the requester
+identity to new review tickets. Questions still have to be processed—including by the
+configured external provider when required—to answer the member.
 
 Normal answers contain no Sources section or explicit links. A member can reply with a
 source-only request such as `sources?` or `where did you get that?` to receive the stored
@@ -219,13 +244,18 @@ Only self-reports are accepted; statements about another member cannot update a 
 In a public thread, recent public context is author-labeled while the active assumptions
 always come from the current message author's private profile. `/privacy status` displays
 the member's saved answer profile alongside learning status. Export includes the stored
-fields and reset restores their defaults.
+fields and reset restores their defaults. Profiles are keyed by Discord user ID in the
+database, so they persist across threads, bot restarts, and current-member DMs. Normal
+answers do not append a profile or assumptions footer; ERIN mentions a setting only when
+it needs clarification, materially affects the recommendation, or the member asks.
 
 `/privacy export` privately attaches a JSON export of the member profile, persisted
-conversation summaries, feedback, and indexed Community Builds starter posts.
+conversation summaries, feedback, indexed Community Builds starter posts, and contributed
+community claims.
 `/privacy reset` requires user-bound confirmation, then resets profile preferences,
-deletes persisted conversation, feedback, and Community Builds index state, anonymizes
-review-ticket and API-usage associations, and clears in-process conversation memory. The
+deletes persisted conversation, feedback, Community Builds index state, and pending
+claims; anonymizes reviewed claims plus review-ticket and API-usage associations; and
+clears in-process conversation memory. The
 learning preference is preserved. Neither reset nor learning opt-out deletes the original
 Discord post; it removes ERIN's indexed copy. Security, moderation, and immutable audit
 records are retained for integrity and are disclosed in both the confirmation and export.

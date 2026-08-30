@@ -50,11 +50,8 @@ async def test_normal_answer_has_no_sources_or_feedback_view() -> None:
     message = destination.send.call_args.args[0]
     assert "https://" not in message
     assert "**Sources**" not in message
-    assert "SHD 5000" in message
-    assert "Expertise 30" in message
-    assert "PvP" in message
-    assert "current item rolls" in message
-    assert "conditional buffs included" in message
+    assert message == "Read the guide."
+    assert "**Assumptions:**" not in message
     assert destination.send.call_args.kwargs == {}
 
 
@@ -99,6 +96,19 @@ def test_private_dm_context_does_not_include_public_thread_memory() -> None:
     assert summary is not None
     assert "private answer" in summary
     assert "public answer" not in summary
+
+
+def test_any_public_participant_can_build_on_the_latest_erin_answer() -> None:
+    cog = ConversationCog(cast(Any, SimpleNamespace()))
+    answer = ConversationTurn(
+        member="Give me a Heartbreaker build.",
+        assistant="Use Gunner.",
+        author_id=1,
+        member_label="User A",
+    )
+    cog._public_memory[99].append(answer)
+
+    assert cog._latest_public_answer(99) is answer
 
 
 @pytest.mark.asyncio

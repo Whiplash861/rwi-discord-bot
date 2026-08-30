@@ -117,4 +117,67 @@ RELEASES: tuple[Release, ...] = (
             ),
         ),
     ),
+    Release(
+        release_id="erin-update-4",
+        update_number=4,
+        version="V0.1.3",
+        released_on=date(2026, 8, 30),
+        notes=(
+            ReleaseNote(
+                ReleaseSection.HIGH_IMPACT,
+                "Added moderated community memory: substantial public corrections enter "
+                "a pending Red Horizon review queue before ERIN can reuse them.",
+            ),
+            ReleaseNote(
+                ReleaseSection.NEW_FEATURES,
+                "Added persistent Accurate, Qualify, Incorrect, Bug, and Exploit controls "
+                "in the Technician Lab, plus equivalent plain-language reply reviews.",
+            ),
+            ReleaseNote(
+                ReleaseSection.IMPROVEMENTS,
+                "Build creation and content-fit evaluations now include tiered Major, "
+                "Situational, and Minor pros and cons.",
+            ),
+            ReleaseNote(
+                ReleaseSection.IMPROVEMENTS,
+                "Removed automatic assumptions footers; ERIN now uses saved profile values "
+                "silently unless they clarify or materially affect an answer.",
+            ),
+            ReleaseNote(
+                ReleaseSection.PRIVACY_SAFETY,
+                "Excluded DMs and opted-out members from community-claim capture, added "
+                "claims to privacy export/reset, and prohibited incorrect, bug, and exploit "
+                "records from answer retrieval.",
+            ),
+            ReleaseNote(
+                ReleaseSection.FIXES,
+                "Locked profile lookup to the member's database-backed Discord identity so "
+                "the same settings persist across threads, restarts, and eligible DMs.",
+            ),
+            ReleaseNote(
+                ReleaseSection.MAINTENANCE,
+                "Added durable claim review states, current-season filtering, audited "
+                "single-resolution decisions, and stale-cache avoidance for reviewed claims.",
+            ),
+        ),
+    ),
+    Release(
+        release_id="erin-update-5",
+        update_number=5,
+        version="V0.1.4",
+        released_on=date(2026, 8, 30),
+        notes=(
+            ReleaseNote(
+                ReleaseSection.PRIVACY_SAFETY,
+                "Moved community-claim capture behind ERIN's member fair-use limiter so "
+                "repeated submissions cannot bypass conversation throttling or flood the "
+                "private review channel.",
+            ),
+            ReleaseNote(
+                ReleaseSection.MAINTENANCE,
+                "Revalidated the moderated learning pipeline, persistent profiles, and "
+                "footer-free answer path after deployment hardening.",
+            ),
+        ),
+    ),
 )

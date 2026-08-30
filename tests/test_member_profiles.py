@@ -163,3 +163,27 @@ async def test_existing_profile_values_are_resolved_independently_per_user() -> 
     assert profile_b.assumptions.shd == 10
     assert profile_a.detail_tier is AnswerTier.STANDARD
     assert profile_b.detail_tier is AnswerTier.CONCISE
+
+
+@pytest.mark.asyncio
+async def test_saved_profile_is_reused_by_a_new_repository_instance() -> None:
+    from unittest.mock import AsyncMock, Mock
+
+    write_session = AsyncMock()
+    write_session.add = Mock()
+    write_session.get.return_value = None
+    inferred = infer_member_profile_update("I'm SHD 5000 and Expertise 30. I play PvP.")
+    assert inferred is not None
+    await ProfileRepository(FakeDatabase(write_session)).update_answer_profile(42, inferred.update)  # type: ignore[arg-type]
+    stored = write_session.add.call_args.args[0]
+
+    later_session = AsyncMock()
+    later_session.get.return_value = stored
+    later_instance = ProfileRepository(FakeDatabase(later_session))  # type: ignore[arg-type]
+
+    from_another_thread_or_dm = await later_instance.get_answer_profile(42)
+
+    assert from_another_thread_or_dm.assumptions.shd == 5000
+    assert from_another_thread_or_dm.assumptions.expertise == 30
+    assert from_another_thread_or_dm.assumptions.mode == "PvP"
+    assert from_another_thread_or_dm.persisted is True

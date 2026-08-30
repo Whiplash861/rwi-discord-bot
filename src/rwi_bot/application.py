@@ -10,6 +10,7 @@ from rwi_bot.db.session import Database
 from rwi_bot.services.audit import AuditService
 from rwi_bot.services.budget import BudgetGuard
 from rwi_bot.services.community import CommunityLoadoutRepository
+from rwi_bot.services.community_learning import CommunityClaimRepository
 from rwi_bot.services.knowledge import CacheRepository, KnowledgeRepository, TicketRepository
 from rwi_bot.services.maintenance import MaintenanceManager
 from rwi_bot.services.privacy import ProfileRepository
@@ -31,6 +32,7 @@ class AppServices:
     discipline: DisciplineRepository
     profiles: ProfileRepository
     community_loadouts: CommunityLoadoutRepository
+    community_claims: CommunityClaimRepository
     release_history: ReleaseHistoryRepository
     ai: RwiOpenAIClient
     qa: QuestionAnsweringService
@@ -55,6 +57,7 @@ async def build_services(settings: Settings) -> AppServices:
     discipline = DisciplineRepository(database)
     profiles = ProfileRepository(database)
     community_loadouts = CommunityLoadoutRepository(database)
+    community_claims = CommunityClaimRepository(database)
     release_history = ReleaseHistoryRepository(database)
     ai = RwiOpenAIClient(
         api_key=settings.openai_api_key.get_secret_value(),
@@ -75,6 +78,7 @@ async def build_services(settings: Settings) -> AppServices:
         tickets=tickets,
         profiles=profiles,
         community_loadouts=community_loadouts,
+        community_claims=community_claims,
         ai=ai,
         audit=audit,
         web_search_enabled=settings.web_search_enabled,
@@ -94,6 +98,7 @@ async def build_services(settings: Settings) -> AppServices:
         discipline=discipline,
         profiles=profiles,
         community_loadouts=community_loadouts,
+        community_claims=community_claims,
         release_history=release_history,
         ai=ai,
         qa=qa,

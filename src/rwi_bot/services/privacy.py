@@ -7,6 +7,8 @@ from sqlalchemy import delete, select, update
 
 from rwi_bot.db.models import (
     ApiUsage,
+    CommunityClaim,
+    CommunityClaimStatus,
     CommunityLoadout,
     ConversationSession,
     Feedback,
@@ -25,7 +27,16 @@ class PrivacyResetResult:
     tickets_anonymized: int
     usage_records_anonymized: int
     community_loadouts_deleted: int
+    pending_claims_deleted: int
+    reviewed_claims_anonymized: int
     learning_opt_out_preserved: bool
+
+
+@dataclass(frozen=True, slots=True)
+class LearningPreferenceResult:
+    community_loadouts_deleted: int = 0
+    pending_claims_deleted: int = 0
+    reviewed_claims_anonymized: int = 0
 
 
 class ProfileRepository:
@@ -85,7 +96,9 @@ class ProfileRepository:
             profile.preferences = preferences
             return self._answer_profile(profile, persisted=True)
 
-    async def set_learning_opt_out(self, user_id: int, *, opted_out: bool) -> int:
+    async def set_learning_opt_out(
+        self, user_id: int, *, opted_out: bool
+    ) -> LearningPreferenceResult:
         async with self.database.session() as session:
             profile = await session.get(UserProfile, user_id, with_for_update=True)
             if profile is None:
@@ -97,11 +110,25 @@ class ProfileRepository:
             else:
                 profile.learning_opt_out = opted_out
             if not opted_out:
-                return 0
-            result = await session.execute(
+                return LearningPreferenceResult()
+            loadout_result = await session.execute(
                 delete(CommunityLoadout).where(CommunityLoadout.author_user_id == user_id)
             )
-            return self._rowcount(result)
+            pending_claim_result = await session.execute(
+                delete(CommunityClaim)
+                .where(CommunityClaim.submitter_user_id == user_id)
+                .where(CommunityClaim.status == CommunityClaimStatus.PENDING.value)
+            )
+            reviewed_claim_result = await session.execute(
+                update(CommunityClaim)
+                .where(CommunityClaim.submitter_user_id == user_id)
+                .values(submitter_user_id=None, member_label="Former member")
+            )
+            return LearningPreferenceResult(
+                community_loadouts_deleted=self._rowcount(loadout_result),
+                pending_claims_deleted=self._rowcount(pending_claim_result),
+                reviewed_claims_anonymized=self._rowcount(reviewed_claim_result),
+            )
 
     async def export_data(self, user_id: int) -> dict[str, Any]:
         async with self.database.session() as session:
@@ -125,6 +152,13 @@ class ProfileRepository:
                     select(CommunityLoadout)
                     .where(CommunityLoadout.author_user_id == user_id)
                     .order_by(CommunityLoadout.submitted_at.asc())
+                )
+            )
+            community_claims = list(
+                await session.scalars(
+                    select(CommunityClaim)
+                    .where(CommunityClaim.submitter_user_id == user_id)
+                    .order_by(CommunityClaim.created_at.asc())
                 )
             )
         return {
@@ -175,11 +209,29 @@ class ProfileRepository:
                 }
                 for item in community_loadouts
             ],
+            "community_claims": [
+                {
+                    "source_question": item.source_question,
+                    "claim_text": item.claim_text,
+                    "source_url": item.source_url,
+                    "game_version": item.game_version,
+                    "status": item.status,
+                    "risk_flag": item.risk_flag,
+                    "review_note": item.review_note,
+                    "reviewed_at": (
+                        item.reviewed_at.isoformat() if item.reviewed_at is not None else None
+                    ),
+                    "created_at": item.created_at.isoformat(),
+                    "updated_at": item.updated_at.isoformat(),
+                }
+                for item in community_claims
+            ],
             "retained_categories": [
                 "security and moderation records",
                 "immutable operational audit events",
                 "anonymized cost accounting",
                 "privacy-sanitized review tickets",
+                "anonymized, human-reviewed community knowledge",
             ],
         }
 
@@ -207,6 +259,16 @@ class ProfileRepository:
             loadout_result = await session.execute(
                 delete(CommunityLoadout).where(CommunityLoadout.author_user_id == user_id)
             )
+            pending_claim_result = await session.execute(
+                delete(CommunityClaim)
+                .where(CommunityClaim.submitter_user_id == user_id)
+                .where(CommunityClaim.status == CommunityClaimStatus.PENDING.value)
+            )
+            reviewed_claim_result = await session.execute(
+                update(CommunityClaim)
+                .where(CommunityClaim.submitter_user_id == user_id)
+                .values(submitter_user_id=None, member_label="Former member")
+            )
 
             if profile is not None:
                 profile.detail_tier = "standard"
@@ -222,6 +284,8 @@ class ProfileRepository:
                 tickets_anonymized=self._rowcount(ticket_result),
                 usage_records_anonymized=self._rowcount(usage_result),
                 community_loadouts_deleted=self._rowcount(loadout_result),
+                pending_claims_deleted=self._rowcount(pending_claim_result),
+                reviewed_claims_anonymized=self._rowcount(reviewed_claim_result),
                 learning_opt_out_preserved=opted_out,
             )
 

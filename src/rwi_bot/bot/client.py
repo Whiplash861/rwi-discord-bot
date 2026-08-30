@@ -40,6 +40,10 @@ class RwiBot(commands.Bot):
     async def setup_hook(self) -> None:
         from rwi_bot.cogs.admin import AdminCog
         from rwi_bot.cogs.community import CommunityLoadoutsCog
+        from rwi_bot.cogs.community_learning import (
+            CommunityClaimReviewView,
+            CommunityLearningCog,
+        )
         from rwi_bot.cogs.conversation import ConversationCog
         from rwi_bot.cogs.moderation import ModerationCog
         from rwi_bot.cogs.onboarding import OnboardingCog
@@ -52,10 +56,12 @@ class RwiBot(commands.Bot):
                 halted=lambda: self.services.maintenance.halted,
             )
         )
+        self.add_view(CommunityClaimReviewView(self))
         await self.add_cog(AdminCog(self))
         await self.add_cog(OnboardingCog(self))
         await self.add_cog(ModerationCog(self))
         await self.add_cog(CommunityLoadoutsCog(self))
+        await self.add_cog(CommunityLearningCog(self))
         await self.add_cog(ConversationCog(self))
         await self.add_cog(PrivacyCog(self))
         await self.add_cog(ReleaseNotesCog(self))

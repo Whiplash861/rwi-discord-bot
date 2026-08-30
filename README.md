@@ -21,7 +21,16 @@ locally at high confidence. Members can also explicitly tell ERIN their level, S
 Expertise, preferred mode, roll/buff assumptions, and answer-detail preference. Those
 private settings persist per Discord user and drive that member's later answers. Public
 thread context labels each author, so multiple agents can participate without one
-member's profile being applied to another.
+member's profile being applied to another. The same database-backed profile follows a
+current server member across public threads, process restarts, and DMs. ERIN uses it
+silently instead of appending assumptions to every answer.
+
+Substantial factual corrections in public ERIN conversations can enter a moderated
+community-memory queue. ERIN archives the claim for experienced-member review in
+`#technician-lab`; only verified or explicitly qualified Red Horizon claims become
+searchable. Incorrect claims and techniques classified as bugs or exploits are retained
+as review outcomes but excluded from recommendations. Build creation and content-fit
+reviews include tiered Major, Situational, and Minor pros and cons.
 Every deployed application revision is also represented in the community-readable,
 read-only `#erin-patch-notes` index. Authored releases use severity-grouped notes;
 deployment fingerprinting produces a categorized fallback when a release manifest was
@@ -34,6 +43,7 @@ This repository is under active private-alpha development.
 - Discord and OpenAI credentials are environment variables and are never committed.
 - The database is authoritative; Discord messages are presentation and editing surfaces.
 - Generated text is never promoted to game truth without a source and provenance record.
+- Raw member claims are never reusable until an authorized experienced member reviews them.
 - Numerical claims must come from structured data and deterministic calculations.
 - Technician changes are versioned, confirmed, audited, and reversible.
 - `/rwi halt` enters durable Do Not Disturb maintenance mode and blocks new paid calls.
