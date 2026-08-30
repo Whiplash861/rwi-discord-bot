@@ -66,8 +66,9 @@ The answer path is:
     A fallback caused by insufficient local evidence independently verifies the original
     question without carrying the incomplete or conflicting local excerpt forward.
     The target set combines current Ubisoft material, the exact official Division 2 Known
-    Issues Trello board, Wikipedia and Division wikis, Reddit, Steam, and selected Q&A and
-    community forums. Community pages remain corroborative rather than first-party truth.
+    Issues Trello board, Wikipedia and Division wikis, Reddit, Steam, current videos, and
+    selected Q&A and community references. Community pages and video transcripts remain
+    corroborative rather than first-party truth.
 12. When no answer can be verified, ask the member for clarification or current in-game
     information. Archive a substantive response for experienced-member review. Open a
     sanitized Technician ticket only when the member says they cannot supply the answer.
@@ -123,6 +124,25 @@ The built-in current-season baseline is scoped to `Y8S3 Red Horizon` and uses
 It is a governed create-only import: it does not overwrite an entry with the same
 subject, claim key, and context. This keeps launch values distinct from earlier PTS
 values and preserves technician-authored revisions.
+
+The baseline includes Ubisoft's 29 changed Brand Sets, nine changed Gear Sets, and all
+43 current Skill variants in separate PvE and PvP records. Skill-table records retain
+base stats, Skill Tier 1-6 values, Overcharge data, source-page locations, and extraction
+method. A deterministic 15-domain syllabus describes the completeness facets for
+equipment, talents, rarities, difficulties, Directives, mission types, Skills, costs,
+special activities, lore, factions, and Incursion encounters. It guides research; it does
+not falsely mark unpopulated domains complete. Text, screenshot/OCR, and video-transcript
+findings enter the same versioned candidate-and-review boundary before they can become
+active knowledge. Material from before Red Horizon can be retained only as historical
+context and cannot verify a current mechanic.
+
+The packaged `div2hub_snapshot` is a separate discovery tier: 2,037 CSV records pinned
+to commit `87b6dcbbceeb3937255b1987b53f91573f549825`, committed after Red Horizon launched.
+Its file, row, commit, license, and known-gap context are retained. Matching rows are
+placed only in the non-evidentiary request-scope section so they can supply exact item and
+talent names to curated web search. They do not create active `KnowledgeEntry` records,
+raise answer confidence, or prevent web fallback. The snapshot commit is part of the
+answer-cache signature whenever it contributes discovery hints.
 
 The Community Builds index accepts only non-bot starter posts in the configured guild's
 public `community-builds` or `community-loadouts` forum. Replies, DMs, other channels,

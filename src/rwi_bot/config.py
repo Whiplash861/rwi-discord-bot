@@ -47,7 +47,12 @@ class Settings(BaseSettings):
         "steamcommunity.com",
         "thedivisionforums.com",
         "prototrack.gg",
+        "siriusarc7.github.io",
+        "github.com",
+        "raw.githubusercontent.com",
         "rubenalamina.mx",
+        "youtube.com",
+        "youtu.be",
     )
     current_game_version: str = "Y8S3 Red Horizon"
     current_game_version_started_on: date = date(2026, 8, 27)

@@ -36,6 +36,7 @@ class RwiBot(commands.Bot):
         self.services = services
         self.log = structlog.get_logger("discord")
         self._auto_bootstrap_complete = False
+        self._global_identity_complete = False
 
     async def setup_hook(self) -> None:
         from rwi_bot.cogs.admin import AdminCog
@@ -72,6 +73,7 @@ class RwiBot(commands.Bot):
             await self.tree.sync(guild=guild)
 
     async def on_ready(self) -> None:
+        await self.ensure_global_identity()
         guild = self.get_guild(self.services.settings.discord_guild_id)
         if guild is None:
             self.log.error("target_guild_missing", guild_id=self.services.settings.discord_guild_id)
@@ -124,6 +126,21 @@ class RwiBot(commands.Bot):
         releases = self.get_cog("ReleaseNotesCog")
         if releases is not None:
             releases.schedule_publish()  # type: ignore[attr-defined]
+
+    async def ensure_global_identity(self) -> None:
+        user = self.user
+        if self._global_identity_complete or user is None:
+            return
+        if user.name == names.BOT_DISPLAY_NAME:
+            self._global_identity_complete = True
+            return
+        try:
+            await user.edit(username=names.BOT_DISPLAY_NAME)
+        except (discord.Forbidden, discord.HTTPException) as exc:
+            self.log.warning("global_identity_update_failed", error_type=type(exc).__name__)
+        else:
+            self._global_identity_complete = True
+            self.log.info("global_identity_updated", username=names.BOT_DISPLAY_NAME)
 
     async def ensure_server_identity(self, guild: discord.Guild) -> None:
         member = guild.me

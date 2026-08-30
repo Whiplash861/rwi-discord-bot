@@ -361,9 +361,20 @@ def classify_external_source(
     hostname = (urlparse(url).hostname or "").casefold()
     if any(_hostname_matches(hostname, domain) for domain in official_domains):
         return "official_web", True
-    wiki_domains = ("wikipedia.org", "fandom.com", "prototrack.gg")
+    wiki_domains = ("wikipedia.org", "fandom.com")
     if any(_hostname_matches(hostname, domain) for domain in wiki_domains):
         return "community_wiki", False
+    reference_domains = (
+        "prototrack.gg",
+        "siriusarc7.github.io",
+        "github.com",
+        "raw.githubusercontent.com",
+    )
+    if any(_hostname_matches(hostname, domain) for domain in reference_domains):
+        return "community_reference", False
+    video_domains = ("youtube.com", "youtu.be")
+    if any(_hostname_matches(hostname, domain) for domain in video_domains):
+        return "community_video", False
     if any(_hostname_matches(hostname, domain) for domain in community_domains):
         return "community_forum", False
     return "external_web", False

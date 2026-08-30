@@ -106,3 +106,18 @@ async def test_erin_server_identity_is_idempotent() -> None:
     member.edit.reset_mock()
     await RwiBot.ensure_server_identity(cast(Any, bot_like), cast(Any, SimpleNamespace(me=member)))
     member.edit.assert_not_awaited()
+
+
+@pytest.mark.asyncio
+async def test_erin_global_identity_is_idempotent_for_dm_display() -> None:
+    user = SimpleNamespace(name="RWI Bot Dev", edit=AsyncMock())
+    bot_like = SimpleNamespace(user=user, log=Mock(), _global_identity_complete=False)
+
+    await RwiBot.ensure_global_identity(cast(Any, bot_like))
+
+    user.edit.assert_awaited_once_with(username="ERIN")
+    assert bot_like._global_identity_complete is True
+
+    user.edit.reset_mock()
+    await RwiBot.ensure_global_identity(cast(Any, bot_like))
+    user.edit.assert_not_awaited()

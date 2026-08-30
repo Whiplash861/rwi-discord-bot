@@ -1,0 +1,77 @@
+brand_set,gear_set,name,is_named,is_exotic,core_1,core_2,core_3,minor_1,minor_2,minor_3,talent_slot,mod_1,mod_2,mod_3
+5.11 Tactical,N/A,5.11 Tactical Gloves,FALSE,FALSE,type:gear-core,N/A,N/A,type:gear-minor,type:gear-minor,N/A,N/A,N/A,N/A,N/A
+Badger Tuff,N/A,Badger Tuff Gloves,FALSE,FALSE,type:gear-core,N/A,N/A,type:gear-minor,type:gear-minor,N/A,N/A,N/A,N/A,N/A
+Belstone Armory,N/A,Belstone Armory Gloves,FALSE,FALSE,type:gear-core,N/A,N/A,type:gear-minor,type:gear-minor,N/A,N/A,N/A,N/A,N/A
+Brazos de Arcabuz,N/A,Brazos de Arcabuz Gloves,FALSE,FALSE,type:gear-core,N/A,N/A,type:gear-minor,type:gear-minor,N/A,N/A,N/A,N/A,N/A
+Gila Guard,N/A,Gila Guard Gloves,FALSE,FALSE,type:gear-core,N/A,N/A,type:gear-minor,type:gear-minor,N/A,N/A,N/A,N/A,N/A
+Golan Gear Ltd,N/A,Golan Gear Ltd Gloves,FALSE,FALSE,type:gear-core,N/A,N/A,type:gear-minor,type:gear-minor,N/A,N/A,N/A,N/A,N/A
+Habsburg Guard,N/A,Habsburg Guard Gloves,FALSE,FALSE,type:gear-core,N/A,N/A,type:gear-minor,type:gear-minor,N/A,N/A,N/A,N/A,N/A
+Improvised,N/A,Improvised Gloves,FALSE,FALSE,type:gear-core,N/A,N/A,type:gear-minor,type:gear-minor,N/A,N/A,type:gear-mod,N/A,N/A
+Lengmo,N/A,Lengmo Gloves,FALSE,FALSE,type:gear-core,N/A,N/A,type:gear-minor,type:gear-minor,N/A,N/A,N/A,N/A,N/A
+Palisade Steelworks,N/A,Palisade Steelworks Gloves,FALSE,FALSE,type:gear-core,N/A,N/A,type:gear-minor,type:gear-minor,N/A,N/A,N/A,N/A,N/A
+Uzina Getica,N/A,Uzina Getica Gloves,FALSE,FALSE,type:gear-core,N/A,N/A,type:gear-minor,type:gear-minor,N/A,N/A,N/A,N/A,N/A
+Yaahl Gear,N/A,Yaahl Gear Gloves,FALSE,FALSE,type:gear-core,N/A,N/A,type:gear-minor,type:gear-minor,N/A,N/A,N/A,N/A,N/A
+Alps Summit Armaments,N/A,Alps Summit Armaments Gloves,FALSE,FALSE,type:gear-core,N/A,N/A,type:gear-minor,type:gear-minor,N/A,N/A,N/A,N/A,N/A
+China Light Industries,N/A,China Light Industries Gloves,FALSE,FALSE,type:gear-core,N/A,N/A,type:gear-minor,type:gear-minor,N/A,N/A,N/A,N/A,N/A
+Edelweiss GPz,N/A,Edelweiss GPz Gloves,FALSE,FALSE,type:gear-core,N/A,N/A,type:gear-minor,type:gear-minor,N/A,N/A,N/A,N/A,N/A
+Electrique,N/A,Electrique Gloves,FALSE,FALSE,type:gear-core,N/A,N/A,type:gear-minor,type:gear-minor,N/A,N/A,N/A,N/A,N/A
+Empress International,N/A,Empress International Gloves,FALSE,FALSE,type:gear-core,N/A,N/A,type:gear-minor,type:gear-minor,N/A,N/A,N/A,N/A,N/A
+Hana-U Corporation,N/A,Hana-U Corporation Gloves,FALSE,FALSE,type:gear-core,N/A,N/A,type:gear-minor,type:gear-minor,N/A,N/A,N/A,N/A,N/A
+Murakami Industries,N/A,Murakami Industries Gloves,FALSE,FALSE,type:gear-core,N/A,N/A,type:gear-minor,type:gear-minor,N/A,N/A,N/A,N/A,N/A
+Richter & Kaiser GmbH,N/A,Richter & Kaiser GmbH Gloves,FALSE,FALSE,type:gear-core,N/A,N/A,type:gear-minor,type:gear-minor,N/A,N/A,N/A,N/A,N/A
+Royal Works,N/A,Royal Works Gloves,FALSE,FALSE,type:gear-core,N/A,N/A,type:gear-minor,type:gear-minor,N/A,N/A,N/A,N/A,N/A
+Shiny Monkey,N/A,Shiny Monkey Gloves,FALSE,FALSE,type:gear-core,N/A,N/A,type:gear-minor,type:gear-minor,N/A,N/A,N/A,N/A,N/A
+Wyvern Wear,N/A,Wyvern Wear Gloves,FALSE,FALSE,type:gear-core,N/A,N/A,type:gear-minor,type:gear-minor,N/A,N/A,N/A,N/A,N/A
+Airaldi Holdings,N/A,Airaldi Holdings Gloves,FALSE,FALSE,type:gear-core,N/A,N/A,type:gear-minor,type:gear-minor,N/A,N/A,N/A,N/A,N/A
+Unit Alloys,N/A,Unit Alloys Gloves,FALSE,FALSE,type:gear-core,N/A,N/A,type:gear-minor,type:gear-minor,N/A,N/A,N/A,N/A,N/A
+Ceska Vyroba s.r.o.,N/A,Ceska Vyroba s.r.o. Gloves,FALSE,FALSE,type:gear-core,N/A,N/A,type:gear-minor,type:gear-minor,N/A,N/A,N/A,N/A,N/A
+Douglas & Harding,N/A,Douglas & Harding Gloves,FALSE,FALSE,type:gear-core,N/A,N/A,type:gear-minor,type:gear-minor,N/A,N/A,N/A,N/A,N/A
+Fenris Group AB,N/A,Fenris Group AB Gloves,FALSE,FALSE,type:gear-core,N/A,N/A,type:gear-minor,type:gear-minor,N/A,N/A,N/A,N/A,N/A
+Grupo Sombra S.A.,N/A,Grupo Sombra S.A. Gloves,FALSE,FALSE,type:gear-core,N/A,N/A,type:gear-minor,type:gear-minor,N/A,N/A,N/A,N/A,N/A
+Imminence Armaments,N/A,Imminence Armaments Gloves,FALSE,FALSE,type:gear-core,N/A,N/A,type:gear-minor,type:gear-minor,N/A,N/A,N/A,N/A,N/A
+Legatus S.p.A,N/A,Legatus S.p.A Gloves,FALSE,FALSE,type:gear-core,N/A,N/A,type:gear-minor,type:gear-minor,N/A,N/A,N/A,N/A,N/A
+Overlord Armaments,N/A,Overlord Armaments Gloves,FALSE,FALSE,type:gear-core,N/A,N/A,type:gear-minor,type:gear-minor,N/A,N/A,N/A,N/A,N/A
+Petrov Defense Group,N/A,Petrov Defense Group Gloves,FALSE,FALSE,type:gear-core,N/A,N/A,type:gear-minor,type:gear-minor,N/A,N/A,N/A,N/A,N/A
+Providence Defense,N/A,Providence Defense Gloves,FALSE,FALSE,type:gear-core,N/A,N/A,type:gear-minor,type:gear-minor,N/A,N/A,N/A,N/A,N/A
+Sokolov Concern,N/A,Sokolov Concern Gloves,FALSE,FALSE,type:gear-core,N/A,N/A,type:gear-minor,type:gear-minor,N/A,N/A,N/A,N/A,N/A
+Urban Lookout,N/A,Urban Lookout Gloves,FALSE,FALSE,type:gear-core,N/A,N/A,type:gear-minor,type:gear-minor,N/A,N/A,N/A,N/A,N/A
+"Walker, Harris & Co.",N/A,"Walker, Harris & Co. Gloves",FALSE,FALSE,type:gear-core,N/A,N/A,type:gear-minor,type:gear-minor,N/A,N/A,N/A,N/A,N/A
+Zwiadowka Sp. z o.o.,N/A,Zwiadowka Sp. z o.o. Gloves,FALSE,FALSE,type:gear-core,N/A,N/A,type:gear-minor,type:gear-minor,N/A,N/A,N/A,N/A,N/A
+N/A,Aces & Eights,Aces & Eights Gloves,FALSE,FALSE,type:gear-core,N/A,N/A,type:gear-minor,N/A,N/A,N/A,N/A,N/A,N/A
+N/A,Aegis,Aegis Gloves,FALSE,FALSE,type:gear-core,N/A,N/A,type:gear-minor,N/A,N/A,N/A,N/A,N/A,N/A
+N/A,Breaking Point,Breaking Point Gloves,FALSE,FALSE,type:gear-core,N/A,N/A,type:gear-minor,N/A,N/A,N/A,N/A,N/A,N/A
+N/A,Cavalier,Cavalier Gloves,FALSE,FALSE,type:gear-core,N/A,N/A,type:gear-minor,N/A,N/A,N/A,N/A,N/A,N/A
+N/A,Concentrated Company,Concentrated Company Gloves,FALSE,FALSE,type:gear-core,N/A,N/A,type:gear-minor,N/A,N/A,N/A,N/A,N/A,N/A
+N/A,Eclipse Protocol,Eclipse Protocol Gloves,FALSE,FALSE,type:gear-core,N/A,N/A,type:gear-minor,N/A,N/A,N/A,N/A,N/A,N/A
+N/A,Foundry Bulwark,Foundry Bulwark Gloves,FALSE,FALSE,type:gear-core,N/A,N/A,type:gear-minor,N/A,N/A,N/A,N/A,N/A,N/A
+N/A,Future Initiative,Future Initiative Gloves,FALSE,FALSE,type:gear-core,N/A,N/A,type:gear-minor,N/A,N/A,N/A,N/A,N/A,N/A
+N/A,Hard Wired,Hard Wired Gloves,FALSE,FALSE,type:gear-core,N/A,N/A,type:gear-minor,N/A,N/A,N/A,N/A,N/A,N/A
+N/A,Heartbreaker,Heartbreaker Gloves,FALSE,FALSE,type:gear-core,N/A,N/A,type:gear-minor,N/A,N/A,N/A,N/A,N/A,N/A
+N/A,Hotshot,Hotshot Gloves,FALSE,FALSE,type:gear-core,N/A,N/A,type:gear-minor,N/A,N/A,N/A,N/A,N/A,N/A
+N/A,Hunter's Fury,Hunter's Fury Gloves,FALSE,FALSE,type:gear-core,N/A,N/A,type:gear-minor,N/A,N/A,N/A,N/A,N/A,N/A
+N/A,Measured Assembly,Measured Assembly Gloves,FALSE,FALSE,type:gear-core,N/A,N/A,type:gear-minor,N/A,N/A,N/A,N/A,N/A,N/A
+N/A,Negotiator's Dilemma,Negotiator's Dilemma Gloves,FALSE,FALSE,type:gear-core,N/A,N/A,type:gear-minor,N/A,N/A,N/A,N/A,N/A,N/A
+N/A,Ongoing Directive,Ongoing Directive Gloves,FALSE,FALSE,type:gear-core,N/A,N/A,type:gear-minor,N/A,N/A,N/A,N/A,N/A,N/A
+N/A,Ortiz: Exuro,Ortiz: Exuro Gloves,FALSE,FALSE,type:gear-core,N/A,N/A,type:gear-minor,N/A,N/A,N/A,N/A,N/A,N/A
+N/A,Ortiz: Reficere,Ortiz: Reficere Gloves,FALSE,FALSE,type:gear-core,N/A,N/A,type:gear-minor,N/A,N/A,N/A,N/A,N/A,N/A
+N/A,Refactor,Refactor Gloves,FALSE,FALSE,type:gear-core,N/A,N/A,type:gear-minor,N/A,N/A,N/A,N/A,N/A,N/A
+N/A,Rigger,Rigger Gloves,FALSE,FALSE,type:gear-core,N/A,N/A,type:gear-minor,N/A,N/A,N/A,N/A,N/A,N/A
+N/A,Striker's Battlegear,Striker's Battlegear Gloves,FALSE,FALSE,type:gear-core,N/A,N/A,type:gear-minor,N/A,N/A,N/A,N/A,N/A,N/A
+N/A,System Corruption,System Corruption Gloves,FALSE,FALSE,type:gear-core,N/A,N/A,type:gear-minor,N/A,N/A,N/A,N/A,N/A,N/A
+N/A,Tip of the Spear,Tip of the Spear Gloves,FALSE,FALSE,type:gear-core,N/A,N/A,type:gear-minor,N/A,N/A,N/A,N/A,N/A,N/A
+N/A,Tipping Scales,Tipping Scales Gloves,FALSE,FALSE,type:gear-core,N/A,N/A,type:gear-minor,N/A,N/A,N/A,N/A,N/A,N/A
+N/A,True Patriot,True Patriot Gloves,FALSE,FALSE,type:gear-core,N/A,N/A,type:gear-minor,N/A,N/A,N/A,N/A,N/A,N/A
+N/A,Umbra Initiative,Umbra Initiative Gloves,FALSE,FALSE,type:gear-core,N/A,N/A,type:gear-minor,N/A,N/A,N/A,N/A,N/A,N/A
+N/A,Virtuoso,Virtuoso Gloves,FALSE,FALSE,type:gear-core,N/A,N/A,type:gear-minor,N/A,N/A,N/A,N/A,N/A,N/A
+N/A,Core Strength,Core Strength Gloves,FALSE,FALSE,type:gear-core,N/A,N/A,type:gear-minor,N/A,N/A,N/A,N/A,N/A,N/A
+N/A,Ember Engine,Ember Engine Gloves,FALSE,FALSE,type:gear-core,N/A,N/A,type:gear-minor,N/A,N/A,N/A,type:gear-mod,N/A,N/A
+5.11 Tactical,N/A,Deathgrips,TRUE,FALSE,type:gear-core,N/A,N/A,fixed:armor-on-kill-deathgrips,type:gear-minor,N/A,N/A,N/A,N/A,N/A
+Petrov Defense Group,N/A,Contractor's Gloves,TRUE,FALSE,type:gear-core,N/A,N/A,fixed:damage-to-armor-contractors-gloves,type:gear-minor,N/A,N/A,N/A,N/A,N/A
+Alps Summit Armaments,N/A,Motherly Love,TRUE,FALSE,type:gear-core,N/A,N/A,fixed:skill-health-motherly-love,type:gear-minor,N/A,N/A,N/A,N/A,N/A
+Zwiadowka Sp. z o.o.,N/A,Eagles Grasp,TRUE,FALSE,type:gear-core,N/A,N/A,fixed:weapon-handling-eagles-grasp,type:gear-minor,N/A,N/A,N/A,N/A,N/A
+Sokolov Concern,N/A,Firm Handshake,TRUE,FALSE,type:gear-core,N/A,N/A,fixed:status-effects-firm-handshake,type:gear-minor,N/A,N/A,N/A,N/A,N/A
+N/A,N/A,Bloody Knuckles,FALSE,TRUE,fixed:weapon-damage-gear-core,N/A,N/A,fixed:critical-hit-chance-gear-minor,fixed:critical-hit-damage-gear-minor,N/A,fixed:Over the top,N/A,N/A,N/A
+N/A,N/A,BTSU Datagloves,FALSE,TRUE,fixed:skill-tier-gear-core,N/A,N/A,fixed:skill-haste-gear-minor,fixed:repair-skills-gear-minor,N/A,fixed:Transference Overclock,N/A,N/A,N/A
+N/A,N/A,Exodus Gloves,FALSE,TRUE,fixed:weapon-damage-gear-core,N/A,N/A,fixed:critical-hit-chance-gear-minor,fixed:critical-hit-damage-gear-minor,N/A,fixed:Smoke Screen,N/A,N/A,N/A
+N/A,N/A,Overdogs,FALSE,TRUE,fixed:weapon-damage-gear-core,N/A,N/A,fixed:critical-hit-chance-gear-minor,fixed:critical-hit-damage-gear-minor,N/A,fixed:Weakest Link,N/A,N/A,N/A
+N/A,N/A,Rugged Gauntlets,FALSE,TRUE,fixed:weapon-damage-gear-core,N/A,N/A,fixed:critical-hit-chance-gear-minor,fixed:critical-hit-damage-gear-minor,N/A,fixed:Iron Grip,N/A,N/A,N/A

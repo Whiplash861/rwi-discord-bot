@@ -1,0 +1,62 @@
+id,name,value_formats
+weapon-damage,Weapon Damage,percent
+assault-rifle-damage,Assault Rifle Damage,percent
+lmg-damage,LMG Damage,percent
+smg-damage,SMG Damage,percent
+rifle-damage,Rifle Damage,percent
+marksman-rifle-damage,Marksman Rifle Damage,percent
+shotgun-damage,Shotgun Damage,percent
+pistol-damage,Pistol Damage,percent
+health-damage,Health Damage,percent
+dtoc,DTOC,percent
+critical-hit-chance,Critical Hit Chance,percent
+critical-hit-damage,Critical Hit Damage,percent
+headshot-damage,Headshot Damage,percent
+damage-to-armor,Damage to Armor,percent
+weapon-handling,Weapon Handling,percent
+magazine-size,Magazine Size,percent|flat
+swap-speed,Swap Speed,percent
+burn-damage,Burn Damage,percent
+burn-duration,Burn Duration,percent
+explosive-damage,Explosive Damage,percent
+signature-weapon-damage,Signature Weapon Damage,percent
+increased-threat,Increased Threat,percent
+ammo-capacity,Ammo Capacity,percent
+melee-damage,Melee Damage,percent
+electronic-damage,Electronic Damage,percent
+armor,Armor,flat
+armor-regeneration,Armor Regeneration,percent|flat
+hazard-protection,Hazard Protection,percent
+health,Health,percent|flat
+explosive-resistance,Explosive Resistance,percent
+incoming-repairs,Incoming Repairs,percent
+armor-on-kill,Armor on Kill,percent|flat
+total-armor,Total Armor,percent
+health-on-kill,Health on Kill,percent
+shock-resistance,Shock Resistance,percent
+disrupt-resistance,Disrupt Resistance,percent
+pulse-resistance,Pulse Resistance,percent
+reduced-threat,Reduced Threat,percent
+damage-resistance,Damage Resistance,percent
+protection-from-elites,Protection from Elites,percent
+burn-resistance,Burn Resistance,percent
+bleed-resistance,Bleed Resistance,percent
+blind-deaf-resistance,Blind/Deaf Resistance,percent
+disorient-resistance,Disorient Resistance,percent
+ensnare-resistance,Ensnare Resistance,percent
+skill-tier,Skill Tier,flat
+reload-speed,Reload Speed,percent
+stability,Stability,percent
+accuracy,Accuracy,percent
+optimal-range,Optimal Range,percent
+rate-of-fire,Rate of Fire,percent
+skill-haste,Skill Haste,percent
+skill-damage,Skill Damage,percent
+repair-skills,Repair Skills,percent
+status-effects,Status Effects,percent
+skill-duration,Skill Duration,percent
+skill-efficiency,Skill Efficiency,percent
+skill-health,Skill Health,percent
+shield-health,Shield Health,percent
+scanner-pulse-haste,Scanner Pulse Haste,percent
+outgoing-healing,Outgoing Healing,percent

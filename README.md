@@ -14,12 +14,22 @@ the current-game freshness boundary: older material can provide history but cann
 support a claim about how the game works now. When local coverage is missing, curated
 discovery includes Ubisoft, the exact Division 2 Known Issues Trello board linked by
 Ubisoft, Wikipedia and Division wikis, Reddit, Steam, and selected Q&A/community forums.
+Current videos and Y8S3 community reference indexes may assist discovery, but one video,
+forum post, or mutable community database cannot establish current mechanics by itself.
 Reviewed community-memory matches require a meaningful shared subject/mechanic term; an
 irrelevant fuzzy match cannot suppress web search. Insufficient local context escalates to
 web search before ERIN abstains. A current curated wiki may support a stable descriptive
 fact, while changeable mechanics still require stronger corroboration.
-The official Red Horizon baseline, including all 29 changed Brand Sets, is imported
-idempotently at startup so a deployed bot cannot silently run with an empty core catalog.
+The official Red Horizon baseline, including all 29 changed Brand Sets, nine changed Gear
+Sets, and Ubisoft's complete 43-variant PvE/PvP Skill table, is imported idempotently at
+startup so a deployed bot cannot silently run with an empty core catalog. Skill records
+retain base stats, Skill Tier 1-6 values, Overcharge details, source pages, and their text-
+table extraction method. Broad Skill-family questions must name every current variant in
+a complete answer; otherwise ERIN asks which variant the member means.
+ERIN also ships a pinned, attributed 2,037-record Y8S3 community research snapshot for
+exact item, talent, attribute, Skill, mod, weapon, and specialization discovery. Those
+rows improve web-search terminology but are deliberately excluded from verified knowledge:
+current claims still need official support or independent corroboration before delivery.
 Normal answers keep citations out of the message; a member can ask for the sources from
 ERIN's immediately preceding answer. Explicit natural follow-ups such as “thanks,” “that
 worked,” “that's wrong,” or “that's outdated” replace rating buttons and are inferred
@@ -99,4 +109,7 @@ values.
 See [`docs/architecture.md`](docs/architecture.md) for trust boundaries and
 [`docs/operations.md`](docs/operations.md) for startup, health, backup, restore, and
 maintenance procedures.
+
+Third-party data attribution is recorded in
+[`THIRD_PARTY_NOTICES.md`](THIRD_PARTY_NOTICES.md).
 

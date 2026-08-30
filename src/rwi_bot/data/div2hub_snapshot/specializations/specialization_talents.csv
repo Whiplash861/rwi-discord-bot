@@ -1,0 +1,231 @@
+name,description
+Sharpshooter Breath Control Tier 1,Increases Stability by 5%
+Sharpshooter Breath Control Tier 2,Increases Stability by 10%
+Sharpshooter Breath Control Tier 3,Increases Stability by 15%
+Sharpshooter Depleted Rounds Tier 1,Increases Marksman Rifle Damage by 5%
+Sharpshooter Depleted Rounds Tier 2,Increases Marksman Rifle Damage by 10%
+Sharpshooter Depleted Rounds Tier 3,Increases Marksman Rifle Damage by 15%
+Sharpshooter E.M.I Tier 1,Increases Assault Rifle Damage by 5%
+Sharpshooter E.M.I Tier 2,Increases Assault Rifle Damage by 10%
+Sharpshooter E.M.I Tier 3,Increases Assault Rifle Damage by 15%
+Sharpshooter Emergency Cleanse Tier 1,"Armor kits repair 100%, remove status effects and increases resistance to bleed, poison, and burn for 20s"
+Sharpshooter Group Signature Ammo Acquisition Tier 1,"Killing enemies with headshots adds 1 to your groups ammo bar, excluding kills with the spec weapon"
+Sharpshooter Gunslinger Tier 1,Increases Pistol Damage by 5%
+Sharpshooter Gunslinger Tier 2,Increases Pistol Damage by 10%
+Sharpshooter Gunslinger Tier 3,Increases Pistol Damage by 15%
+Sharpshooter My Home is My Castle Tier 1,Bonus armor gained while in cover
+Sharpshooter One in the Head Tier 1,Increased headshot damage by 3% with Rifles and Marksman Rifles
+Sharpshooter One in the Head Tier 2,Increased headshot damage by 6% with Rifles and Marksman Rifles
+Sharpshooter One in the Head Tier 3,Increased headshot damage by 9% with Rifles and Marksman Rifles
+Sharpshooter One in the Head Tier 4,Increased headshot damage by 12% with Rifles and Marksman Rifles
+Sharpshooter One in the Head Tier 5,Increased headshot damage by 15% with Rifles and Marksman Rifles
+Sharpshooter Onslaught Tier 1,Increases LMG Damage by 5%
+Sharpshooter Onslaught Tier 2,Increases LMG Damage by 10%
+Sharpshooter Onslaught Tier 3,Increases LMG Damage by 15%
+Sharpshooter Round After Round Tier 1,"After 20 seconds in cover, you start generating 5 MMR and 5 Rifle ammo every 10 seconds"
+Sharpshooter Running the Gun Tier 1,Increases Shotgun Damage by 5%
+Sharpshooter Running the Gun Tier 2,Increases Shotgun Damage by 10%
+Sharpshooter Running the Gun Tier 3,Increases Shotgun Damage by 15%
+Sharpshooter Sharpshooter Tactical Link Tier 1,All group members that are closer to enemies than you get +10% headshot damage
+Sharpshooter Signature Ammo Acquisition Tier 1,"Killing enemies with headshots adds 2 to the ammo bar, excluding kills with the spec weapon"
+Sharpshooter Signature Weapon Damage Tier 1,Increases Signature Weapon Damage by 10%
+Sharpshooter Signature Weapon Damage Tier 2,Increases Signature Weapon Damage by 20%
+Sharpshooter Signature Weapon Damage Tier 3,Increases Signature Weapon Damage by 30%
+Sharpshooter Signature Weapon Damage Tier 4,Increases Signature Weapon Damage by 40%
+Sharpshooter Spray and Pray Tier 1,Increases SMG Damage by 5%
+Sharpshooter Spray and Pray Tier 2,Increases SMG Damage by 10%
+Sharpshooter Spray and Pray Tier 3,Increases SMG Damage by 15%
+Sharpshooter This is my Rifle Tier 1,Increases Rifle Damage by 5%
+Sharpshooter This is my Rifle Tier 2,Increases Rifle Damage by 10%
+Sharpshooter This is my Rifle Tier 3,Increases Rifle Damage by 15%
+Sharpshooter Vital Protection Tier 1,Increases Pulse Resistance by 50%
+Survivalist Crunch Time Tier 1,"While in cover, gain 10% skill haste"
+Survivalist Depleted Rounds Tier 1,Increases Marksman Rifle Damage by 5%
+Survivalist Depleted Rounds Tier 2,Increases Marksman Rifle Damage by 10%
+Survivalist Depleted Rounds Tier 3,Increases Marksman Rifle Damage by 15%
+Survivalist Distributed Repair Tier 1,"Armor kits now repair over 5 seconds instead of instantly, but also apply to group members within 20 meters"
+Survivalist E.M.I Tier 1,Increases Assault Rifle Damage by 5%
+Survivalist E.M.I Tier 2,Increases Assault Rifle Damage by 10%
+Survivalist E.M.I Tier 3,Increases Assault Rifle Damage by 15%
+Survivalist Elite Defense Tier 1,Increases Protection from Elites by 3%
+Survivalist Elite Defense Tier 2,Increases Protection from Elites by 6%
+Survivalist Elite Defense Tier 3,Increases Protection from Elites by 10%
+Survivalist Group Signature Ammo Acquisition Tier 1,"Killing enemies under status effects adds 3 to your groups ammo bar, excluding kills with the spec weapon"
+Survivalist Gunslinger Tier 1,Increases Pistol Damage by 5%
+Survivalist Gunslinger Tier 2,Increases Pistol Damage by 10%
+Survivalist Gunslinger Tier 3,Increases Pistol Damage by 15%
+Survivalist Onslaught Tier 1,Increases LMG Damage by 5%
+Survivalist Onslaught Tier 2,Increases LMG Damage by 10%
+Survivalist Onslaught Tier 3,Increases LMG Damage by 15%
+Survivalist Running the Gun Tier 1,Increases Shotgun Damage by 5%
+Survivalist Running the Gun Tier 2,Increases Shotgun Damage by 10%
+Survivalist Running the Gun Tier 3,Increases Shotgun Damage by 15%
+Survivalist Scraping By Tier 1,Gain 5 ammo per second for your current weapon while performing a cover-to-cover in combat
+Survivalist Signature Ammo Acquisition Tier 1,"Killing enemies under status effects adds 3 to the ammo bar, excluding kills with the spec weapon"
+Survivalist Signature Weapon Damage Tier 1,Increases Signature Weapon Damage by 10%
+Survivalist Signature Weapon Damage Tier 2,Increases Signature Weapon Damage by 20%
+Survivalist Signature Weapon Damage Tier 3,Increases Signature Weapon Damage by 30%
+Survivalist Signature Weapon Damage Tier 4,Increases Signature Weapon Damage by 40%
+Survivalist Spray and Pray Tier 1,Increases SMG Damage by 5%
+Survivalist Spray and Pray Tier 2,Increases SMG Damage by 10%
+Survivalist Spray and Pray Tier 3,Increases SMG Damage by 15%
+Survivalist Survivalist Tactical Link Tier 1,Group members get 10% bonus damage to targets with status effects
+Survivalist This is my Rifle Tier 1,Increases Rifle Damage by 5%
+Survivalist This is my Rifle Tier 2,Increases Rifle Damage by 10%
+Survivalist This is my Rifle Tier 3,Increases Rifle Damage by 15%
+Survivalist Triage Specialist Tier 1,Increases Outgoing Healing by 5%
+Survivalist Triage Specialist Tier 2,Increases Outgoing Healing by 10%
+Survivalist Triage Specialist Tier 3,Increases Outgoing Healing by 15%
+Survivalist Vital Protection Tier 1,Increases Pulse Resistance by 50%
+Demolitionist Braced for Impact Tier 1,Ignore explosions. Can only trigger once every 60 seconds
+Demolitionist Crisis Response Tier 1,"When armor is reduced to 0, refills all main weapon clip ammo"
+Demolitionist Demolitionist Tactical Link Tier 1,Group members gain 5% damage to targets out of cover
+Demolitionist Depleted Rounds Tier 1,Increases Marksman Rifle Damage by 5%
+Demolitionist Depleted Rounds Tier 2,Increases Marksman Rifle Damage by 10%
+Demolitionist Depleted Rounds Tier 3,Increases Marksman Rifle Damage by 15%
+Demolitionist E.M.I Tier 1,Increases Assault Rifle Damage by 5%
+Demolitionist E.M.I Tier 2,Increases Assault Rifle Damage by 10%
+Demolitionist E.M.I Tier 3,Increases Assault Rifle Damage by 15%
+Demolitionist Explosive Ordnance Tier 1,Increases Explosive Damage by 3%
+Demolitionist Explosive Ordnance Tier 2,Increases Explosive Damage by 6%
+Demolitionist Explosive Ordnance Tier 3,Increases Explosive Damage by 10%
+Demolitionist Group Signature Ammo Acquisition Tier 1,"Killing enemies with explosions adds 2 to your groups ammo bar, excluding kills with the spec weapon"
+Demolitionist Gunslinger Tier 1,Increases Pistol Damage by 5%
+Demolitionist Gunslinger Tier 2,Increases Pistol Damage by 10%
+Demolitionist Gunslinger Tier 3,Increases Pistol Damage by 15%
+Demolitionist Incombustible Tier 1,Increase Burn Resistance by 20%
+Demolitionist Onslaught Tier 1,Increases LMG Damage by 5%
+Demolitionist Onslaught Tier 2,Increases LMG Damage by 10%
+Demolitionist Onslaught Tier 3,Increases LMG Damage by 15%
+Demolitionist Running the Gun Tier 1,Increases Shotgun Damage by 5%
+Demolitionist Running the Gun Tier 2,Increases Shotgun Damage by 10%
+Demolitionist Running the Gun Tier 3,Increases Shotgun Damage by 15%
+Demolitionist Signature Ammo Acquisition Tier 1,"Killing enemies with explosions adds 3 to the ammo bar, excluding kills with the spec weapon"
+Demolitionist Signature Weapon Damage Tier 1,Increases Signature Weapon Damage by 10%
+Demolitionist Signature Weapon Damage Tier 2,Increases Signature Weapon Damage by 20%
+Demolitionist Signature Weapon Damage Tier 3,Increases Signature Weapon Damage by 30%
+Demolitionist Signature Weapon Damage Tier 4,Increases Signature Weapon Damage by 40%
+Demolitionist Spray and Pray Tier 1,Increases SMG Damage by 5%
+Demolitionist Spray and Pray Tier 2,Increases SMG Damage by 10%
+Demolitionist Spray and Pray Tier 3,Increases SMG Damage by 15%
+Demolitionist Stimulant Patch Tier 1,Armor kits repair 100% damage and boost weapon handling by 30% for 15s
+Demolitionist This is my Rifle Tier 1,Increases Rifle Damage by 5%
+Demolitionist This is my Rifle Tier 2,Increases Rifle Damage by 10%
+Demolitionist This is my Rifle Tier 3,Increases Rifle Damage by 15%
+Demolitionist Vital Protection Tier 1,Increases Pulse Resistance by 50%
+Gunner Barrage Tier 1,Rate of fire increases by 5% on kill for 5s
+Gunner Coupler Tier 1,Every 5th reload is 50% faster
+Gunner Coupler Tier 2,Every 4th reload is 50% faster
+Gunner Coupler Tier 3,Every 3rd reload is 50% faster
+Gunner Depleted Rounds Tier 1,Increases Marksman Rifle Damage by 5%
+Gunner Depleted Rounds Tier 2,Increases Marksman Rifle Damage by 10%
+Gunner Depleted Rounds Tier 3,Increases Marksman Rifle Damage by 15%
+Gunner E.M.I Tier 1,Increases Assault Rifle Damage by 5%
+Gunner E.M.I Tier 2,Increases Assault Rifle Damage by 10%
+Gunner E.M.I Tier 3,Increases Assault Rifle Damage by 15%
+Gunner Emplacement Tier 1,"10% weapon handling while not moving, need to be motionless for 1 second"
+Gunner Group Signature Ammo Acquisition Tier 1,"Killing multiple enemies without releasing the trigger adds 1 to group members' ammo bar, excluding kills with the spec weapon"
+Gunner Gunslinger Tier 1,Increases Pistol Damage by 5%
+Gunner Gunslinger Tier 2,Increases Pistol Damage by 10%
+Gunner Gunslinger Tier 3,Increases Pistol Damage by 15%
+Gunner Hardened Armor Kits Tier 1,Armor kits repair 100% armor and grant 30% bonus armor for 10 seconds
+Gunner Incessant Tier 1,Increases Armor on Kill by 5%
+Gunner Incessant Tier 2,Increases Armor on Kill by 7%
+Gunner Incessant Tier 3,Increases Armor on Kill by 10%
+Gunner Onslaught Tier 1,Increases LMG Damage by 5%
+Gunner Onslaught Tier 2,Increases LMG Damage by 10%
+Gunner Onslaught Tier 3,Increases LMG Damage by 15%
+Gunner Running the Gun Tier 1,Increases Shotgun Damage by 5%
+Gunner Running the Gun Tier 2,Increases Shotgun Damage by 10%
+Gunner Running the Gun Tier 3,Increases Shotgun Damage by 15%
+Gunner Signature Ammo Acquisition Tier 1,"Killing multiple enemies without releasing the trigger adds 3 to the ammo bar, excluding kills with the spec weapon"
+Gunner Signature Weapon Damage Tier 1,Increases Signature Weapon Damage by 10%
+Gunner Signature Weapon Damage Tier 2,Increases Signature Weapon Damage by 20%
+Gunner Signature Weapon Damage Tier 3,Increases Signature Weapon Damage by 30%
+Gunner Signature Weapon Damage Tier 4,Increases Signature Weapon Damage by 40%
+Gunner Spray and Pray Tier 1,Increases SMG Damage by 5%
+Gunner Spray and Pray Tier 2,Increases SMG Damage by 10%
+Gunner Spray and Pray Tier 3,Increases SMG Damage by 15%
+Gunner Supply Line Tier 1,Generate 10% of total ammo capacity every 60 seconds. Party members recover 5%
+Gunner This is my Rifle Tier 1,Increases Rifle Damage by 5%
+Gunner This is my Rifle Tier 2,Increases Rifle Damage by 10%
+Gunner This is my Rifle Tier 3,Increases Rifle Damage by 15%
+Gunner Vital Protection Tier 1,Increases Pulse Resistance by 50%
+Technician Amped Tier 1,+1 Skill Tier
+Technician Depleted Rounds Tier 1,Increases Marksman Rifle Damage by 5%
+Technician Depleted Rounds Tier 2,Increases Marksman Rifle Damage by 10%
+Technician Depleted Rounds Tier 3,Increases Marksman Rifle Damage by 15%
+Technician Dismantling Tier 1,"Extra damage to drones, skill proxies, and robotics — 3%"
+Technician Dismantling Tier 2,"Extra damage to drones, skill proxies, and robotics — 6%"
+Technician Dismantling Tier 3,"Extra damage to drones, skill proxies, and robotics — 9%"
+Technician Dismantling Tier 4,"Extra damage to drones, skill proxies, and robotics — 12%"
+Technician E.M.I Tier 1,Increases Assault Rifle Damage by 5%
+Technician E.M.I Tier 2,Increases Assault Rifle Damage by 10%
+Technician E.M.I Tier 3,Increases Assault Rifle Damage by 15%
+Technician Emergency Patch Tier 1,Armor kit also applies to all friendly skill proxies within 10m
+Technician Enhanced Diagnostics Tier 1,+10% Repair Skills
+Technician Faraday Field Tier 1,Party members within 5m of your deployed and un-disrupted skills are immune to shock and disruption
+Technician Group Signature Ammo Acquisition Tier 1,Destroying hostile skill proxies and drones and robotics adds 1 to the ammo bar of your group
+Technician Gunslinger Tier 1,Increases Pistol Damage by 5%
+Technician Gunslinger Tier 2,Increases Pistol Damage by 10%
+Technician Gunslinger Tier 3,Increases Pistol Damage by 15%
+Technician Onslaught Tier 1,Increases LMG Damage by 5%
+Technician Onslaught Tier 2,Increases LMG Damage by 10%
+Technician Onslaught Tier 3,Increases LMG Damage by 15%
+Technician Overclocked CPU Tier 1,+10% Skill Damage
+Technician Running the Gun Tier 1,Increases Shotgun Damage by 5%
+Technician Running the Gun Tier 2,Increases Shotgun Damage by 10%
+Technician Running the Gun Tier 3,Increases Shotgun Damage by 15%
+Technician Signature Ammo Acquisition Tier 1,Destroying hostile skill proxies and drones and robotics adds 3 to the ammo bar
+Technician Signature Weapon Damage Tier 1,Increases Signature Weapon Damage by 10%
+Technician Signature Weapon Damage Tier 2,Increases Signature Weapon Damage by 20%
+Technician Signature Weapon Damage Tier 3,Increases Signature Weapon Damage by 30%
+Technician Signature Weapon Damage Tier 4,Increases Signature Weapon Damage by 40%
+Technician Spray and Pray Tier 1,Increases SMG Damage by 5%
+Technician Spray and Pray Tier 2,Increases SMG Damage by 10%
+Technician Spray and Pray Tier 3,Increases SMG Damage by 15%
+Technician Technomancy Tier 1,Gain 15% bonus armor while aiming a skill
+Technician This is my Rifle Tier 1,Increases Rifle Damage by 5%
+Technician This is my Rifle Tier 2,Increases Rifle Damage by 10%
+Technician This is my Rifle Tier 3,Increases Rifle Damage by 15%
+Technician Vital Protection Tier 1,Increases Pulse Resistance by 50%
+Firewall Bull Rush Tier 1,+30% Bonus Armor during cover to cover moves
+Firewall Depleted Rounds Tier 1,Increases Marksman Rifle Damage by 5%
+Firewall Depleted Rounds Tier 2,Increases Marksman Rifle Damage by 10%
+Firewall Depleted Rounds Tier 3,Increases Marksman Rifle Damage by 15%
+Firewall E.M.I Tier 1,Increases Assault Rifle Damage by 5%
+Firewall E.M.I Tier 2,Increases Assault Rifle Damage by 10%
+Firewall E.M.I Tier 3,Increases Assault Rifle Damage by 15%
+Firewall Enriched Magnesium Formula Tier 1,Increases Burn Duration by 4%
+Firewall Enriched Magnesium Formula Tier 2,Increases Burn Duration by 8%
+Firewall Enriched Magnesium Formula Tier 3,Increases Burn Duration by 12%
+Firewall Enriched Magnesium Formula Tier 4,Increases Burn Duration by 16%
+Firewall Enriched Magnesium Formula Tier 5,Increases Burn Duration by 20%
+Firewall Extracellular Matrix Mesh Tier 1,Your armor kit recovers 200% armor and 200% health over 10 seconds
+Firewall Fiery Response Tier 1,"On armor break, apply burn to enemies within 5m"
+Firewall Firewall Tactical Link Tier 1,Allies deal +10% damage to enemies that are within 10 meters of you
+Firewall Frontline Recovery Tier 1,Increases Health on Kill by 10%
+Firewall Frontline Recovery Tier 2,Increases Health on Kill by 20%
+Firewall Frontline Recovery Tier 3,Increases Health on Kill by 30%
+Firewall Group Signature Ammo Acquisition Tier 1,"Killing enemies within 10 meters adds 1 to your groups ammo bar, excluding kills with the spec weapon"
+Firewall Gunslinger Tier 1,Increases Pistol Damage by 5%
+Firewall Gunslinger Tier 2,Increases Pistol Damage by 10%
+Firewall Gunslinger Tier 3,Increases Pistol Damage by 15%
+Firewall Onslaught Tier 1,Increases LMG Damage by 5%
+Firewall Onslaught Tier 2,Increases LMG Damage by 10%
+Firewall Onslaught Tier 3,Increases LMG Damage by 15%
+Firewall Running the Gun Tier 1,Increases Shotgun Damage by 5%
+Firewall Running the Gun Tier 2,Increases Shotgun Damage by 10%
+Firewall Running the Gun Tier 3,Increases Shotgun Damage by 15%
+Firewall Signature Ammo Acquisition Tier 1,"Killing enemies within 10 meters adds 3 to your ammo bar, excluding kills with the spec weapon"
+Firewall Signature Weapon Damage Tier 1,Increases Signature Weapon Damage by 10%
+Firewall Signature Weapon Damage Tier 2,Increases Signature Weapon Damage by 20%
+Firewall Signature Weapon Damage Tier 3,Increases Signature Weapon Damage by 30%
+Firewall Signature Weapon Damage Tier 4,Increases Signature Weapon Damage by 40%
+Firewall Spray and Pray Tier 1,Increases SMG Damage by 5%
+Firewall Spray and Pray Tier 2,Increases SMG Damage by 10%
+Firewall Spray and Pray Tier 3,Increases SMG Damage by 15%
+Firewall This is my Rifle Tier 1,Increases Rifle Damage by 5%
+Firewall This is my Rifle Tier 2,Increases Rifle Damage by 10%
+Firewall This is my Rifle Tier 3,Increases Rifle Damage by 15%
+Firewall Vital Protection Tier 1,Increases Pulse Resistance by 50%

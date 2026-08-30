@@ -1,0 +1,26 @@
+name,type,category,parent,description,budget,max_tier,tier1_cost,tier2_cost,tier3_cost,tier4_cost,tier5_cost
+Weapon Damage Hub,hub,N/A,N/A,N/A,45,N/A,N/A,N/A,N/A,N/A,N/A
+Skill Hub,hub,N/A,Faraday Field,N/A,5,N/A,N/A,N/A,N/A,N/A,N/A
+This is my Rifle,node,talent,Weapon Damage Hub,N/A,N/A,3,5,5,5,N/A,N/A
+Depleted Rounds,node,talent,Weapon Damage Hub,N/A,N/A,3,5,5,5,N/A,N/A
+E.M.I,node,talent,Weapon Damage Hub,N/A,N/A,3,5,5,5,N/A,N/A
+Gunslinger,node,talent,Weapon Damage Hub,N/A,N/A,3,5,5,5,N/A,N/A
+Onslaught,node,talent,Weapon Damage Hub,N/A,N/A,3,5,5,5,N/A,N/A
+Running the Gun,node,talent,Weapon Damage Hub,N/A,N/A,3,5,5,5,N/A,N/A
+Spray and Pray,node,talent,Weapon Damage Hub,N/A,N/A,3,5,5,5,N/A,N/A
+Signature Weapon Damage,node,talent,Signature Ammo Acquisition,N/A,N/A,4,10,10,10,10,N/A
+Signature Ammo Acquisition,node,talent,N/A,N/A,N/A,1,0,N/A,N/A,N/A,N/A
+Group Signature Ammo Acquisition,node,talent,Signature Ammo Acquisition,N/A,N/A,1,5,N/A,N/A,N/A,N/A
+EMP Grenade,node,item,N/A,The EMP grenade applies Disrupt to all electrical abilities within the affected area,N/A,1,3,N/A,N/A,N/A,N/A
+Maxim 9,node,item,N/A,Integrally suppressed 9mm pistol for when you don't want to compromise between performance and suppression. Carries the Perfect Spike talent,N/A,1,10,N/A,N/A,N/A,N/A
+Amped,node,talent,N/A,N/A,N/A,1,13,N/A,N/A,N/A,N/A
+Dismantling,node,talent,Amped,N/A,N/A,4,2,2,3,3,N/A
+Emergency Patch,node,talent,Amped,N/A,N/A,1,3,N/A,N/A,N/A,N/A
+Artificer,node,item,N/A,The artificer sends out micro electro-booster drones that expend themselves to increase allied skills efficiency and refresh their duration,N/A,1,5,N/A,N/A,N/A,N/A
+Upgraded Sensor,node,item,Artificer,Mod to increase the radius of the hive skill,N/A,1,3,N/A,N/A,N/A,N/A
+Liquid Cooling,node,item,Upgraded Sensor,Mod to increase the recovery rate of the hive skill,N/A,1,3,N/A,N/A,N/A,N/A
+Faraday Field,node,talent,N/A,N/A,N/A,1,10,N/A,N/A,N/A,N/A
+Technomancy,node,talent,Faraday Field,N/A,N/A,1,5,N/A,N/A,N/A,N/A
+Vital Protection,node,talent,Faraday Field,N/A,N/A,1,5,N/A,N/A,N/A,N/A
+Overclocked CPU,node,talent,Skill Hub,N/A,N/A,1,5,N/A,N/A,N/A,N/A
+Enhanced Diagnostics,node,talent,Skill Hub,N/A,N/A,1,5,N/A,N/A,N/A,N/A

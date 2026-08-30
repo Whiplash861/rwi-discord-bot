@@ -4,6 +4,7 @@ from dataclasses import dataclass
 from decimal import Decimal
 from typing import Any
 
+from rwi_bot.data.red_horizon_skills import RED_HORIZON_SKILL_TABLES
 from rwi_bot.db.models import KnowledgeStatus, SourceType
 from rwi_bot.services.knowledge import SourceEvidence
 
@@ -32,6 +33,18 @@ OFFICIAL_BRAND_BREAKDOWN_SOURCE = SourceEvidence(
     publisher="Ubisoft",
     supports_claim=True,
     note="Final Y8S3 Gear and Brand Set breakdown linked from the Red Horizon launch article.",
+)
+OFFICIAL_SKILL_BREAKDOWN_URL = (
+    "https://canopy.ubisoft.com/AssetLink/1y4y4a237pd4u0o41c4te2j2t5c315k1.pdf"
+)
+OFFICIAL_SKILL_BREAKDOWN_SOURCE = SourceEvidence(
+    url=OFFICIAL_SKILL_BREAKDOWN_URL,
+    title="Red Horizon PvE and PvP Skill Changes",
+    source_type=SourceType.OFFICIAL,
+    trust_score=Decimal("0.990"),
+    publisher="Ubisoft",
+    supports_claim=True,
+    note="Final Y8S3 Skill table linked from the Red Horizon launch article.",
 )
 
 
@@ -196,6 +209,124 @@ RED_HORIZON_BRAND_BONUSES: dict[str, tuple[str, str, str]] = {
 }
 
 
+RED_HORIZON_GEAR_SET_UPDATES: dict[str, dict[str, Any]] = {
+    "Ortiz: Exuro": {
+        "chest_talent": "Chain Combustion",
+        "chest_effect": (
+            "Enemies set ablaze by the Ortiz Incinerator Turret Prototype ignite other "
+            "enemies within 10m."
+        ),
+        "backpack_talent": "Heatstroke",
+        "backpack_effects": [
+            "+40% amplified damage to enemies set on fire by the Ortiz Incinerator "
+            "Turret Prototype",
+            "+25% Ortiz Incinerator Turret Prototype range",
+        ],
+        "description_correction": (
+            "The backpack description says Increased Weapon Damage, but the bonus is an amplifier."
+        ),
+    },
+    "True Patriot": {
+        "two_piece": "+15% Weapon Handling",
+        "three_piece": "+30% Magazine Size",
+        "four_piece_talent": "Red, White and Blue",
+        "four_piece_rules": {
+            "rotation_seconds": 2,
+            "red": "+15% amplified damage taken",
+            "white": "Shooting repairs the attacking agent's armor by 2% once per second",
+            "blue": "-10% enemy damage dealt",
+            "full_flag": (
+                "Death under all three debuffs creates a 5m explosion equal to total health "
+                "and armor; Named-enemy explosion damage is reduced."
+            ),
+        },
+        "chest_talent": "Waving the Flag",
+        "chest_rotation_seconds": 1,
+        "backpack_talent": "Patriotic Boost",
+        "backpack_values": {"red": "+30%", "white": "+5%", "blue": "-20%"},
+    },
+    "Aces & Eights": {
+        "two_piece": ["+30% MMR Damage", "+30% Rifle Damage"],
+        "three_piece": ["+30% Headshot Damage", "+30% Weapon Handling (+15% PvP)"],
+        "four_piece_talent": "Dead Man's Hand",
+        "four_piece_rules": (
+            "Rifle or Marksman Rifle hits flip cards. After five cards, the next shot is "
+            "amplified by 75%; Four of a Kind enhances four shots, Full House three, and "
+            "Aces and Eights two. Headshots flip one additional card."
+        ),
+        "chest_talent": "No Limit",
+        "chest_amplification": "+100%",
+    },
+    "Breaking Point": {
+        "two_piece": ["+30% MMR Damage", "+30% Rifle Damage"],
+        "three_piece": ["+30% Headshot Damage", "+30% Weapon Handling"],
+        "four_piece_talent": "On Point",
+        "four_piece_rules": (
+            "Rifle or MMR hits grant stacks. Reloading grants +2% Weapon Handling and +4% "
+            "Weapon Damage per stack for 20 seconds. No stacks are gained while active; "
+            "expiry or a weapon switch refills the magazine, and switching while inactive "
+            "also removes all stacks."
+        ),
+        "chest_talent": "Point of No Return",
+        "chest_duration_seconds": 40,
+        "backpack_talent": "Point of Honor",
+        "backpack_weapon_damage_per_stack": "+9%",
+    },
+    "Hotshot": {
+        "bonus_change": "The +30% Weapon Handling bonus moved from the 2-piece to 3-piece bonus.",
+        "four_piece_talent": "Headache",
+        "four_piece_cycle": [
+            "First MMR headshot gives the next headshot +80% damage.",
+            "Second consecutive MMR headshot gives +10% armor, or bonus armor when full, "
+            "up to 50% of current armor.",
+            "Third consecutive MMR headshot refills the magazine.",
+            "From the fourth consecutive headshot kill onward, all three bonuses apply.",
+            "Missing a headshot resets the cycle.",
+        ],
+    },
+    "Concentrated Company": {
+        "four_piece_talent": "Camaraderie",
+        "four_piece_rules": (
+            "Shooting marks an enemy for 10 seconds. When it dies, gain one stack of +3% "
+            "Weapon Damage and +3% Critical Hit Damage for each ally or skill that helped, "
+            "including yourself. Maximum 35 stacks; stacks decay every 10 seconds; maximum "
+            "four marks."
+        ),
+        "backpack_talent": "One for All",
+        "backpack_weapon_damage_per_stack": "+6%",
+    },
+    "Negotiator's Dilemma": {
+        "four_piece_talent": "Crowd Control",
+        "four_piece_rules": (
+            "Critical hits mark enemies for 20 seconds, up to three marks. Critically hitting "
+            "one marked enemy deals 60% of that damage to every other marked enemy. A marked "
+            "enemy death grants +10% Critical Hit Damage, up to 10 stacks or until combat ends."
+        ),
+    },
+    "Ongoing Directive": {
+        "four_piece_talent": "Rules of Engagement",
+        "four_piece_rules": (
+            "Shooting a status-affected enemy marks it for 10 seconds. Killing it grants a "
+            "full magazine of Hollow-Point Ammo to the active weapon and half a magazine of "
+            "each party member's active weapon. Hollow-Point Ammo amplifies weapon damage by "
+            "40% and applies bleed on hit."
+        ),
+        "chest_talent": "Parabellum Rounds",
+        "chest_hollow_point_amplification": "+60% for the owner; does not apply to the party",
+    },
+    "Tipping Scales": {
+        "four_piece_talent": "Throttle Control",
+        "four_piece_rules": (
+            "Shooting builds up to 50 stacks. Each stack grants +0.5% Weapon Handling and +5% "
+            "Critical Hit Damage. Lose six stacks per second while not shooting, except while "
+            "an enemy is Suppressed."
+        ),
+        "backpack_talent": "Snowball",
+        "backpack_critical_hit_damage_per_stack": "+8%",
+    },
+}
+
+
 RED_HORIZON_SEEDS: tuple[KnowledgeSeed, ...] = (
     KnowledgeSeed(
         subject="Red Horizon Under Pressure",
@@ -228,6 +359,28 @@ RED_HORIZON_SEEDS: tuple[KnowledgeSeed, ...] = (
                 ],
             },
             "passive_modifier_count": 20,
+        },
+        context={"season": "Red Horizon", "mode": "seasonal"},
+    ),
+    KnowledgeSeed(
+        subject="Red Horizon Hostile Modifiers",
+        entity_type="seasonal_modifier",
+        claim_key="current_rules",
+        content={
+            "removal_rule": (
+                "Setting the affected enemy on fire is the only permanent way to remove or "
+                "reverse the hostile effect."
+            ),
+            "Draining Presence": (
+                "Drains magazine ammunition and Pressure while the affected enemy is nearby."
+            ),
+            "Achilles' Heal": (
+                "Breaking weak points or armor restores the affected enemy and nearby allies' "
+                "Health while reducing Pressure."
+            ),
+            "Thousand Cuts": (
+                "Enemy hits reduce Pressure and apply a stacking Damage Reduction debuff."
+            ),
         },
         context={"season": "Red Horizon", "mode": "seasonal"},
     ),
@@ -455,6 +608,19 @@ RED_HORIZON_SEEDS: tuple[KnowledgeSeed, ...] = (
         context={"season": "Red Horizon", "mode": "pvevp"},
     ),
     KnowledgeSeed(
+        subject="Red Horizon Dark Zone Rotation",
+        entity_type="activity",
+        claim_key="current_rotation_rules",
+        content={
+            "weekly_zone_count": 3,
+            "pve_zone_count": 1,
+            "pvp_zone_count": 2,
+            "always_active_variants": ["Toxic", "Balanced"],
+            "alternating_variants": ["Blackout", "Classic"],
+        },
+        context={"season": "Red Horizon", "mode": "dark_zone"},
+    ),
+    KnowledgeSeed(
         subject="Red Horizon PvP Dark Zone Prototype Drops",
         entity_type="acquisition",
         claim_key="current_drop_rates",
@@ -506,6 +672,153 @@ RED_HORIZON_SEEDS: tuple[KnowledgeSeed, ...] = (
             "targeted_loot_additions": ["Caduceus", "Nurse's Kneepads"],
         },
         context={"season": "Red Horizon", "mode": "current"},
+    ),
+    KnowledgeSeed(
+        subject="Red Horizon PvP Stat Display",
+        entity_type="system",
+        claim_key="current_behavior",
+        content={
+            "inventory": (
+                "PvP weapon damage values display alongside PvE values and stats switch to "
+                "their PvP values upon entering a PvP environment."
+            ),
+            "shooting_range": (
+                "PvP Normalization and Global PvP Balance overrides can be enabled in the "
+                "Shooting Range."
+            ),
+            "normalization_button": "Temporarily unavailable while its UI is updated.",
+        },
+        context={"season": "Red Horizon", "mode": "pvp"},
+    ),
+    KnowledgeSeed(
+        subject="Red Horizon Classified Assignments",
+        entity_type="activity",
+        claim_key="current_schedule_and_access",
+        content={
+            "assignments": {
+                "The District Mall Inferno": "August 27, 2026",
+                "The Georgetown Dead Zone": "October 15, 2026",
+            },
+            "access": "Dedicated Assignments map tab; unlocks at Level 30.",
+            "purchase_required": True,
+        },
+        context={"season": "Red Horizon", "mode": "pve"},
+    ),
+    KnowledgeSeed(
+        subject="Red Horizon Retaliation Events",
+        entity_type="activity",
+        claim_key="current_schedule",
+        content={
+            "project_chain": "September 8 through September 22, 2026",
+            "project_chain_reward": "One eligible outfit token after completing the chain",
+            "retaliation_surge": "September 8 through September 15, 2026",
+            "retaliation_surge_effect": "Double Retaliation Faction Materials from all sources",
+        },
+        context={"season": "Red Horizon", "mode": "pve"},
+    ),
+    KnowledgeSeed(
+        subject="Ballistic Shield",
+        entity_type="skill_family",
+        claim_key="current_pve_stats_and_overcharge",
+        content={
+            "variants": [
+                "Bulwark Shield",
+                "Crusader Shield",
+                "Deflector Shield",
+                "Striker Shield",
+            ],
+            "common_pve_overcharge_effect": "Shield Wall: the shield is invulnerable.",
+            "pvp_overcharge_functionality": False,
+            "pve": {
+                "Bulwark Shield": {
+                    "cooldown_seconds": 20,
+                    "base_health": 2654490,
+                    "health_tiers_1_to_6_percent": [67, 133, 200, 266, 333, 400],
+                    "overcharge_health_percent": 400,
+                    "base_active_regeneration_per_second": 79635,
+                    "active_regeneration_tiers_1_to_6_percent": [20, 40, 60, 80, 100, 120],
+                    "overcharge_active_regeneration_percent": 500,
+                    "base_holstered_regeneration_per_second": 132725,
+                    "holstered_regeneration_tiers_1_to_6_percent": [5, 10, 15, 20, 25, 40],
+                    "overcharge_holstered_regeneration_percent": 40,
+                },
+                "Crusader Shield": {
+                    "cooldown_seconds": 20,
+                    "base_health": 1327245,
+                    "health_tiers_1_to_6_percent": [40, 66, 100, 150, 200, 250],
+                    "overcharge_health_percent": 250,
+                    "base_active_regeneration_per_second": 39817,
+                    "active_regeneration_tiers_1_to_6_percent": [10, 20, 30, 40, 50, 60],
+                    "overcharge_active_regeneration_percent": 500,
+                    "base_holstered_regeneration_per_second": 66362,
+                    "holstered_regeneration_tiers_1_to_6_percent": [5, 10, 15, 20, 25, 40],
+                    "overcharge_holstered_regeneration_percent": 40,
+                },
+                "Deflector Shield": {
+                    "cooldown_seconds": 20,
+                    "base_health": 2123592,
+                    "health_tiers_1_to_6_percent": [40, 66, 100, 150, 200, 250],
+                    "overcharge_health_percent": 250,
+                    "base_active_regeneration_per_second": 63708,
+                    "active_regeneration_tiers_1_to_6_percent": [10, 20, 30, 40, 50, 60],
+                    "overcharge_active_regeneration_percent": 60,
+                    "base_holstered_regeneration_per_second": 106180,
+                    "holstered_regeneration_tiers_1_to_6_percent": [5, 10, 15, 20, 25, 40],
+                    "overcharge_holstered_regeneration_percent": 40,
+                    "base_deflector_damage": 80465,
+                    "deflector_damage_tiers_1_to_6_percent": [10, 20, 30, 40, 50, 60],
+                    "overcharge_deflector_damage_percent": 100,
+                },
+                "Striker Shield": {
+                    "cooldown_seconds": 20,
+                    "base_damage_bonus_per_enemy_percent": 5,
+                    "damage_bonus_tiers_1_to_6_percentage_points": [1, 1.2, 1.4, 1.6, 1.8, 2],
+                    "overcharge_damage_bonus_percentage_points": 2.5,
+                    "buff_angle_degrees": 45,
+                    "buff_range_meters": 10,
+                    "base_health": 1327245,
+                    "health_tiers_1_to_6_percent": [40, 66, 100, 150, 200, 250],
+                    "overcharge_health_percent": 400,
+                    "base_active_regeneration_per_second": 39817,
+                    "active_regeneration_tiers_1_to_6_percent": [10, 20, 30, 40, 50, 60],
+                    "overcharge_active_regeneration_percent": 60,
+                    "base_holstered_regeneration_per_second": 66362,
+                    "holstered_regeneration_tiers_1_to_6_percent": [5, 10, 15, 20, 25, 40],
+                    "overcharge_holstered_regeneration_percent": 100,
+                },
+            },
+        },
+        context={"season": "Red Horizon", "mode": "pve_and_pvp", "level": 40},
+        confidence=0.99,
+        sources=(OFFICIAL_SOURCE, OFFICIAL_SKILL_BREAKDOWN_SOURCE),
+    ),
+    *(
+        KnowledgeSeed(
+            subject=display_name,
+            entity_type="skill_variant",
+            claim_key="current_base_tiers_and_overcharge",
+            content=record,
+            context={
+                "season": "Red Horizon",
+                "mode": record["mode"],
+                "source": "final_y8s3_skill_table",
+            },
+            confidence=0.99,
+            sources=(OFFICIAL_SOURCE, OFFICIAL_SKILL_BREAKDOWN_SOURCE),
+        )
+        for display_name, record in RED_HORIZON_SKILL_TABLES.items()
+    ),
+    *(
+        KnowledgeSeed(
+            subject=gear_set,
+            entity_type="gear_set",
+            claim_key="red_horizon_current_rules",
+            content=content,
+            context={"season": "Red Horizon", "mode": "pve_and_pvp"},
+            confidence=0.99,
+            sources=(OFFICIAL_SOURCE, OFFICIAL_BRAND_BREAKDOWN_SOURCE),
+        )
+        for gear_set, content in RED_HORIZON_GEAR_SET_UPDATES.items()
     ),
     *(
         KnowledgeSeed(

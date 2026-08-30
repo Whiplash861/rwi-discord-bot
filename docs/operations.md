@@ -173,6 +173,25 @@ identity. Service startup performs the same create-only, idempotent import autom
 the command remains available for private inspection and manual recovery. Re-running it is
 safe and imports only identities still missing.
 
+The packaged baseline contains the final official Brand/Gear updates and the complete
+Red Horizon Skill table as 43 PvE plus 43 PvP records. The Skill PDF extraction script is
+`scripts/extract_red_horizon_skills.py`; generated records retain their source pages and
+`pdf_table_text` extraction method. Regeneration requires the bundled document Python
+runtime with `pdfplumber`, and generated values must be reviewed against rendered source
+pages before deployment. Community indexes, forums, Reddit, screenshots, OCR text, and
+video transcripts are discovery or candidate material. Do not activate mutable current-
+game claims from a single community host, and never let pre-August 27, 2026 material
+verify a current Red Horizon mechanic.
+
+The bundled `src/rwi_bot/data/div2hub_snapshot` directory is a low-trust research index,
+not an automatic knowledge seed. `SNAPSHOT.json` pins the upstream commit, timestamp,
+license, record count, and trust boundary; the upstream README, license, known gaps, and
+game-text-error notes are preserved beside the CSV files. A matching row may improve
+ERIN's external search query, but it cannot answer a question without the usual current
+source evidence. When refreshing this snapshot, review its upstream diff, confirm the
+commit is newer than the current-game boundary, update attribution and record counts,
+run the catalog tests, and deploy it as a new ERIN release so cache signatures change.
+
 Exact Technicians, Division Commanders, and the configured owner can inspect an entry
 with `/rwi knowledge-history`. Create the first source-backed revision with
 `/rwi knowledge-create`. It requires a subject, stable `entity_type` and `claim_key`,

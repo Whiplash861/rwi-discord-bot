@@ -1,0 +1,24 @@
+name,type,category,parent,description,budget,max_tier,tier1_cost,tier2_cost,tier3_cost,tier4_cost,tier5_cost
+Weapon Damage Hub,hub,N/A,N/A,N/A,45,N/A,N/A,N/A,N/A,N/A,N/A
+This is my Rifle,node,talent,Weapon Damage Hub,N/A,N/A,3,5,5,5,N/A,N/A
+Depleted Rounds,node,talent,Weapon Damage Hub,N/A,N/A,3,5,5,5,N/A,N/A
+E.M.I,node,talent,Weapon Damage Hub,N/A,N/A,3,5,5,5,N/A,N/A
+Gunslinger,node,talent,Weapon Damage Hub,N/A,N/A,3,5,5,5,N/A,N/A
+Onslaught,node,talent,Weapon Damage Hub,N/A,N/A,3,5,5,5,N/A,N/A
+Running the Gun,node,talent,Weapon Damage Hub,N/A,N/A,3,5,5,5,N/A,N/A
+Spray and Pray,node,talent,Weapon Damage Hub,N/A,N/A,3,5,5,5,N/A,N/A
+Frontline Recovery,node,talent,Enriched Magnesium Formula,N/A,N/A,3,3,3,2,N/A,N/A
+Extracellular Matrix Mesh,node,talent,Enriched Magnesium Formula,N/A,N/A,1,3,N/A,N/A,N/A,N/A
+Signature Weapon Damage,node,talent,Signature Ammo Acquisition,N/A,N/A,4,10,10,10,10,N/A
+Signature Ammo Acquisition,node,talent,N/A,N/A,N/A,1,0,N/A,N/A,N/A,N/A
+Group Signature Ammo Acquisition,node,talent,Signature Ammo Acquisition,N/A,N/A,1,5,N/A,N/A,N/A,N/A
+Cluster Grenade,node,item,N/A,The cluster grenade launches mini grenades which detonate in a large area of effect,N/A,1,3,N/A,N/A,N/A,N/A
+Firestarter,node,item,N/A,Chambered shots contain a fine powder that increase the flammability of targets hit by the shotgun,N/A,1,10,N/A,N/A,N/A,N/A
+Enriched Magnesium Formula,node,talent,N/A,N/A,N/A,5,3,3,3,3,3
+Striker,node,item,N/A,"The Striker shield is a modified version of the crusader shield, allowing the K8-JetStream Flamethrower to be used while equipped. In addition, the Striker shield boosts the damage of the user and all allies behind them based on the number of enemies in front of the shield",N/A,1,5,N/A,N/A,N/A,N/A
+Shock Hardened Frame,node,item,Striker,Mod to increase the health of the shield skill,N/A,1,3,N/A,N/A,N/A,N/A
+Macromolecular Coverings,node,item,Shock Hardened Frame,Mod to increase the regeneration rate of the shield skill (while active),N/A,1,3,N/A,N/A,N/A,N/A
+Firewall Tactical Link,node,talent,N/A,N/A,N/A,1,10,N/A,N/A,N/A,N/A
+Bull Rush,node,talent,Firewall Tactical Link,N/A,N/A,1,5,N/A,N/A,N/A,N/A
+Vital Protection,node,talent,Firewall Tactical Link,N/A,N/A,1,5,N/A,N/A,N/A,N/A
+Fiery Response,node,talent,Firewall Tactical Link,N/A,N/A,1,5,N/A,N/A,N/A,N/A

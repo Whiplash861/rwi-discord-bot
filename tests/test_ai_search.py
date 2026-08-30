@@ -21,6 +21,7 @@ from rwi_bot.domain.schemas import AnswerRequest, ConfidenceLabel, SourceCitatio
 from rwi_bot.services.budget import BudgetGuard
 from rwi_bot.services.maintenance import MaintenanceManager
 from rwi_bot.services.qa import QuestionAnsweringService
+from rwi_bot.services.reference_catalog import Division2ReferenceCatalog
 
 
 class RecordingUsage:
@@ -330,6 +331,170 @@ async def test_high_confidence_correction_is_delivered() -> None:
     cache.create_candidate.assert_awaited_once()
 
 
+@pytest.mark.asyncio
+async def test_local_reference_snapshot_improves_web_search_without_becoming_evidence() -> None:
+    cache = SimpleNamespace(
+        get_valid=AsyncMock(return_value=None),
+        create_candidate=AsyncMock(return_value=uuid4()),
+    )
+    ai = SimpleNamespace(
+        answer=AsyncMock(
+            return_value=SimpleNamespace(
+                text="Iron Will is the current Exotic chest with Resolved.",
+                citations=[
+                    SourceCitation(
+                        title="Current official source",
+                        url="https://www.ubisoft.com/example",
+                        source_type="official_web",
+                        official=True,
+                    )
+                ],
+                evidence_confidence=ConfidenceLabel.HIGH,
+            )
+        ),
+        _select_model=Mock(return_value="gpt-5.6-terra"),
+    )
+    audit = SimpleNamespace(record=AsyncMock())
+    service = QuestionAnsweringService(
+        maintenance=cast(Any, SimpleNamespace(halted=False)),
+        knowledge=cast(Any, SimpleNamespace(search=AsyncMock(return_value=[]))),
+        cache=cast(Any, cache),
+        tickets=cast(Any, SimpleNamespace(open_or_increment=AsyncMock())),
+        profiles=cast(Any, SimpleNamespace(learning_opted_out=AsyncMock(return_value=False))),
+        ai=cast(Any, ai),
+        audit=cast(Any, audit),
+        web_search_enabled=True,
+        reference_catalog=Division2ReferenceCatalog.packaged(),
+    )
+
+    result = await service.answer(
+        AnswerRequest(
+            user_id=42,
+            guild_id=1,
+            channel_id=2,
+            question="What does the Iron Will Exotic chest do?",
+        )
+    )
+
+    call = ai.answer.await_args
+    assert call.kwargs["web_search"] is True
+    assert call.kwargs["search_scope"] is WebSearchScope.CURATED
+    assert "discovery hints only, not verified evidence" in call.kwargs["input_text"]
+    assert "Iron Will" in call.kwargs["input_text"]
+    assert result.confidence is ConfidenceLabel.HIGH
+    events = [item.args[0].event_type for item in audit.record.await_args_list]
+    assert "answer.reference_catalog_match" in events
+
+
+@pytest.mark.asyncio
+async def test_incomplete_skill_family_answer_asks_for_variant_without_ticket() -> None:
+    cache = SimpleNamespace(get_valid=AsyncMock(return_value=None), create_candidate=AsyncMock())
+    tickets = SimpleNamespace(open_or_increment=AsyncMock())
+    ai = SimpleNamespace(
+        answer=AsyncMock(
+            return_value=SimpleNamespace(
+                text="Bulwark Shield gains Shield Wall.",
+                citations=[
+                    SourceCitation(
+                        title="Official Skill table",
+                        url="https://www.ubisoft.com/example",
+                        source_type="official_web",
+                        official=True,
+                    )
+                ],
+                evidence_confidence=ConfidenceLabel.HIGH,
+            )
+        ),
+        _select_model=Mock(return_value="gpt-5.6-terra"),
+    )
+    audit = SimpleNamespace(record=AsyncMock())
+    service = QuestionAnsweringService(
+        maintenance=cast(Any, SimpleNamespace(halted=False)),
+        knowledge=cast(Any, SimpleNamespace(search=AsyncMock(return_value=[]))),
+        cache=cast(Any, cache),
+        tickets=cast(Any, tickets),
+        profiles=cast(Any, SimpleNamespace(learning_opted_out=AsyncMock(return_value=False))),
+        ai=cast(Any, ai),
+        audit=cast(Any, audit),
+        web_search_enabled=True,
+    )
+
+    result = await service.answer(
+        AnswerRequest(
+            user_id=42,
+            guild_id=1,
+            channel_id=2,
+            question="What is the Shield's overcharge bonus?",
+        )
+    )
+
+    assert "Which one do you mean" in result.text
+    assert "Bulwark Shield" in result.text
+    assert "Striker Shield" in result.text
+    assert result.awaiting_user_input is False
+    assert result.failure_code is None
+    tickets.open_or_increment.assert_not_awaited()
+    cache.create_candidate.assert_not_awaited()
+    input_text = ai.answer.await_args.kwargs["input_text"]
+    assert "REQUEST SCOPE" in input_text
+    assert "Deflector Shield" in input_text
+    assert audit.record.await_args.args[0].event_type == (
+        "answer.skill_variant_clarification_requested"
+    )
+
+
+@pytest.mark.asyncio
+async def test_complete_skill_family_answer_is_delivered_and_cached() -> None:
+    cache = SimpleNamespace(
+        get_valid=AsyncMock(return_value=None),
+        create_candidate=AsyncMock(return_value=uuid4()),
+    )
+    ai = SimpleNamespace(
+        answer=AsyncMock(
+            return_value=SimpleNamespace(
+                text=(
+                    "Bulwark Shield, Crusader Shield, Deflector Shield, and Striker Shield "
+                    "all gain Shield Wall in PvE."
+                ),
+                citations=[
+                    SourceCitation(
+                        title="Official Skill table",
+                        url="https://www.ubisoft.com/example",
+                        source_type="official_web",
+                        official=True,
+                    )
+                ],
+                evidence_confidence=ConfidenceLabel.HIGH,
+            )
+        ),
+        _select_model=Mock(return_value="gpt-5.6-terra"),
+    )
+    service = QuestionAnsweringService(
+        maintenance=cast(Any, SimpleNamespace(halted=False)),
+        knowledge=cast(Any, SimpleNamespace(search=AsyncMock(return_value=[]))),
+        cache=cast(Any, cache),
+        tickets=cast(Any, SimpleNamespace(open_or_increment=AsyncMock())),
+        profiles=cast(Any, SimpleNamespace(learning_opted_out=AsyncMock(return_value=False))),
+        ai=cast(Any, ai),
+        audit=cast(Any, SimpleNamespace(record=AsyncMock())),
+        web_search_enabled=True,
+    )
+
+    result = await service.answer(
+        AnswerRequest(
+            user_id=42,
+            guild_id=1,
+            channel_id=2,
+            question="What is the Shield's overcharge bonus?",
+        )
+    )
+
+    assert result.text.startswith("Bulwark Shield")
+    assert result.confidence is ConfidenceLabel.HIGH
+    assert result.awaiting_user_input is False
+    cache.create_candidate.assert_awaited_once()
+
+
 def test_external_source_trust_is_classified_by_exact_target() -> None:
     arguments = {
         "official_domains": ("ubisoft.com",),
@@ -339,6 +504,11 @@ def test_external_source_trust_is_classified_by_exact_target() -> None:
             "thedivision.fandom.com",
             "reddit.com",
             "gaming.stackexchange.com",
+            "prototrack.gg",
+            "siriusarc7.github.io",
+            "github.com",
+            "raw.githubusercontent.com",
+            "youtube.com",
         ),
     }
 
@@ -360,5 +530,21 @@ def test_external_source_trust_is_classified_by_exact_target() -> None:
     )
     assert classify_external_source("https://www.reddit.com/r/thedivision/", **arguments) == (
         "community_forum",
+        False,
+    )
+    assert classify_external_source("https://prototrack.gg/division2-wiki.php", **arguments) == (
+        "community_reference",
+        False,
+    )
+    assert classify_external_source("https://siriusarc7.github.io/TD2_GARL/", **arguments) == (
+        "community_reference",
+        False,
+    )
+    assert classify_external_source("https://github.com/div2hub/game-data", **arguments) == (
+        "community_reference",
+        False,
+    )
+    assert classify_external_source("https://www.youtube.com/watch?v=example", **arguments) == (
+        "community_video",
         False,
     )

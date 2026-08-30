@@ -1,0 +1,24 @@
+name,type,category,parent,description,budget,max_tier,tier1_cost,tier2_cost,tier3_cost,tier4_cost,tier5_cost
+Weapon Damage Hub,hub,N/A,N/A,N/A,45,N/A,N/A,N/A,N/A,N/A,N/A
+This is my Rifle,node,talent,Weapon Damage Hub,N/A,N/A,3,5,5,5,N/A,N/A
+Depleted Rounds,node,talent,Weapon Damage Hub,N/A,N/A,3,5,5,5,N/A,N/A
+E.M.I,node,talent,Weapon Damage Hub,N/A,N/A,3,5,5,5,N/A,N/A
+Gunslinger,node,talent,Weapon Damage Hub,N/A,N/A,3,5,5,5,N/A,N/A
+Onslaught,node,talent,Weapon Damage Hub,N/A,N/A,3,5,5,5,N/A,N/A
+Running the Gun,node,talent,Weapon Damage Hub,N/A,N/A,3,5,5,5,N/A,N/A
+Spray and Pray,node,talent,Weapon Damage Hub,N/A,N/A,3,5,5,5,N/A,N/A
+Signature Weapon Damage,node,talent,Signature Ammo Acquisition,N/A,N/A,4,10,10,10,10,N/A
+Signature Ammo Acquisition,node,talent,N/A,N/A,N/A,1,0,N/A,N/A,N/A,N/A
+Group Signature Ammo Acquisition,node,talent,Signature Ammo Acquisition,N/A,N/A,1,5,N/A,N/A,N/A,N/A
+Flashbang Grenade,node,item,N/A,The flashbang grenade applies blind to all targets within a large area of effect,N/A,1,3,N/A,N/A,N/A,N/A
+Sharpshooters 93R,node,item,N/A,A 3-round burst fire weapon for hectic close encounters. Carries the Perfect Unwavering talent,N/A,1,10,N/A,N/A,N/A,N/A
+One in the Head,node,talent,N/A,N/A,N/A,5,3,3,3,3,3
+Breath Control,node,talent,One in the Head,N/A,N/A,3,3,3,3,N/A,N/A
+Emergency Cleanse,node,talent,One in the Head,N/A,N/A,1,3,N/A,N/A,N/A,N/A
+Tactician,node,item,N/A,"The tactician scouts and marks hostile targets, feeding them to the agent and other allies' HUD",N/A,1,5,N/A,N/A,N/A,N/A
+Graphene Battery,node,item,Tactician,Mod to increase the drone's duration,N/A,1,3,N/A,N/A,N/A,N/A
+Carbon Fiber Frame,node,item,Graphene Battery,Mod to increase the drone's scan range,N/A,1,3,N/A,N/A,N/A,N/A
+Sharpshooter Tactical Link,node,talent,N/A,N/A,N/A,1,10,N/A,N/A,N/A,N/A
+Round After Round,node,talent,Sharpshooter Tactical Link,N/A,N/A,1,5,N/A,N/A,N/A,N/A
+Vital Protection,node,talent,Sharpshooter Tactical Link,N/A,N/A,1,5,N/A,N/A,N/A,N/A
+My Home is My Castle,node,talent,Sharpshooter Tactical Link,N/A,N/A,1,5,N/A,N/A,N/A,N/A

@@ -1,0 +1,245 @@
+name,category,compatibility,stats
+Acog Scope (4x),optics,optics-long|optics-normal,optimal-range:50%
+552 Holo Sight,optics,optics-long|optics-normal,accuracy:30%
+C79 Scope (3.4x),optics,optics-long|optics-normal,critical-hit-chance:5%
+CQBSS Scope (8x),optics,optics-long|optics-normal,headshot-damage:30%
+VX1 Scope  (12x),optics,optics-long|optics-normal,headshot-damage:35%|reload-speed:-10%
+Digital Scope,optics,optics-long|optics-normal,headshot-damage:45%|critical-hit-damage:-5%
+GR9 Built-in scope (8x),optics,N/A,critical-hit-chance:5%
+Small RDS Scope,optics,optics-long|optics-normal|optics-short,stability:50%|accuracy:-20%
+T2 Micro Red Dot Sight,optics,optics-long|optics-normal|optics-short,accuracy:30%
+Russian Red dot Sight,optics,optics-long|optics-normal|optics-short,critical-hit-damage:10%
+EXPS3 Holo Sight,optics,optics-long|optics-normal|optics-short,headshot-damage:10%
+PRO Red Dot Sight,optics,optics-long|optics-normal|optics-short,stability:30%
+Reflex Sight,optics,optics-long|optics-normal|optics-short,weapon-handling:12%
+Rugged Mini Reflex Sight,optics,optics-long|optics-micro|optics-normal|optics-short,critical-hit-chance:5%
+Low Reflex Sight,optics,optics-micro|optics-short,headshot-damage:15%|optimal-range:-25%
+Open Iron Sights,optics,optics-normal,accuracy:30%
+Streamlined Iron Sights,optics,optics-normal,reload-speed:14%
+Weighted Iron Sights,optics,optics-normal,stability:30%
+Counter-Clockwise Tubular Spring,magazine,mag-tubular,headshot-damage:5%
+Hard Tubular Spring,magazine,mag-tubular,rate-of-fire:5%
+Flexible tubular Spring,magazine,mag-tubular,reload-speed:20%
+Non-Disruptive Link,magazine,mag-belt,critical-hit-damage:10%
+Nimble Link Belt,magazine,mag-belt,rate-of-fire:5%
+Tactical Small Pouch,magazine,mag-belt,reload-speed:20%
+Large Pouch,magazine,mag-belt,magazine-size:35
+Large Pouch (Gunner mag),magazine,mag-belt,magazine-size:50
+Calibrated Link,magazine,mag-belt,stability:30%
+Underbalanced Integrated Spring,magazine,mag-integrated,rate-of-fire:5%
+Compensated Integrated Spring,magazine,mag-integrated,reload-speed:20%
+Overbalanced Integrated Spring,magazine,mag-integrated,stability:30%
+Stiff Integrated Spring,magazine,mag-integrated,weapon-damage:5%
+Mended Marksman Mag,magazine,mag-mmr-7.62,optimal-range:50%
+Lightweight Marksman Mag,magazine,mag-mmr-7.62,reload-speed:20%
+Tightly Packed Marksman Mag,magazine,mag-mmr-7.62,magazine-size:5
+Sturdy Marksman Mag,magazine,mag-mmr-7.62,stability:20%
+Precision 7.62 Mag,magazine,mag-7.62,headshot-damage:10%
+Thin 7.62 Mag,magazine,mag-7.62,reload-speed:20%
+Light Extended 7.62 Mag,magazine,mag-7.62,magazine-size:15
+Sturdy Extended 7.62 Mag,magazine,mag-7.62,magazine-size:20|reload-speed:-10%
+Weighted 7.62 Mag,magazine,mag-7.62,stability:20%
+Tactical 5.56 Mag,magazine,mag-5.56,critical-hit-damage:10%
+Infantry 5.56 Mag,magazine,mag-5.56,optimal-range:70%
+Light Extended 5.56 Mag,magazine,mag-5.56,magazine-size:15
+Sturdy Extended 5.56 Mag,magazine,mag-5.56,magazine-size:20|reload-speed:-10%
+Balanced Spring 5.56 Mag,magazine,mag-5.56,stability:30%
+Force Feed .45 ACP Mag,magazine,mag-45-acp,rate-of-fire:5%
+Short Spring .45 ACP Mag,magazine,mag-45-acp,reload-speed:20%
+Extended .45 ACP Mag,magazine,mag-45-acp,magazine-size:15
+Oversized .45 ACP Mag,magazine,mag-45-acp,magazine-size:20|reload-speed:-10%
+Precision Feeding .45 Mag,magazine,mag-45-acp,stability:30%
+Heavy Spring 9mm Mag,magazine,mag-9mm,critical-hit-damage:10%
+Oversized 9mm Mag,magazine,mag-9mm,magazine-size:15
+Extended 9mm Mag,magazine,mag-9mm,magazine-size:20|reload-speed:-10%
+Segmented 9mm Mag,magazine,mag-9mm,reload-speed:20%
+Field Pistol Mag,magazine,mag-pistol,optimal-range:30%
+Police Pistol Mag,magazine,mag-pistol,reload-speed:20%
+Extended Pistol Mag,magazine,mag-pistol,magazine-size:11
+Speed Loading Revolver Drum,magazine,mag-drum,reload-speed:20%
+Large Suppressor 7.62,muzzle,muzzle-7.62,accuracy:30%
+Muzzle Brake 7.62,muzzle,muzzle-7.62,critical-hit-chance:5%
+Flash Hider 7.62,muzzle,muzzle-7.62,critical-hit-damage:10%
+Loud Vent Brake 7.62,muzzle,muzzle-7.62,optimal-range:50%
+Compensator 7.62,muzzle,muzzle-7.62,stability:30%
+Omega 7.62 Rifle Suppresor,muzzle,muzzle-7.62,stability:40%|optimal-range:-10%
+Large Suppressor 5.56,muzzle,muzzle-5.56,accuracy:30%
+Muzzle Brake 5.56,muzzle,muzzle-5.56,critical-hit-chance:5%
+Flash Hider 5.56,muzzle,muzzle-5.56,critical-hit-damage:10%
+Loud Vent Brake 5.56,muzzle,muzzle-5.56,optimal-range:50%
+Compensator 5.56,muzzle,muzzle-5.56,stability:30%
+Omega 5.56 Rifle Suppressor,muzzle,muzzle-5.56,stability:40%|optimal-range:-10%
+QDC Sound Suppressor,muzzle,muzzle-qdc,stability:30%
+Small Suppressor .45,muzzle,muzzle-45,accuracy:30%
+Osprey 45 Suppressor,muzzle,muzzle-45,critical-hit-chance:5%
+Flash Hider .45,muzzle,muzzle-45,critical-hit-damage:10%
+Muzzle Brake .45,muzzle,muzzle-45,headshot-damage:10%
+Loud Vent Brake .45,muzzle,muzzle-45,optimal-range:50%
+Compensator .45,muzzle,muzzle-45,stability:30%
+Small Suppressor 9mm,muzzle,muzzle-9mm,accuracy:30%
+Osprey 9 Suppressor,muzzle,muzzle-9mm,critical-hit-chance:5%
+Flash Hider 9mm,muzzle,muzzle-9mm,critical-hit-damage:10%
+Muzzle Brake 9mm,muzzle,muzzle-9mm,headshot-damage:10%
+Loud Vent Brake 9mm,muzzle,muzzle-9mm,optimal-range:50%
+Compensator 9mm,muzzle,muzzle-9mm,stability:30%
+Short Grip,underbarrel,underbarrel-long,critical-hit-damage:10%
+Tactical Short Grip,underbarrel,underbarrel-long,critical-hit-damage:15%
+Handstop,underbarrel,underbarrel-long,reload-speed:14%
+Vertical Grip,underbarrel,underbarrel-long|underbarrel-short,accuracy:30%
+Angled Grip,underbarrel,underbarrel-long|underbarrel-short,stability:30%
+Laser Pointer,underbarrel,underbarrel-long|underbarrel-short|underbarrel-side,critical-hit-chance:5%
+Small Laser Pointer,underbarrel,underbarrel-long|underbarrel-short|underbarrel-side,critical-hit-chance:7%
+Compact Coupled Small  Laser Pointer,underbarrel,underbarrel-gadget,critical-hit-chance:10%
+Compact Coupled Laser Pointer,underbarrel,underbarrel-gadget,headshot-damage:10%
+Fire Select Scope,optics,N/A,headshot-damage:40%
+Tension Spring Magazine,magazine,N/A,reload-speed:20%
+Carbon Steel Muzzle,muzzle,N/A,accuracy:20%
+Bighorn Horn Grip,underbarrel,N/A,stability:20%
+Strega Optic,optics,N/A,critical-hit-damage:5%
+Strega Magazine,magazine,N/A,magazine-size:20
+Strega Muzzle,muzzle,N/A,critical-hit-chance:5%
+Senate Grip,underbarrel,N/A,weapon-handling:10%
+Conductor Rail,optics,N/A,critical-hit-damage:15%
+Insulated Magazine,magazine,N/A,magazine-size:30
+Overcharged Muzzle,muzzle,N/A,critical-hit-chance:15%
+Insulated Grip,underbarrel,N/A,weapon-handling:10%
+Eagle Eye Sight,optics,N/A,critical-hit-chance:15%
+Bullet Eyrie,magazine,N/A,magazine-size:30
+Jagged Beak,muzzle,N/A,critical-hit-damage:20%
+Talon Grip,underbarrel,N/A,weapon-handling:10%
+Conductive Focal,optics,N/A,critical-hit-chance:10%
+Voltage Generator,magazine,N/A,magazine-size:11
+Discharge Electrode,muzzle,N/A,critical-hit-damage:30%
+Dielectric Safety Grip,underbarrel,N/A,weapon-handling:10%
+Chameleon Optics,optics,N/A,critical-hit-chance:15%
+Chameleon ActivCamo,magazine,N/A,magazine-size:20
+Chameleon Dampener,muzzle,N/A,accuracy:20%
+Chameleon Grip,underbarrel,N/A,stability:10%
+Built-in Scope (8x),optics,N/A,critical-hit-chance:5%
+Lightning Sight,optics,N/A,reload-speed:20%
+Deauthentication Frame,magazine,N/A,weapon-handling:20%
+Overclock Muzzle,muzzle,N/A,rate-of-fire:20%
+Dropkick Grip,underbarrel,N/A,stability:20%
+Plagued Magazine,magazine,N/A,rate-of-fire:10%
+Plagued Muzzle,muzzle,N/A,accuracy:10%
+Caution Tape,underbarrel,N/A,stability:10%
+Bellows,magazine,N/A,magazine-size:35
+Dragon Horns,muzzle,N/A,critical-hit-chance:10%
+Scales,underbarrel,N/A,critical-hit-damage:20%
+Mag of Holding,magazine,N/A,N/A
+Gold Plated Muzzle,muzzle,N/A,critical-hit-chance:15%
+Solid Gold Bipod,underbarrel,N/A,stability:20%
+Pakhan Optic,optics,N/A,weapon-damage:15%
+Pakhan Magazine,magazine,N/A,magazine-size:20
+Pakhan Muzzle,muzzle,N/A,critical-hit-chance:15%
+Pakhan Underbarrel,underbarrel,N/A,reload-speed:10%
+Anti-Glint Coated Sight,optics,N/A,headshot-damage:40%
+Well-Oiled Machine,magazine,N/A,reload-speed:10%
+Wrapped Suppressor,muzzle,N/A,critical-hit-chance:5%
+Ghillie Frame,underbarrel,N/A,stability:10%
+Nemesis Digital Scope,optics,N/A,headshot-damage:45%
+Nemesis Bolt,magazine,N/A,reload-speed:10%
+Nemesis Barrel,muzzle,N/A,critical-hit-damage:5%
+Nemesis Bipod,underbarrel,N/A,weapon-handling:5%
+Sacrum Sight,optics,N/A,headshot-damage:20%
+Sacrum Magazine,magazine,N/A,headshot-damage:10%
+Sacrum Muzzle,muzzle,N/A,optimal-range:20%
+Sacrum Underbarrel,underbarrel,N/A,stability:20%
+Shroud Scope,optics,N/A,headshot-damage:25%
+Shroud Magazine,magazine,N/A,reload-speed:20%
+Shroud Muzzle,muzzle,N/A,headshot-damage:20%
+Shroud Underbarrel,underbarrel,N/A,critical-hit-damage:5%
+Judgement's Glare,optics,N/A,headshot-damage:40%
+Tuned-tension Spring,magazine,N/A,weapon-handling:15%
+Punctuating Barrel,muzzle,N/A,critical-hit-chance:10%
+Fearless Frame,underbarrel,N/A,stability:10%
+Tempest Magazine,magazine,N/A,stability:50%
+Tempest Muzzle,muzzle,N/A,critical-hit-chance:15%
+Engraved Drum,magazine,N/A,reload-speed:10%
+Engraved Muzzle,muzzle,N/A,accuracy:20%
+Mosquito Magazine,magazine,N/A,reload-speed:15%
+Mosquito Muzzle,muzzle,N/A,accuracy:15%
+Liberty Sight,optics,N/A,headshot-damage:5%
+Liberty Grip,magazine,N/A,weapon-handling:15%
+Liberty Customs,muzzle,N/A,critical-hit-chance:5%
+Trigger Mechanism,underbarrel,N/A,rate-of-fire:15%
+Bee's Focus,optics,N/A,optimal-range:25%
+Bee's Speed,magazine,N/A,reload-speed:10%
+Bee's Purpose,muzzle,N/A,stability:10%
+Bee's Strength,underbarrel,N/A,critical-hit-chance:5%
+Bittersweet Scope,optics,N/A,headshot-damage:5%
+Bittersweet Magazine,magazine,N/A,magazine-size:10
+Bittersweet Underbarrel,underbarrel,N/A,headshot-damage:5%
+Doctor's Sight,optics,N/A,accuracy:10%
+Home's Magazine,magazine,N/A,reload-speed:10%
+Doctor's Perseverance,muzzle,N/A,stability:10%
+Doctor's Grip,underbarrel,N/A,weapon-handling:10%
+Merciless Optics,optics,N/A,accuracy:15%
+Merciless Magazine,magazine,N/A,reload-speed:10%
+Merciless Muzzle,muzzle,N/A,stability:15%
+Merciless Grip,underbarrel,N/A,weapon-handling:15%
+Unid Custom Russian Sight,optics,N/A,accuracy:15%
+Ruthless Magazine,magazine,N/A,reload-speed:15%
+Mayhem's Muzzle,muzzle,N/A,stability:15%
+Ruthless Grip,underbarrel,N/A,weapon-handling:15%
+Predatory Optics,optics,N/A,critical-hit-chance:5%
+Gluttonous Magazines,magazine,N/A,reload-speed:10%
+Devouring Maw,muzzle,N/A,critical-hit-damage:5%
+Wolf's Claw,underbarrel,N/A,stability:10%
+AR Scope,optics,N/A,accuracy:15%
+Simulation Magazine,magazine,N/A,magazine-size:5
+Velocity Amplifier,muzzle,N/A,optimal-range:10%
+Loop Grip,underbarrel,N/A,stability:15%
+Diamondback Dot Sight,optics,N/A,accuracy:10%
+Diamondback Lever,magazine,N/A,reload-speed:10%
+Diamondback Ornamentation,muzzle,N/A,critical-hit-damage:15%
+Diamondback Grip,underbarrel,N/A,stability:10%
+Ballistic Rail,optics,N/A,critical-hit-damage:15%
+Riot Magazine,magazine,N/A,reload-speed:15%
+Fortified Grip,underbarrel,N/A,stability:20%
+Damaged Optics,optics,N/A,accuracy:15%
+Hardened Grip,underbarrel,N/A,optimal-range:25%
+Outcast Optics,optics,N/A,accuracy:15%
+Modified Feed System,magazine,N/A,reload-speed:15%
+Stunner,underbarrel,N/A,optimal-range:25%
+Starlight Receptors,optics,N/A,critical-hit-chance:10%
+Venom Glands,magazine,N/A,reload-speed:10%
+Aculeus,muzzle,N/A,stability:10%
+Chelae Grip,underbarrel,N/A,weapon-handling:10%
+Quick Sight,optics,N/A,critical-hit-chance:15%
+Barbed Grip Magazine,magazine,N/A,magazine-size:20
+Jagged Muzzle,muzzle,N/A,critical-hit-damage:15%
+Barbed Frame,underbarrel,N/A,stability:10%
+Gaze of Death,optics,N/A,critical-hit-chance:15%
+Death's Hand,magazine,N/A,reload-speed:10%
+Death's Maw,muzzle,N/A,critical-hit-damage:10%
+Kiss of Death,underbarrel,N/A,melee-damage:500%
+Infinity Sights,optics,N/A,critical-hit-damage:10%
+Serpent Magazine,magazine,N/A,reload-speed:25%
+Weather-Resistant Muzzle,muzzle,N/A,rate-of-fire:10%
+Light Heavy-Duty Grip,underbarrel,N/A,critical-hit-chance:10%
+Oxpecker Optic,optics,N/A,optimal-range:50%
+Oxpecker Muzzle,muzzle,N/A,magazine-size:10
+Oxpecker Underbarrel,underbarrel,N/A,critical-hit-chance:15%
+Modified Optics,optics,N/A,critical-hit-chance:15%
+Chatterbox Magazine,magazine,N/A,magazine-size:10
+Chatterbox Muzzle,muzzle,N/A,critical-hit-damage:15%
+Chatterbox Canister,underbarrel,N/A,weapon-handling:10%
+Agitator Scope,optics,N/A,critical-hit-chance:10%
+Agitator Magazine,magazine,N/A,magazine-size:20
+Agitator Muzzle,muzzle,N/A,swap-speed:50%
+Whiplash Optics,optics,N/A,critical-hit-damage:10%
+Whiplash Magazine,magazine,N/A,critical-hit-chance:10%
+Whiplash Underbarrel,underbarrel,N/A,swap-speed:50%
+Caduceus Optics,optics,N/A,critical-hit-chance:10%
+Caduceus Magazine,magazine,N/A,magazine-size:40
+Caduceus Muzzle,muzzle,N/A,critical-hit-chance:5%
+Caduceus Underbarrel,underbarrel,N/A,critical-hit-damage:5%
+Underboss Optics,optics,N/A,critical-hit-chance:15%
+Prima Donna Scope,optics,N/A,headshot-damage:25%
+Prima Donna Magazine,magazine,N/A,weapon-handling:7.5%
+Prima Donna Muzzle,muzzle,N/A,headshot-damage:20%
+Prima Donna Underbarrel,underbarrel,N/A,weapon-handling:7.5%
+Fafnir Optics,optics,N/A,critical-hit-chance:15%
+Fafnir Magazine,magazine,N/A,magazine-size:5
+Fafnir Underbarrel,underbarrel,N/A,weapon-handling:10%

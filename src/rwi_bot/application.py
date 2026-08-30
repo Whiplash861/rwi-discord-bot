@@ -15,6 +15,7 @@ from rwi_bot.services.knowledge import CacheRepository, KnowledgeRepository, Tic
 from rwi_bot.services.maintenance import MaintenanceManager
 from rwi_bot.services.privacy import ProfileRepository
 from rwi_bot.services.qa import QuestionAnsweringService
+from rwi_bot.services.reference_catalog import Division2ReferenceCatalog
 from rwi_bot.services.releases import ReleaseHistoryRepository
 from rwi_bot.services.seeding import apply_red_horizon_seed
 
@@ -34,6 +35,7 @@ class AppServices:
     profiles: ProfileRepository
     community_loadouts: CommunityLoadoutRepository
     community_claims: CommunityClaimRepository
+    reference_catalog: Division2ReferenceCatalog
     release_history: ReleaseHistoryRepository
     ai: RwiOpenAIClient
     qa: QuestionAnsweringService
@@ -59,6 +61,7 @@ async def build_services(settings: Settings) -> AppServices:
     profiles = ProfileRepository(database)
     community_loadouts = CommunityLoadoutRepository(database)
     community_claims = CommunityClaimRepository(database)
+    reference_catalog = Division2ReferenceCatalog.packaged()
     release_history = ReleaseHistoryRepository(database)
     await apply_red_horizon_seed(knowledge, actor_id=settings.owner_user_id)
     ai = RwiOpenAIClient(
@@ -81,6 +84,7 @@ async def build_services(settings: Settings) -> AppServices:
         profiles=profiles,
         community_loadouts=community_loadouts,
         community_claims=community_claims,
+        reference_catalog=reference_catalog,
         ai=ai,
         audit=audit,
         web_search_enabled=settings.web_search_enabled,
@@ -101,6 +105,7 @@ async def build_services(settings: Settings) -> AppServices:
         profiles=profiles,
         community_loadouts=community_loadouts,
         community_claims=community_claims,
+        reference_catalog=reference_catalog,
         release_history=release_history,
         ai=ai,
         qa=qa,

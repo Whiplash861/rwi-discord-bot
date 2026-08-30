@@ -84,6 +84,7 @@ def render_sources(citations: tuple[SourceCitation, ...]) -> str:
 def _source_label(source_type: str) -> str:
     labels = {
         "community_wiki": "Community Wiki",
+        "community_reference": "Community Reference",
         "community_forum": "Community / Q&A",
         "community_loadout": "Community Loadout",
         "external_web": "External Web",

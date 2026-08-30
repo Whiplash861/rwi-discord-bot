@@ -1,0 +1,213 @@
+name,compatibility,description
+Explosive Delivery,chest,"Whenever you throw a skill, 1.5 seconds after landing, it creates an explosion damaging enemies within 5m. Damage scales with skill tier dealing 25-100% damage of a concussion grenade. At most once per skill."
+Perfect Explosive Delivery,N/A,"Whenever you throw a skill, 1.5 seconds after landing, it creates an explosion damaging enemies within 5m. Afterwards explosions will occur every 5s. Damage scales with skill tier dealing 25-100% damage of a concussion grenade."
+Kinetic Momentum,chest,"When in combat, each skill generates stacks while active or not on cooldown  Each stack increases your total skill damage by 1.5% and total skill repair by 2%. Up to 15 stacks per skill. Stacks are lost when skills go on cooldown."
+Perfect Kinetic Momentum,N/A,"When in combat, each skill generates stacks while active or not on cooldown  Each stack increases your total skill damage by 1.5% and total skill repair by 2%. Up to 18 stacks per skill. Stacks are lost when skills go on cooldown."
+Gunslinger,chest,Weapon swapping increases total weapon damage by 23% for 5s. This buff is lost for 5s if you weapon swap while it is active.
+Perfect Gunslinger,N/A,Weapon swapping increases total weapon damage by 28% for 5s. This buff is lost for 5s if you weapon swap while it is active.
+Focus,chest,"Increases total weapon damage by 5% every second you are aiming while scoped 8x or higher, up to 50%."
+Perfect Focus,N/A,"Increases total weapon damage by 6% every second you are aiming while scoped 8x or higher, up to 60%."
+Spark,chest,Damaging an enemy with a skill increases total weapon damage by 15% for 15s.
+Perfect Spark,N/A,Damaging an enemy with a skill increases total weapon damage by 18% for 20s.
+Obliterate,chest,Critical hits increase total weapon damage by 1% for 10s. Stacks up to 20 times.
+Perfect Obliterate,N/A,Critical hits increase total weapon damage by 1% for 10s. Stacks up to 24 times.
+Intimidate,chest,"While you have bonus armour, gain 3 stacks each second up to a max of 9. Each stack amplifies weapon damage by 4% to enemies within 10m. All stacks are lost when you have no bonus armour."
+Perfect Intimidate,N/A,"While you have bonus armour, gain 3 stacks each second up to a max of 10. Each stack amplifies weapon damage by 4% to enemies within 10m. All stacks are lost when you have no bonus armour."
+Headhunter,chest,"After killing an enemy with a headshot, your next weapon hit within 30s deals 125% of that killing blow's damage in addition to it. Damage is capped to 800% of your weapon damage. This is raised to 1250% if your headshot damage is greater than 150%."
+Perfect Headhunter,N/A,"After killing an enemy with a headshot, your next weapon hit within 30s deals 150% of that killing blow's damage in addition to it. Damage is capped to 800% of your weapon damage. This is raised to 1250% if your headshot damage is greater than 150%."
+Empathic Resolve,chest,"Repairing an ally, increases their total weapon and skill damage by 3-15% for 10s. 1-7% if self. Effectiveness increased by your skill tier."
+Perfect Empathic Resolve,N/A,"Repairing an ally, increases their total weapon and skill damage by 3-20% for 10s. 2.3-16.3% if self. Effectiveness increased by your skill tier."
+Overwatch,chest,"After staying in cover for 10s, increase your and all allies' total weapon and skill damage by 12% as long as you remain in cover or in a cover-to-cover move."
+Perfect Overwatch,N/A,"After staying in cover for 8s, increase your and all allies' total weapon and skill damage by 14% as long as you remain in cover or in a cover-to-cover move."
+Glass Cannon,chest,All damage you deal is amplified by 25%. All damage you take is amplified by 50%.
+Perfect Glass Cannon,N/A,All damage you deal is amplified by 30%. All damage you take is amplified by 60%.
+Spotter,chest,Amplifies total weapon and skill damage by 15% to pulsed enemies.
+Perfect Spotter,N/A,Amplifies total weapon and skill damage by 20% to pulsed enemies.
+Unbreakable,chest,"When your armor is depleted, repair 95% of your armor. 60s cool down."
+Perfect Unbreakable,N/A,"When your armor is depleted, repair 100% of your armor. 55s cool down."
+Vanguard,chest,Deploying a shield makes it invulnerable for 5s and grants 45% of your armor as bonus armor to all other allies for 20s.  Cooldown: 25s
+Perfect Vanguard,N/A,Deploying a shield makes it invulnerable for 5s and grants 50% of your armor as bonus armor to all other allies for 20s.  Cooldown: 25s
+Protected Reload,chest,Grants +20% bonus armor while reloading. Grants 0%-18% of your armor as bonus armor to all other allies when they are reloading  Each blue core attribute adds 3% to the bonus armour Maximum is 18%
+Perfect Protected Reload,N/A,Grants +40% bonus armor while reloading. Grants 0-30% of your armor as bonus armor to all other allies when they are reloading  Each blue core attribute adds 3% to the bonus armour Maximum is 18%
+Entrench,chest,"If you are below 30% armor, headshots from cover repair 20% of your armor. Cooldown: 2 seconds."
+Perfect Entrench,N/A,"If you are below 30% armor, headshots from cover repair 20% of your armor. Cooldown: 1 seconds."
+Efficient,chest,Using an armor kit has a 50% chance to not consume the armor kit. Specialization armor kit bonuses are increased by 100%. Requires 10 seconds to arm talent
+Perfect Efficient,N/A,Using an armor kit has a 75% chance to not consume the armor kit. Specialization armor kit bonuses are increased by 100%. Requires 10 seconds to arm talent
+Mad Bomber,chest,"Grenade Radius is increased by 50% Grenade that kill an enemy are refunded. Grenades can now be ''cooked'' by holding the fire button, making them explode earlier. Gain 15% bonus armor while aiming grendes"
+Perfect Mad Bomber,N/A,"Grenade Radius is increased by 75% Grenade that kill an enemy are refunded. Grenades can now be ''cooked'' by holding the fire button, making them explode earlier. Gain 15% bonus armor while aiming grendes"
+Braced,chest,While in cover weapon handling is increased by 45%.
+Perfect Braced,N/A,While in cover weapon handling is increased by 50%.
+Skilled,chest,Skill kills have a 25% chance to reset skill cooldowns.
+Perfect Skilled,N/A,Skill kills have a 30% chance to reset skill cooldowns.
+Tag Team,chest,The last enemy you have damaged with a skill is marked. Dealing weapon damage to that enemy consumes the mark to reduce active cooldowns by 6s.  Cooldown: 4s
+Perfect Tag Team,N/A,The last enemy you have damaged with a skill is marked. Dealing weapon damage to that enemy consumes the mark to reduce active cooldowns by 12s.  Cooldown: 4s
+Trauma,chest,Applies blind to an enemy hit in the head. Cooldown: 30 seconds. Applies bleed to an enemy hit in the chest. Cooldown: 30 seconds.
+Perfect Trauma,N/A,Applies blind to an enemy hit in the head. Cooldown: 20 seconds. Applies bleed to an enemy hit in the chest. Cooldown: 20 seconds.
+Tamper Proof,chest,"Enemies that walk within 3 meters of your hive, turret, remote pulse, or decoy are shocked. Arm time: 2 seconds. Cooldown per skill: 10 seconds.(8s)"
+Perfect Tamper Proof,N/A,"Enemies that walk within 3 meters of your hive, turret, remote pulse, or decoy are shocked. Arm time: 2 seconds. Cooldown per skill: 10 seconds.(8s)"
+Reassigned,chest,Killing an enemy adds 1 round of a random special ammo into your sidearm. Cooldown: 15 seconds.
+Perfect Reassigned,N/A,Killing an enemy adds 1 round of a random special ammo into your sidearm. Cooldown 8s
+Combined Arms,backpack,Shooting an enemy increases total skill damage by 25% for 3s.
+Perfect Combined Arms,N/A,Shooting an enemy increases total skill damage by 30% for 3s.
+Tech Support,backpack,Skill kills increase total skill damage by 25% for 25s.
+Perfect Tech Support,N/A,Skill kills increase total skill damage by 25% for 27s.
+Shock and Awe,backpack,Applying a status effect to an enemy increases total skill damage and repair by 20% for 20s.
+Perfect Shock and Awe,N/A,Applying a status effect to an enemy increases total skill damage and repair by 20% for 27s.
+Vigilance,backpack,Increases total weapon damage by 25%. Taking damage disables this buff for 4s.
+Perfect Vigilance,N/A,Increases total weapon damage by 25%. Taking damage disables this buff for 3s.
+Versatile,backpack,Amplifies total weapon damage for 10s when swapping between your primary and secondary weapons if they are different. 35% to enemies within 15m for Shotguns and SMGs 35% to enemies further than 25m for Rifles and MMRs 10% to enemies between 15-25m for LMGs and Assault Rifles. At most once per 5s per weapon type.
+Perfect Versatile,N/A,Amplifies total weapon damage for 10s when swapping between your primary and secondary weapons if they are different. 45% to enemies within 15m for Shotguns and SMGs 45% to enemies further than 25m for Rifles and MMRs 20% to enemies between 15-25m for LMGs and Assault Rifles. At most once per 5s per weapon type.
+Unstoppable Force,backpack,Killing an enemy increases total weapon damage by 5% for 15s. Stacks up to 5 times. Grenade kills add 2 stacks.
+Perfect Unstoppable Force,N/A,Killing an enemy increases total weapon damage by 7% for 15s. Stacks up to 5 times. Grenade kills add 2 stacks.
+Companion,backpack,"While you are within 5 m of an ally or skill, total weapon damage is increased by 15%."
+Perfect Companion,N/A,"While you are within 10 m of an ally or skill, total weapon damage is increased by 20%."
+Composure,backpack,"While in cover, increases total weapon damage by 15%."
+Perfect Composure,N/A,"While in cover, increases total weapon damage by 20%."
+Concussion,backpack,Headshots increase total weapon damage by 10% for 1.5s. 5s with marksman rifles. Headshot kills increase total weapon damage by 15% for 10s. Both buffs can be active for an increase of 25% total weapon damage
+Perfect Concussion,N/A,Headshots increase total weapon damage by 20% for 1.5s. 5s with marksman rifles. Headshot kills increase total weapon damage by 15% for 10s. Both buffs can be active for an increase of 35% total weapon damage
+Wicked,backpack,Applying a status effect increases total weapon damage by 18% for 20s.
+Perfect Wicked,N/A,Applying a status effect increases total weapon damage by 18% for 27s.
+Opportunistic,backpack,Enemies you hit with shotguns and marksman rifles amplifies the damage they take by 10% from all sources for 5s.
+Perfect Opportunistic,N/A,Enemies you hit with shotguns and marksman rifles amplifies the damage they take by 15% from all sources for 5s.
+Clutch,backpack,"When you are below 15% armor, critical hits repair 2.5% of missing armor. On kill, critical hits repair 2.5% of missing armor for 4 seconds. Lowest possible repair is 0% armour  Each red core attribute adds 1 second to the time. Maximum is 10 seconds."
+Perfect Clutch,N/A,"When you are below 20% armor, critical hits repair 2.5% of missing armor. On kill, critical hits repair 2.5% of missing armor for 4 seconds. Lowest possible repair is 0% armour  Each red core attribute adds 1 second to the time. Maximum is 10 seconds."
+Safeguard,backpack,"While at full armor, increases total skill repair by 130%."
+Perfect Safeguard,N/A,"While at full armor, increases total skill repair by 160%."
+Bloodsucker,backpack,Killing an enemy adds and refreshes a stack of +10% bonus armor for 10s. Max stack is 10.
+Perfect Bloodsucker,N/A,Killing an enemy adds and refreshes a stack of +12% bonus armor for 10s. Max stack is 10.
+Leadership,backpack,Performing a cover to cover grants 15% of your armor as bonus armor to you and all allies for 10s. This is doubled if you end within 10m of an enemy.  Cooldown: 10s.
+Perfect Leadership,N/A,Performing a cover to cover grants 20% of your armor as bonus armor to you and all allies for 10s. This is tripled if you end within 10m of an enemy.  Cooldown: 10s.
+Protector,backpack,"When your shield is damaged, you gain +5% and all other allies gain +15% of your armor as bonus armor for 3s.  Cooldown: 3s."
+Perfect Protector,N/A,"When your shield is damaged, you gain +25% bonus armor and all other allies gain +35% of your armor as bonus armor for 3s.  Cooldown: 3s."
+Adrenaline Rush,backpack,"When you are within 10m of an enemy, gain 20% bonus armor for 5s. Stacks up to 3 times. Cooldown: 5s"
+Perfect Adrenaline Rush,N/A,"When you are within 10m of an enemy, gain 23% bonus armor for 5s. Stacks up to 3 times. Cooldown: 5s"
+Galvanize,backpack,"Applying a Blind, Ensnare, Confuse, or Shock to an enemy grants 40% of your armor as bonus armor to you and all allies within 20m of that enemy for 10s"
+Perfect Galvanize,N/A,"Applying a Blind, Ensnare, Confuse, or Shock to an enemy grants 50% of your armor as bonus armor to you and all allies within 30m of that enemy for 10s"
+Energize,backpack,"Using an armor kit grants +1 skill tier for 15s. If already at skill tier 6, grants overcharge.  Cooldown: 60s"
+Perfect Energize,N/A,"Using an armor kit grants +1 skill tier for 15s. If already at skill tier 6, grants overcharge.  Cooldown: 30s"
+Calculated,backpack,Kills from cover reduce skill cooldowns by 10%.
+Perfect Calculated,N/A,Kills from cover reduce skill cooldowns by 15%.
+Overclock,backpack,"You and allies within 7m of your deployed skills, gain +25% reload speed and reduces active cooldowns by 0.2 each second."
+Perfect Overclock,N/A,"You and allies within 15 of your deployed skills, gain +30% reload speed and reduces active cooldowns by 0.6 each second."
+Creeping Death,backpack,"When you apply a status effect, it is also applied to all enemies within 8m of your target.  Cooldown: 15s"
+Perfect Creeping Death,N/A,"When you apply a status effect, it is also applied to all enemies within 10m of your target.  Cooldown: 10s"
+Accelerando,N/A,Decreases the number of stacks needed to proc the Symphony double buffs from 4 to 3.
+Ace in the Sleeve,N/A,Amplifies 1 extra shot when revealing your hand.
+Advanced Combat Tactics,N/A,Increases Ground Control proximity repair from 60% to 120%.
+All for One,N/A,Increase the amount of marks that can be placed from 4 to 8.
+Best Buds,N/A,Increase the damage buff from 25% to 50%.
+Chain Combustion,N/A,Enemies set ablaze by the Ortiz Incinerator Turret Prototype ignite other enemies within 10m.
+Cold,N/A,Stacks now supply +2% bonus armor.
+Complete Uptime,N/A,Cancelling your skills will reset their cooldown.
+Compiler Optimization,N/A,Decreases Hackstep Protocol cooldown from 20s to 15s.
+Critical Measures,N/A,Increases Crowd Control damage to additional marked enemies from 60% to 112%.
+Deceit,N/A,Enemies targeting your Decoy also count towards the Stoic Damage Reduction bonus.
+Endless Hunger,N/A,Increases the duration of Apex Predator stacks from 10s to 30s.
+Fortissimo,N/A,Double the weapon damage bonus from Symphony.
+From the Shadows,N/A,"Increases max stacks for Into the Light from 50 to 100, stack gain from 10 to 20 and stack consumption from 10 to 20."
+Heatstroke,N/A,+40% Amplified Weapon Damage to enemies set on fire by the Ortiz Incinerator Turret Prototype. +25% Ortiz Incinerator Turret Prototype Range.
+Hivemind,N/A,Decrease the Overcharge cooldown from 40s to 25s.
+Improved Dampeners,N/A,Decrease the Duration and Range reduction from 90% to 25%.
+Improved Materials,N/A,Decreases time taken for Makeshift Repairs from 10s to 5s.
+Inner Core,N/A,Increase the percentage of the bonuses you receive from the other Cores from 40% to 75%.
+Increased Interest,N/A,"For PvE: Increase the repairs received from Return to Sender from 10% to 25%, and from 20% to 35%. For PvP: Increase the repairs received from Return to Sender from 5% to 15%, and from 10% to 20%."
+Into the Light,N/A,"Increases max stacks for From the Shadows from 50 to 100, stack gain from 10 to 20."
+Lucky,N/A,Agents can miss a headshot before resetting the cycle.
+Max BPM,N/A,Max stack is now 100.
+Multithreaded Execution,N/A,Increases Hackstep Protocol bonus armor from 50% to 100%.
+No Limit,N/A,Increases Dead Man's Hand damage bonus from 75% to 100%.
+One for All,N/A,Increase the Weapon Damage bonus per stack from 3% to 6%.
+Overcharged Nanites,N/A,Increase the Healing Efficiency bonus from 150% to 225%.
+Outer Core,N/A,This Talent does not provide a direct change to the Core Exercise Talent.
+Over-engineered,N/A,"While at full Armor, repairs received from Return to Sender will provide Bonus Armor, up to 80% of your Total Armor. Does not apply to allies."
+Overcharging,N/A,Increases Charging max incoming damage protection to 70%.
+Overwhelming Force,N/A,Increases the radius of disorient on Apex Predator kills from 5m to 10m.
+Parabellum Rounds,N/A,Increases Hollow-Point Ammo weapon damage amplification to 60%. Does not affect party ammo.
+Patriotic Boost,N/A,"Increases Red, White, and Blue debuff strength. Red: From 15% to 30%. White: From 2% to 5%. Blue: From 10% to 20%."
+Point of Honor,N/A,Increases On Point Weapon Damage bonus from 4% to 9%.
+Point of no Return,N/A,Increase On Point bonuses timer from 20s to 40s.
+Polyethylene Plating,N/A,Increase Stoic Damage Resistance bonus from 4% to 5%.
+Positive Reinforcement,N/A,Increases Feedback Loop skill damage and repair bonus from +10% to +25%.
+Press the Advantage,N/A,Increases max stacks for Striker's Gamble from 100 to 200. 3 stacks lost per second between 101 and 200 stacks.
+Process Refinery,N/A,Increases Makeshift Repairs from 25% over 10s to 35% over 10s.
+Proliferation,N/A,Increases Indirect Transmission range from 10m to 15m. Increases refresh percentage from 50% to 75%.
+Risk Management,N/A,Increases total weapon damage gained per stack of Striker's Gamble from 0.65% to 0.9%.
+Safe Charging,N/A,Charging gives 10% protection per second.
+Short Circuit,N/A,Decreases Feedback Loop cooldown from 10s to 5s.
+Signature Moves,N/A,+50% Amplified Weapon Damage for 15s after fully depleting the Signature Weapon of ammo. Doubles the amount of ammo generated by Aggressive Recon.
+Smart Cooperation,N/A,Decrease the cooldown for destroying Mortars and enemy skills from 10s to 1s.
+Snowball,N/A,Increase the Critical Hit Damage received per stack from 5% to 8%.
+Specialized Destruction,N/A,Increase Aggressive Recon Signature Weapon Damage bonus from 15% to 30%. Every 3rd Signature Weapon kill generates Signature Weapon ammo.
+Stand Tall,N/A,Increases bonus Armor from 50% to 100%.
+Sustainability,N/A,Increase the maximum number of stacks from 50 to 75.
+Symptom Aggravator,N/A,Amplifies all damage you deal to status affected targets by 30%.
+Tactical Superiority,N/A,Increases Ground Control damage bonus from 15% to 25%.
+Target Rich Environment,N/A,Increases Crowd Control mark count from 3 to 5.
+Trauma Specialist,N/A,Increases duration of bleed status effects by 50% and all bleed damage done by 100%.
+Waving the Flag,N/A,"Increases Red, White, and Blue rotation speed to 1 second."
+Ablative Nano-Plating,N/A,"Whenever you or any ally's armor breaks, they gain 80% of your armor as bonus armor for 10s. Cooldown per ally: 45s. Killing an enemy with your specialization weapon removes this cooldown for all allies."
+Abridged,N/A,"If your Primary and Secondary weapon are not Exotic or Named and of the same type, the Secondary Weapon's talent will also be applied to the Primary Weapon. Doesn't apply to talents that include Weapon Swapping."
+Aggressive Recon,N/A,Getting a Signature Weapon kill gives +15% Signature Weapon Damage for 10s and +25% Reload Speed for the next reload of the weapon (the bonuses do not stack). Automatically regenerate Signature Weapon Ammo every 60s.
+Alternating Current,N/A,"Generate a stack of 2.5% skill damage on one of your skills every second, capping at 10 stacks. After 10 seconds at the cap the stacks transfer to your other skill. The process then repeats ad-infinitum."
+Apex Predator,N/A,"Enemies within 15m receive a debuff, amplifying your weapon damage against them by +20%. Killing a debuffed enemy with your weapon disorients other enemies within 5m, and amplifies weapon damage by 5% for 10s, stacking up to 5 times."
+Bewildered,N/A,"When dealing Weapon Damage to an enemy, 50% of the damage will be dealt to another enemy within 30m instead. When there are no enemies nearby, deal damage normally. Does not apply to Armor Plates."
+Bleeding Edge,N/A,Shooting enemies within 15m applies bleed to the target. Repair 3-48% of your armor per second for every enemy that is bleeding within 15m. Repair strength per number of bleeding enemies: 1:3% 2:6% 3:12% 4:24% 5:48%
+Bob and Weave,N/A,Receive repairs of 5% of your Total Armor for every 1m run in cover-to-cover. Damage taken while doing a cover-to-cover is healed over 10s.
+Bond,N/A,"Both you and Allies receive +30% Critical Hit Damage, +15% Skill Efficiency and +2% Armor Regen when an Ally is within 10m of you. Receive +15% Critical Hit Damage, +7.5% Skill Efficiency and +1% Armor Regen when one of your Skills is within 10m of you. Only the highest group of buffs can be active at one time."
+Camaraderie,N/A,"Shooting an enemy marks them for 10 seconds. When a marked enemy dies, receive one stack of 3% Weapon Damage and 3% Critical Hit Damage for each Ally or Skill that has contributed to killing that enemy. Max stacks is 35. Stacks decay every 10 seconds. Maximum amount of marks that can be placed is 4."
+Challenger,N/A,Recieve +25% Damage resistance from enemies within 20m.
+Charging,N/A,"For each second spent out of cover during combat, Agents will get 5% reduced incoming skill damage. Max 50%. Charged: While fully charged, gain immunity to any movement speed debuff and share this with all of the agents hazard protection and the incoming skill damage with all allies for 10 seconds. After Charged is consumed, Charging buff will resume if still in combat and out of cover."
+Chemical Agent,N/A,"Catalysis: Dealing and receiving status effects (Burn, Bleed, Shock, EMP/Disrupt, Poison and blind/disorient) builds stacks of Catalysis to a maximum of 12. Each stack grants: +2% Weapon Damage, +2% Status Effects. Each enemy within 25 Meters that is affected by a status effect grants +1 stack/sec. Being affected by status effects grants +2 stacks/sec. Stacks decay at 1 stack/sec after 5s if no enemies in the radius or you are affected by status effects. Reactant: At max stacks, killing a status-affected enemy grants bonuses for 5s: +25% bonus armor."
+Combat Medic,N/A,"+80% Revive Speed. -50% Weakened Debuff timer. +45% Hive efficiency. Provides +50% damage resistance to both agents while reviving or being revived, and for 5s after a successful Hive Revive, or 10s after a Manual Revive. Any successful revives provide +1 Skill tier for 5s. Revives at skill tier 6 grant Overcharge for 15s."
+Core Exercise,N/A,"For each Core attribute, receive 40% of the other two Core Attributes' bonuses. Skill Tiers count as 15% Skill Efficiency when these bonuses are applied. All pieces from this Gear Set, apart from the Backpack, will feature random Core Attributes."
+Counter,N/A,"Swapping weapons will give the following groups of bonuses one by one, in order: 1. +20% Rate of Fire, +20% Weapon Damage. 2. +50% Magazine Size, +50% Reload Speed. The bonuses remain active for 12s or until the next weapon swap. Swapping to your sidearm will not trigger the next group of bonuses."
+Crowd Control,N/A,"Critical hits mark enemies for 20s, up to 3 marks total. When you critically hit a marked enemy, all other marked enemies take 60% of the damage dealt. Whenever a marked enemy dies, gain +10% critical hit damage, stacking up to 10 times, or until combat ends."
+Dead Man's Hand,N/A,"Flip a card when landing shots with a Rifle or Marksman rifle. After 5 cards are flipped, the damage of your next shot is amplified by 75%. More shots are enhanced the better the hand revealed. Four of a Kind: 4 shots. Full House: 3 shots. Aces and Eights: 2 shots. Flip an additional card on headshots."
+Defibrillator,N/A,"While ""Shocker Punch"" is equipped, the stun received by the agent from the Shock status effect will be reduced by 50%. Using a shield will give 100% to melee damage. Using St. Elmo's Engine with the holster will give 100% extra melee damage and will make the next melee attack apply shock to the target. Using all three items will offer all of the above mentioned bonuses and the Shock from the melee attack will have a 5m radius, starting from the first target. 15 second cooldown."
+Dragon's Glare,N/A,"While in combat, applies burn to the enemy closest to you within 20m. Cooldown: 35s."
+Escape Plan,N/A,"Vaulting grants +10% Movement Speed for 3s. After not moving for 5s, receive +20% Movement Speed for 5s. Being applied a Status Effect grants +10% Movement Speed for 5s. Max Movement Speed bonus is 20%. The bonuses do not stack with Movement Speed bonuses from other sources. -50% Movement Impairment penalty from Status Effects."
+Feedback Loop,N/A,"Whenever you use or cancel a skill, your other skill's cooldown is reduced by 30s, total skill repair is increased by 10% for 20s, and total skill damage is increased by 10% for 20s. Cooldown: 10s."
+Fireworks Show,N/A,Concussion grenades become Festive Grenades. Hitting an enemy with a Festive Grenade will cause explosions to happen around two other enemies within 20m. 10m in pvp. *Dealing 15% damage in PVP.
+Flurry,N/A,Status effects apply snowfall to target.
+From the Shadows Into the Light,N/A,"From the Shadows: While out of cover and in combat, gain 10 Stacks per second up to 50. Each stack will give 0.8% Armor regen when it is consumed. Stacks consume, 10 stacks per second, only in cover. Into the Light: While in cover, gain 10 Stacks per second up to 50. Each stack will give 1.2% Critical damage increase and 0.4% RPM. Buff does not apply while shooting from cover. While out of cover Agents lose 2 stacks per second at normal speed and 1 stack per second if sprinting."
+Ground Control,N/A,"Increases you and your allies' total weapon and skill damage by 15% when at full armor. When you repair an ally, you and all allies within 5m of you are also repaired for 60% of that amount."
+Hackstep Protocol,N/A,"Replaces armor kits with an instant, infinite-use ability. Grants 50% bonus armor for 5s. Hides your nameplate for 5s. Repairs 20% of your armor. Increases total weapon damage by 2% per 5% bonus armor gained, up to 20%. Ability cooldown: 20s."
+Headache,N/A,"First Headshot with a Marksman Rifle will increase next headshot by 80%, second consecutive headshot with a Marksman Rifle will give +10% armor (if at full armor it will give bonus armor max +50% of current armor value), third consecutive headshot will refill magazine. From the fourth headshot forward agents will get all 3 bonuses for each consecutive headshot kill. Missing a headshot will reset the cycle."
+Heartstopper,N/A,Headshots apply pulse for 5s. Weapon hits on pulsed enemies add and refresh a stack of +1% bonus armor and +1.1% amplified weapon damage to pulsed enemies for 5s. Max stack is 50. Two stacks are lost per second.
+Hoarder,N/A,"+3 Grenade Capacity. +50% Grenade Radius. +35% Grenade Damage. +25% Grenade Damage for each extra enemy caught in the blast. Automatically regenerate grenades every 30s, if you have less than 2 grenades in your inventory."
+Huddle,N/A,"Receive +1 Skill Tier for each ally Agent that is within the range of the hive or Smart Cover. While at Skill Tier 6, having at least one ally Agent in the range of your Hive or Smart Cover for 4s will grant Overcharge for 15s. Cooldown: 40s. Mortars and enemy Skills that enter the range of your Hive or Smart Cover will be destroyed. Cooldown: 10s. The cooldown is 20% faster for each ally agent within the range of your hive or smart cover."
+Impervious,N/A,Both you and Allies within 10m of you receive +40% Hazard Protection.
+Indirect Transmission,N/A,On kill: Spread status effects of that enemy to all enemies within 10m. Refresh 50% of status effect durations.
+Iron Grip,N/A,-50% Recoil Penalty when hip-firing. -50% Recoil Penalty when blind-firing from cover.
+Kill Confirmed,N/A,"Enemies you kill drop a trophy on death. Collecting trophies provides both a short and long term buff, the first of which scales with the number of core attributes equipped and lasts 10s. Red Core - 5% Weapon Damage. Blue Core - 10% Bonus Armor. Yellow Core - 5% Skill Efficiency. For every trophy collected gain an additional +1% weapon damage, +1% skill efficiency and +0.1% armor regeneration for 300s. Maximum 30 stacks."
+Makeshift Repairs,N/A,"Whenever you or your shield take damage, 25% of that amount is repaired to both over 10s."
+On Point,N/A,"Hitting a shot with a Rifle or MMR grants a stack. Max stack is equal to the weapon's Magazine Size. Reloading will grant +2% Weapon Handling and +4% Weapon Damage per stack, for 20s.  No stacks are acquired while the bonuses are active. The timer running out will refill your magazine.  Switching weapons while the bonuses are active will stop the effect and refill your magazine. Switching weapons while the bonuses are not active will remove all stacks and refill your magazine."
+One in the Hand... / ...Two in the Bag,N/A,Throwing a grenade refunds it and grants +1 skill tier for 15s. Grants overcharge if already at skill tier 6. Cooldown: 60s. +1 Armor Kit Capacity. +3 Grenade Capacity. +25% Ammo Capacity. +10% Repair-Skills. +10% Status Effects.
+Ortiz Incinerator Turret Prototype,N/A,The Incinerator Turret spins 360 degrees. You are immune to your own Incinerator Turret's fire. The Incinerator Turret explodes when disabled.
+Ortiz Rapid Application Nanite Prototype,N/A,"Healing Skills' Duration and Range are decreased by 90%, but their Healing Efficiency is increased by 150%. Healing an Ally with a Skill will provide them 30% Hazard Protection for 10s. Cooldown per ally: 10s."
+Ostracize,N/A,"Shooting an enemy applies a mark. Only one mark can be active at a time. The mark disappears after 15s, or when the marked enemy dies. Receive 600% Amplified Damage from the marked enemy. Deal 20% Amplified Damage to unmarked enemies. If only one enemy remains in combat, the mark disappears and cannot be reapplied."
+Over the top,N/A,"Damaging an enemy with a grenade or striking an enemy with a melee attack, activates Seeing Red. Seeing Red grants +25% total weapon damage and +100% melee damage. Seeing Red lasts 20 seconds and starts a 60 second cooldown after completion. While in cooldown, damaging an enemy with a melee attack or hitting an enemy with the effect of a grenade will complete the cooldown instantly."
+Pack Instincts,N/A,You and all allies gain a bonus based on the distance of the last enemy you hit. 0-15m: +25% critical hit damage. 15-25m: +10% critical hit chance and +10% critical hit damage. 25m+: +25% critical hit chance.
+Parkour!,N/A,Performing a cover to cover or vaulting reloads your drawn weapon and grants +25% bonus armor for 5s.
+Quick Draw,N/A,"While your pistol is holstered, gain a stacking buff every 0.3s, up to 100. When you swap to it, your first shot consumes the buff and deals +10% damage per stack. This deals headshot damage to anywhere you hit."
+Rebalance,N/A,"Getting kills and hitting enemies 3 times build Red stacks. Each stack provides 0.5% Weapon Damage. Getting hit 3 times builds Blue stacks. Each stack provides 0.5% Damage Resistance. Upon reaching 80 stacks in total, lose all stacks and receive a separate bonus of 0.5% Damage Resistance per Red stack and 0.5% Weapon Damage per Blue stack until the next time the stack cap is reached."
+"Red, White and Blue",N/A,"Enemies you shoot receive stacking debuffs of Red/White/Blue. Changes every 2 seconds. Red: Amplifies the enemy's damage taken by 15%. White: Hitting the enemy restores you and your allies' armor by 2% once every second. Blue: Decreases enemy damage dealt by 10%. Full Flag: Enemies that die while under the effect of all three debuffs create a 5m explosion, dealing damage equal to their total health and armor. Explosion strength is reduced on Named enemy deaths."
+Resourceful,N/A,Slots in with any equipped Gear Set and/or Brand Set item to fulfill a requirement towards unlocking a Gear and/or Brand Sets bonus. Can unlock bonuses from multiple sets simultaneously.
+Return to Sender,N/A,For PvE: Receive repairs of 10% of the damage dealt by your Skills. Your allies will receive repairs of 20% of the damage dealt by your Skills. For PvP: Receive repairs of 5% of the damage dealt by your Skills. Your allies will receive repairs of 10% of the damage dealt by your Skills.
+Rules of Engagement,N/A,"Shooting a status affected enemy will apply a mark. Killing a marked enemy grants a full clip of Hollow-Point Ammo for your active weapon, and half a clip of the agent's active weapon to the rest of the party. Mark lasts for 10 seconds. Hollow-Point Ammo amplifies weapon damage by 40% and applies bleed on hit."
+Slotted,N/A,"Receive bonuses for each non-Core Attribute on this item, depending on their color: Red: +10% Critical Hit Damage. Yellow: +5% Skill Efficiency. Blue: +1% Armor Regen. This item can feature any Core Attribute. This item features a third random Attribute instead of having a Gear Mod Slot. This item cannot feature the Headshot Damage, Health, or Skill Repair Attributes."
+Smoke Screen,N/A,"On Armor break, drop a Smoke Bomb at your feet, concealing you from enemies for 3s. Cooldown: 40s."
+Stand Your Ground,N/A,Cannot be staggered by explosions. Increases total weapon damage by 3% each second you are not moving. Stacks up to 10 until you start moving. All stacks lost 10s after moving.
+Stoic,N/A,"Get +4% Damage Resistance for every enemy that is targeting you. The bonus is multiplied by 1.X, where X is the number of agents in your group."
+Striker's Gamble,N/A,"Weapon hits amplify total weapon damage by 0.65%, stacking up to 100 times. 1 stack lost per second between 0 to 50 stacks; 2 stacks lost per second between 51 and 100 stacks."
+Symphony,N/A,"Kills Beyond 25 Meters: +40% Weapon Damage to Shotguns, SMGs, and Pistols; +20% Weapon Damage to Assault Rifles and LMGs; and +25% Bonus Armor for 15s. Kills Within 25 Meters: +40% Weapon Damage to Marksman Rifles and Rifles; +20% Weapon Damage to Assault Rifles and LMGs; and +30% Headshot Damage for 15s. Intermittently killing enemies from both ranges builds up stacks. At 4 stacks, all bonuses are multiplied by 1.5 and triggered simultaneously for 15s. No stacks gained while talent is active."
+Tend and Befriend,N/A,"Interacting with your deployed skills grants the skill 25% skill damage for 10s. This buff cannot be refreshed. Interactions include: Using / Deploying the Skill, Changing the skills target, Healing the skill."
+Throttle Control,N/A,Shooting builds stacks to a max of 50. Each stack provides +0.5% Weapon Handling and +5% Critical Hit Damage. Lose 6 stacks per second while not shooting. No stacks are lost if an enemy is Suppressed.
+Toxic Delivery,N/A,Status effects also apply a damage over time debuff for 10s. Total Damage dealt is equal to 50% of your concussion grenade damage and increased by your status effect attributes.
+Transference Overclock,N/A,"Grants 15% Hive skill haste per skill tier. Detonating a hive refreshes your skill cooldowns and grants overcharge for 15s. If at Skill Tier 6, this effect also applies to all allies. Allies receiving this effect are unable to benefit from it again for 120s."
+Vicious Cycle,N/A,"Taking damage builds stacks to a cap of 30. Each stack grants 1.5% Weapon Damage. Taking damage at max stacks triggers a purge, removing all stacks and Status Effects and then dropping a healing cloud which restores 5% of Max Armor for 10s to all allies in the cloud."
+Weakest Link,N/A,"Amplifies Weapon Damage by 30% to the lowest ranking enemies currently in combat, as per the Tier hierarchy. Tier 1: Hunter, Rogue, Leader, Tank, Shield, Heavy Weapons, RPG, Medic, Controller, Warhound, Marauder. Tier 2: Support, Engineer, Bodyguard, Immobilizer, Bomber, Mini Tank, Drone Operator. Tier 3: Any other enemy or skill proxy."
+Spontaneous Combustion,N/A,"Every Status Effect you apply has a 40% chance of also applying Burn to the enemy. If the Status Effect initially applied was Burn, the enemy will receive +25% Burn Damage for the duration of the Burn"
+Flashpoint,N/A,Increase the chance of applying Burn of Spontaneous Combustion to 60%
+White Hot,N/A,Increase the Duration of the Burn Damage debuff of Spontaneous Combustion by +50%
+Resolved,N/A,"Your next body shot will be considered a headshot. Cooldown: 2s Requires Equipped: Marksman Rifle, Rifle or Pistol"

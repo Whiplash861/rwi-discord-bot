@@ -344,4 +344,72 @@ RELEASES: tuple[Release, ...] = (
             ),
         ),
     ),
+    Release(
+        release_id="erin-update-12",
+        update_number=12,
+        version="V0.1.11",
+        released_on=date(2026, 8, 30),
+        notes=(
+            ReleaseNote(
+                ReleaseSection.HIGH_IMPACT,
+                "Imported Ubisoft's final Red Horizon Skill tables for all 43 variants "
+                "in both PvE and PvP, including base stats, Skill Tiers 1-6, and Overcharge.",
+            ),
+            ReleaseNote(
+                ReleaseSection.NEW_FEATURES,
+                "A 15-domain Division 2 research syllabus now guides local retrieval and "
+                "web research across equipment, talents, activities, costs, lore, enemies, "
+                "and encounter mechanics.",
+            ),
+            ReleaseNote(
+                ReleaseSection.FIXES,
+                "Broad Skill questions now require complete coverage of every current "
+                "variant or a focused clarification instead of silently answering for one.",
+            ),
+            ReleaseNote(
+                ReleaseSection.FIXES,
+                "The Discord account's global username now reconciles to ERIN so direct "
+                "messages no longer display the former RWI Bot Dev identity.",
+            ),
+            ReleaseNote(
+                ReleaseSection.IMPROVEMENTS,
+                "Current video sources and Y8S3 community reference indexes can assist "
+                "discovery, while mutable claims still require official or independent "
+                "corroboration before ERIN treats them as reliable.",
+            ),
+            ReleaseNote(
+                ReleaseSection.IMPROVEMENTS,
+                "Expanded the built-in Red Horizon baseline with nine updated Gear Sets "
+                "and current seasonal, PvP, Dark Zone, and Classified Assignment systems.",
+            ),
+        ),
+    ),
+    Release(
+        release_id="erin-update-13",
+        update_number=13,
+        version="V0.1.12",
+        released_on=date(2026, 8, 30),
+        notes=(
+            ReleaseNote(
+                ReleaseSection.HIGH_IMPACT,
+                "Added a pinned local Y8S3 research index with 2,037 structured equipment, "
+                "talent, attribute, Skill, weapon, mod, and specialization records.",
+            ),
+            ReleaseNote(
+                ReleaseSection.NEW_FEATURES,
+                "ERIN now uses exact local item and talent matches to improve web-research "
+                "terms before answering unfamiliar Division 2 questions.",
+            ),
+            ReleaseNote(
+                ReleaseSection.PRIVACY_SAFETY,
+                "The community snapshot is explicitly discovery-only and cannot bypass "
+                "Red Horizon freshness, source corroboration, or confidence checks.",
+            ),
+            ReleaseNote(
+                ReleaseSection.MAINTENANCE,
+                "Pinned the reference snapshot to an attributed CC-BY-4.0 commit and retained "
+                "its known-gap and measured-game-text documentation for review.",
+            ),
+        ),
+    ),
 )

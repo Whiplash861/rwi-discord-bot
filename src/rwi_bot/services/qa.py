@@ -30,9 +30,21 @@ from rwi_bot.services.knowledge import (
     knowledge_context,
     sanitize_for_technicians,
 )
+from rwi_bot.services.knowledge_syllabus import knowledge_scope_prompt
 from rwi_bot.services.language import interpret_locally, question_signature
 from rwi_bot.services.maintenance import MaintenanceManager
 from rwi_bot.services.privacy import ProfileRepository
+from rwi_bot.services.reference_catalog import (
+    Division2ReferenceCatalog,
+    reference_scope_prompt,
+)
+from rwi_bot.services.skill_scope import (
+    SkillFamilyRequest,
+    identify_broad_skill_family,
+    render_variant_clarification,
+    response_covers_every_variant,
+    skill_scope_prompt,
+)
 
 MAINTENANCE_MESSAGE = (
     "ERIN is in maintenance mode. I'm not accepting questions or starting external checks "
@@ -54,6 +66,7 @@ class QuestionAnsweringService:
         web_search_enabled: bool,
         community_loadouts: CommunityLoadoutRepository | None = None,
         community_claims: CommunityClaimRepository | None = None,
+        reference_catalog: Division2ReferenceCatalog | None = None,
         current_game_version: str = "Y8S3 Red Horizon",
         current_game_version_started_on: date = date(2026, 8, 27),
     ) -> None:
@@ -67,6 +80,7 @@ class QuestionAnsweringService:
         self.web_search_enabled = web_search_enabled
         self.community_loadouts = community_loadouts
         self.community_claims = community_claims
+        self.reference_catalog = reference_catalog
         self.current_game_version = current_game_version
         self.current_game_version_started_on = current_game_version_started_on
         self.log = structlog.get_logger("qa")
@@ -78,6 +92,24 @@ class QuestionAnsweringService:
 
         learning_opt_out = await self.profiles.learning_opted_out(request.user_id)
         interpreted = interpret_locally(request.question)
+        skill_family_request = identify_broad_skill_family(request.question)
+        reference_hits = (
+            self.reference_catalog.search(interpreted.normalized_question)
+            if self.reference_catalog is not None
+            else []
+        )
+        request_scope_parts = [
+            value
+            for value in (
+                skill_scope_prompt(skill_family_request) if skill_family_request else None,
+                knowledge_scope_prompt(request.question),
+                reference_scope_prompt(reference_hits, self.reference_catalog.snapshot)
+                if self.reference_catalog is not None
+                else None,
+            )
+            if value
+        ]
+        request_scope = "\n".join(request_scope_parts) or None
         if interpreted.intent is IntentKind.BUILD_ADVICE and self.community_loadouts is not None:
             try:
                 community_hits = await self.community_loadouts.search(
@@ -123,10 +155,32 @@ class QuestionAnsweringService:
                         confidence=ConfidenceLabel.MEDIUM,
                         learning_opt_out=learning_opt_out,
                     )
+        if reference_hits:
+            await self.audit.record(
+                AuditRecord(
+                    event_type="answer.reference_catalog_match",
+                    actor_id=request.user_id,
+                    target_type="community_reference_snapshot",
+                    correlation_id=correlation_id,
+                    details={
+                        "snapshot_commit": self.reference_catalog.snapshot.commit[:12]
+                        if self.reference_catalog is not None
+                        else None,
+                        "source_files": sorted({hit.record.source_file for hit in reference_hits}),
+                        "result_count": len(reference_hits),
+                        "is_dm": request.is_dm,
+                    },
+                )
+            )
         assumptions_dict = request.assumptions.model_dump(mode="json")
         effective_constraints = {
             **interpreted.constraints,
             "current_game_version": self.current_game_version,
+            "reference_snapshot": (
+                self.reference_catalog.snapshot.commit
+                if self.reference_catalog is not None and reference_hits
+                else None
+            ),
         }
         signature = question_signature(
             interpreted.normalized_question,
@@ -213,6 +267,7 @@ class QuestionAnsweringService:
             freshness_boundary=self.current_game_version_started_on.isoformat(),
             knowledge_context=context,
             conversation_summary=request.conversation_summary,
+            request_scope=request_scope,
         )
 
         used_web = False
@@ -257,6 +312,7 @@ class QuestionAnsweringService:
                             "Independently verify the answer from current external evidence."
                         ),
                         conversation_summary=request.conversation_summary,
+                        request_scope=request_scope,
                     )
                 generated = await self.ai.answer(
                     input_text=web_input_text,
@@ -291,6 +347,15 @@ class QuestionAnsweringService:
             elif generated is None:
                 raise OpenAIUnavailableError("Web fallback is disabled and no knowledge matched.")
         except OpenAIUnavailableError as exc:
+            if skill_family_request is not None:
+                return await self._request_skill_variant_clarification(
+                    request,
+                    correlation_id,
+                    skill_family_request,
+                    diagnostic=str(exc),
+                    used_web_search=used_web,
+                    learning_opt_out=learning_opt_out,
+                )
             return await self._request_member_input(
                 request,
                 correlation_id,
@@ -312,6 +377,15 @@ class QuestionAnsweringService:
 
         if not getattr(generated, "complete", True):
             reason = getattr(generated, "incomplete_reason", None) or "unknown cutoff"
+            if skill_family_request is not None:
+                return await self._request_skill_variant_clarification(
+                    request,
+                    correlation_id,
+                    skill_family_request,
+                    diagnostic=f"Completion retry ended with: {reason}",
+                    used_web_search=used_web,
+                    learning_opt_out=learning_opt_out,
+                )
             return await self._request_member_input(
                 request,
                 correlation_id,
@@ -332,6 +406,15 @@ class QuestionAnsweringService:
             )
 
         if not generated.text.strip():
+            if skill_family_request is not None:
+                return await self._request_skill_variant_clarification(
+                    request,
+                    correlation_id,
+                    skill_family_request,
+                    diagnostic="The response contained no usable answer text.",
+                    used_web_search=used_web,
+                    learning_opt_out=learning_opt_out,
+                )
             return await self._request_member_input(
                 request,
                 correlation_id,
@@ -346,6 +429,22 @@ class QuestionAnsweringService:
                     "original question to the Technicians."
                 ),
                 diagnostic="The response contained no usable answer text.",
+                used_web_search=used_web,
+                learning_opt_out=learning_opt_out,
+            )
+
+        if skill_family_request is not None and (
+            confidence in {ConfidenceLabel.LOW, ConfidenceLabel.UNKNOWN}
+            or not response_covers_every_variant(generated.text, skill_family_request)
+        ):
+            return await self._request_skill_variant_clarification(
+                request,
+                correlation_id,
+                skill_family_request,
+                diagnostic=(
+                    "Available evidence did not support a complete answer covering every "
+                    "variant in the requested Skill family."
+                ),
                 used_web_search=used_web,
                 learning_opt_out=learning_opt_out,
             )
@@ -410,6 +509,41 @@ class QuestionAnsweringService:
             knowledge_revision_ids=revision_ids,
             cache_entry_id=cache_entry_id,
             used_web_search=used_web,
+            learning_opt_out=learning_opt_out,
+        )
+
+    async def _request_skill_variant_clarification(
+        self,
+        request: AnswerRequest,
+        correlation_id: UUID,
+        skill_request: SkillFamilyRequest,
+        *,
+        diagnostic: str,
+        used_web_search: bool,
+        learning_opt_out: bool,
+    ) -> AnswerResult:
+        await self.audit.record(
+            AuditRecord(
+                event_type="answer.skill_variant_clarification_requested",
+                actor_id=request.user_id,
+                target_type="answer",
+                correlation_id=correlation_id,
+                reason=diagnostic,
+                details={
+                    "skill_family": skill_request.family.name,
+                    "variants": list(skill_request.variant_names),
+                    "explicitly_requested_all": skill_request.explicitly_requests_all,
+                    "used_web_search": used_web_search,
+                    "is_dm": request.is_dm,
+                    "learning_opt_out": learning_opt_out,
+                },
+            )
+        )
+        return AnswerResult(
+            text=render_variant_clarification(skill_request),
+            assumptions=request.assumptions,
+            confidence=ConfidenceLabel.UNKNOWN,
+            used_web_search=used_web_search,
             learning_opt_out=learning_opt_out,
         )
 
