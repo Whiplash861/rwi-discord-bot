@@ -544,4 +544,42 @@ RELEASES: tuple[Release, ...] = (
             ),
         ),
     ),
+    Release(
+        release_id="erin-update-19",
+        update_number=19,
+        version="V0.1.18",
+        released_on=date(2026, 8, 31),
+        notes=(
+            ReleaseNote(
+                ReleaseSection.HIGH_IMPACT,
+                "Added complete, ordered encounter guidance and role-specific build advice "
+                "for Paradise Lost, Broken Rain, Operation Dark Hours, and Operation Iron Horse.",
+            ),
+            ReleaseNote(
+                ReleaseSection.NEW_FEATURES,
+                "ERIN now predicts canonical Incursion and Raid targets from boss-only names, "
+                "aliases, shorthand, common misspellings, and varied question phrasing.",
+            ),
+            ReleaseNote(
+                ReleaseSection.FIXES,
+                "Questions about Lovebirds, Wright, Iris Steel, and the Meret Estate now route "
+                "to the correct current encounter records instead of failing retrieval.",
+            ),
+            ReleaseNote(
+                ReleaseSection.IMPROVEMENTS,
+                "Encounter answers now lead with the objective and team setup, then present "
+                "numbered mechanics, wipe conditions, callouts, and recommended builds.",
+            ),
+            ReleaseNote(
+                ReleaseSection.PRIVACY_SAFETY,
+                "Current Incursion guidance excludes immunity bypasses, one-shot shortcuts, "
+                "melee phase skips, cheeses, bugs, and exploits.",
+            ),
+            ReleaseNote(
+                ReleaseSection.MAINTENANCE,
+                "Expanded the Red Horizon local knowledge seed to 183 versioned records and "
+                "invalidated older answer-cache prompts for the new encounter format.",
+            ),
+        ),
+    ),
 )

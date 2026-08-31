@@ -23,6 +23,10 @@ from rwi_bot.services.community_learning import (
     CommunityClaimRepository,
     community_claim_context,
 )
+from rwi_bot.services.encounter_intent import (
+    encounter_scope_prompt,
+    predict_encounter_request,
+)
 from rwi_bot.services.knowledge import (
     CacheRepository,
     KnowledgeRepository,
@@ -92,9 +96,43 @@ class QuestionAnsweringService:
 
         learning_opt_out = await self.profiles.learning_opted_out(request.user_id)
         interpreted = interpret_locally(request.question)
+        encounter_prediction = predict_encounter_request(request.question)
+        if encounter_prediction is not None and encounter_prediction.clarification:
+            await self.audit.record(
+                AuditRecord(
+                    event_type="answer.encounter_clarification_requested",
+                    actor_id=request.user_id,
+                    target_type="answer",
+                    correlation_id=correlation_id,
+                    reason="Predictive encounter resolution remained below the safe threshold.",
+                    details={
+                        "predicted_activity": encounter_prediction.activity,
+                        "resolver_confidence": round(encounter_prediction.confidence, 3),
+                        "is_dm": request.is_dm,
+                        "learning_opt_out": learning_opt_out,
+                    },
+                )
+            )
+            return AnswerResult(
+                text=encounter_prediction.clarification,
+                assumptions=request.assumptions,
+                confidence=ConfidenceLabel.UNKNOWN,
+                awaiting_user_input=True,
+                failure_code="encounter_clarification",
+                failure_summary=(
+                    "ERIN found a likely encounter name but could not safely resolve it without "
+                    "member confirmation."
+                ),
+                learning_opt_out=learning_opt_out,
+            )
+        retrieval_query = (
+            encounter_prediction.search_query
+            if encounter_prediction is not None
+            else interpreted.normalized_question
+        )
         skill_family_request = identify_broad_skill_family(request.question)
         reference_hits = (
-            self.reference_catalog.search(interpreted.normalized_question)
+            self.reference_catalog.search(retrieval_query)
             if self.reference_catalog is not None
             else []
         )
@@ -102,6 +140,9 @@ class QuestionAnsweringService:
             value
             for value in (
                 skill_scope_prompt(skill_family_request) if skill_family_request else None,
+                encounter_scope_prompt(encounter_prediction)
+                if encounter_prediction is not None
+                else None,
                 knowledge_scope_prompt(request.question),
                 reference_scope_prompt(reference_hits, self.reference_catalog.snapshot)
                 if self.reference_catalog is not None
@@ -113,7 +154,7 @@ class QuestionAnsweringService:
         if interpreted.intent is IntentKind.BUILD_ADVICE and self.community_loadouts is not None:
             try:
                 community_hits = await self.community_loadouts.search(
-                    interpreted.normalized_question,
+                    retrieval_query,
                     guild_id=request.guild_id,
                     game_version=self.current_game_version,
                 )
@@ -176,6 +217,15 @@ class QuestionAnsweringService:
         effective_constraints = {
             **interpreted.constraints,
             "current_game_version": self.current_game_version,
+            "encounter_activity": (
+                encounter_prediction.activity if encounter_prediction is not None else None
+            ),
+            "encounter_name": (
+                encounter_prediction.encounter if encounter_prediction is not None else None
+            ),
+            "encounter_request_kind": (
+                encounter_prediction.request_kind if encounter_prediction is not None else None
+            ),
             "reference_snapshot": (
                 self.reference_catalog.snapshot.commit
                 if self.reference_catalog is not None and reference_hits
@@ -191,7 +241,7 @@ class QuestionAnsweringService:
         if self.community_claims is not None:
             try:
                 community_claim_hits = await self.community_claims.search(
-                    interpreted.normalized_question,
+                    retrieval_query,
                     guild_id=request.guild_id,
                     game_version=self.current_game_version,
                 )
@@ -246,7 +296,13 @@ class QuestionAnsweringService:
             )
 
         hits = await self.knowledge.search(
-            interpreted.normalized_question,
+            retrieval_query,
+            limit=(
+                16
+                if encounter_prediction is not None
+                and encounter_prediction.request_kind == "activity_guide"
+                else 8
+            ),
             game_version=self.current_game_version,
         )
         context, revision_ids, knowledge_citations = knowledge_context(hits)
@@ -255,7 +311,8 @@ class QuestionAnsweringService:
             context = f"{context}\n\n{reviewed_context}" if context else reviewed_context
         complexity = (
             "complex"
-            if interpreted.intent.value in {"build_advice", "build_rating", "mission_guide"}
+            if encounter_prediction is not None
+            or interpreted.intent.value in {"build_advice", "build_rating", "mission_guide"}
             else "normal"
         )
         input_text = compose_answer_input(
@@ -473,7 +530,13 @@ class QuestionAnsweringService:
         if not learning_opt_out and not community_claim_hits:
             cache_entry_id = await self.cache.create_candidate(
                 signature=signature,
-                normalized_intent=interpreted.intent.value,
+                normalized_intent=(
+                    IntentKind.MISSION_GUIDE.value
+                    if encounter_prediction is not None
+                    and encounter_prediction.request_kind
+                    in {"encounter_guide", "activity_guide"}
+                    else interpreted.intent.value
+                ),
                 entities=interpreted.entities,
                 constraints=effective_constraints,
                 assumptions=assumptions_dict,

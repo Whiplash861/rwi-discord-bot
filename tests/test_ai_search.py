@@ -332,6 +332,59 @@ async def test_high_confidence_correction_is_delivered() -> None:
 
 
 @pytest.mark.asyncio
+async def test_encounter_prediction_expands_retrieval_and_prompt_scope() -> None:
+    cache = SimpleNamespace(
+        get_valid=AsyncMock(return_value=None),
+        create_candidate=AsyncMock(return_value=uuid4()),
+    )
+    knowledge = SimpleNamespace(search=AsyncMock(return_value=[]))
+    ai = SimpleNamespace(
+        answer=AsyncMock(
+            return_value=SimpleNamespace(
+                text="Separate the bosses, destroy The Kid in flight, then deny healing.",
+                citations=[
+                    SourceCitation(
+                        title="Current source",
+                        url="https://example.test/current",
+                        source_type="official_web",
+                        official=True,
+                    )
+                ],
+                evidence_confidence=ConfidenceLabel.HIGH,
+            )
+        ),
+        _select_model=Mock(return_value="gpt-5.6-terra"),
+    )
+    service = QuestionAnsweringService(
+        maintenance=cast(Any, SimpleNamespace(halted=False)),
+        knowledge=cast(Any, knowledge),
+        cache=cast(Any, cache),
+        tickets=cast(Any, SimpleNamespace(open_or_increment=AsyncMock())),
+        profiles=cast(Any, SimpleNamespace(learning_opted_out=AsyncMock(return_value=False))),
+        ai=cast(Any, ai),
+        audit=cast(Any, SimpleNamespace(record=AsyncMock())),
+        web_search_enabled=True,
+    )
+
+    result = await service.answer(
+        AnswerRequest(
+            user_id=42,
+            guild_id=1,
+            channel_id=2,
+            question="How do I beat the Lovebirds in the meret estate incursion?",
+        )
+    )
+
+    retrieval = knowledge.search.await_args.args[0]
+    assert "Paradise Lost" in retrieval
+    assert "The Lovebirds: Martinez and Johnson" in retrieval
+    prompt = ai.answer.await_args.kwargs["input_text"]
+    assert "PREDICTIVE ENCOUNTER RESOLUTION" in prompt
+    assert "mechanics in numbered order" in prompt
+    assert result.confidence is ConfidenceLabel.HIGH
+
+
+@pytest.mark.asyncio
 async def test_local_reference_snapshot_improves_web_search_without_becoming_evidence() -> None:
     cache = SimpleNamespace(
         get_valid=AsyncMock(return_value=None),

@@ -12,6 +12,7 @@ from rwi_bot.data.red_horizon import (
     RED_HORIZON_BRAND_BONUSES,
     RED_HORIZON_SEEDS,
 )
+from rwi_bot.data.red_horizon_encounters import COMPLETE_ENCOUNTER_RECORDS
 from rwi_bot.data.red_horizon_raids_dz import RAID_AND_DZ_RECORDS
 from rwi_bot.data.red_horizon_skills import RED_HORIZON_SKILL_TABLES
 from rwi_bot.db.models import KnowledgeStatus
@@ -22,18 +23,24 @@ from rwi_bot.services.seeding import apply_red_horizon_seed, preview_red_horizon
 class FakeKnowledgeRepository:
     def __init__(self, existing_subjects: set[str] | None = None) -> None:
         self.existing_subjects = existing_subjects or set()
+        self.identities: set[tuple[str, str, str]] = set()
         self.created: list[dict[str, object]] = []
 
     async def identity_exists(
         self, *, subject: str, claim_key: str, context: dict[str, object]
     ) -> bool:
-        return subject in self.existing_subjects
+        identity = (subject, claim_key, repr(sorted(context.items())))
+        return subject in self.existing_subjects or identity in self.identities
 
     async def add_candidate(self, **kwargs: object) -> UUID:
         subject = str(kwargs["subject"])
-        if subject in self.existing_subjects:
+        claim_key = str(kwargs["claim_key"])
+        context = kwargs["context"]
+        assert isinstance(context, dict)
+        identity = (subject, claim_key, repr(sorted(context.items())))
+        if subject in self.existing_subjects or identity in self.identities:
             raise KnowledgeIdentityConflictError
-        self.existing_subjects.add(subject)
+        self.identities.add(identity)
         self.created.append(kwargs)
         return uuid4()
 
@@ -48,7 +55,13 @@ def test_red_horizon_seed_catalog_is_unique_and_current() -> None:
         for item in RED_HORIZON_SEEDS
     }
 
-    assert len(RED_HORIZON_SEEDS) == (62 + len(RED_HORIZON_SKILL_TABLES) + len(RAID_AND_DZ_RECORDS))
+    expected = (
+        62
+        + len(RED_HORIZON_SKILL_TABLES)
+        + len(RAID_AND_DZ_RECORDS)
+        + len(COMPLETE_ENCOUNTER_RECORDS)
+    )
+    assert len(RED_HORIZON_SEEDS) == expected
     assert len(RED_HORIZON_SKILL_TABLES) == 86
     assert len(identities) == len(RED_HORIZON_SEEDS)
     assert all(item.status == KnowledgeStatus.ACTIVE for item in RED_HORIZON_SEEDS)
@@ -132,6 +145,14 @@ def test_red_horizon_raid_and_dark_zone_catalog_covers_requested_encounters() ->
         "Iron Horse: Captain Fieser",
         "Iron Horse: Lieutenant Williams",
         "Iron Horse: Colonel Morozova and Iron Horse",
+        "Paradise Lost: Estate Turrets",
+        "Paradise Lost: Oil Tanker Defense",
+        "Paradise Lost: Wright",
+        "Paradise Lost: The Lovebirds, Martinez and Johnson",
+        "Broken Rain: Lester Steel",
+        "Broken Rain: Patch Escort and Dwayne Steel IV",
+        "Broken Rain: Iris Steel",
+        "Broken Rain: Marguerite Steel",
         "Red Horizon Toxic Dark Zone",
         "Red Horizon Balanced Dark Zone",
         "Red Horizon Classic Dark Zone",
@@ -141,6 +162,7 @@ def test_red_horizon_raid_and_dark_zone_catalog_covers_requested_encounters() ->
 
     assert required <= {item.subject for item in RED_HORIZON_SEEDS}
     assert all(record["sources"] for record in RAID_AND_DZ_RECORDS)
+    assert all(record["sources"] for record in COMPLETE_ENCOUNTER_RECORDS)
     toxic = seed("Red Horizon Toxic Dark Zone")
     blackout = seed("Red Horizon Blackout Dark Zone")
     invaded = seed("Red Horizon Invaded Dark Zone")
@@ -159,12 +181,13 @@ async def test_seed_preview_and_apply_are_create_only_and_idempotent() -> None:
     result = await apply_red_horizon_seed(repository, actor_id=42)  # type: ignore[arg-type]
     second = await apply_red_horizon_seed(repository, actor_id=42)  # type: ignore[arg-type]
 
-    assert preview.total == 148 + len(RAID_AND_DZ_RECORDS)
+    expected = 148 + len(RAID_AND_DZ_RECORDS) + len(COMPLETE_ENCOUNTER_RECORDS)
+    assert preview.total == expected
     assert preview.existing == 2
-    assert preview.missing == 146 + len(RAID_AND_DZ_RECORDS)
-    assert len(result.created_entry_ids) == 146 + len(RAID_AND_DZ_RECORDS)
+    assert preview.missing == expected - 2
+    assert len(result.created_entry_ids) == expected - 2
     assert result.skipped_existing == 2
     assert len(second.created_entry_ids) == 0
-    assert second.skipped_existing == 148 + len(RAID_AND_DZ_RECORDS)
+    assert second.skipped_existing == expected
     assert all(item["actor_id"] == 42 for item in repository.created)
     assert all(item["game_version"] == GAME_VERSION for item in repository.created)

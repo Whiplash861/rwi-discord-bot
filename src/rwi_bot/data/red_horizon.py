@@ -4,6 +4,7 @@ from dataclasses import dataclass
 from decimal import Decimal
 from typing import Any
 
+from rwi_bot.data.red_horizon_encounters import COMPLETE_ENCOUNTER_RECORDS
 from rwi_bot.data.red_horizon_raids_dz import RAID_AND_DZ_RECORDS
 from rwi_bot.data.red_horizon_skills import RED_HORIZON_SKILL_TABLES
 from rwi_bot.db.models import KnowledgeStatus, SourceType
@@ -848,5 +849,17 @@ RED_HORIZON_SEEDS: tuple[KnowledgeSeed, ...] = (
             sources=record["sources"],
         )
         for record in RAID_AND_DZ_RECORDS
+    ),
+    *(
+        KnowledgeSeed(
+            subject=record["subject"],
+            entity_type=record["entity_type"],
+            claim_key=record["claim_key"],
+            content=record["content"],
+            context=record["context"],
+            confidence=record["confidence"],
+            sources=record["sources"],
+        )
+        for record in COMPLETE_ENCOUNTER_RECORDS
     ),
 )
