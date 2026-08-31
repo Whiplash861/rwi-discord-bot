@@ -12,6 +12,7 @@ from rwi_bot.data.red_horizon import (
     RED_HORIZON_BRAND_BONUSES,
     RED_HORIZON_SEEDS,
 )
+from rwi_bot.data.red_horizon_raids_dz import RAID_AND_DZ_RECORDS
 from rwi_bot.data.red_horizon_skills import RED_HORIZON_SKILL_TABLES
 from rwi_bot.db.models import KnowledgeStatus
 from rwi_bot.services.knowledge import KnowledgeIdentityConflictError
@@ -47,7 +48,7 @@ def test_red_horizon_seed_catalog_is_unique_and_current() -> None:
         for item in RED_HORIZON_SEEDS
     }
 
-    assert len(RED_HORIZON_SEEDS) == 62 + len(RED_HORIZON_SKILL_TABLES)
+    assert len(RED_HORIZON_SEEDS) == (62 + len(RED_HORIZON_SKILL_TABLES) + len(RAID_AND_DZ_RECORDS))
     assert len(RED_HORIZON_SKILL_TABLES) == 86
     assert len(identities) == len(RED_HORIZON_SEEDS)
     assert all(item.status == KnowledgeStatus.ACTIVE for item in RED_HORIZON_SEEDS)
@@ -121,6 +122,35 @@ def test_red_horizon_skill_and_gear_catalog_uses_final_launch_tables() -> None:
     )
 
 
+def test_red_horizon_raid_and_dark_zone_catalog_covers_requested_encounters() -> None:
+    required = {
+        "Dark Hours: Max 'Boomer' Bailey",
+        "Dark Hours: Dizzy, Ricochet, and Weasel",
+        "Dark Hours: Buddy and Lucy",
+        "Dark Hours: DDP-52 Razorback",
+        "Iron Horse: Lieutenant Gray",
+        "Iron Horse: Captain Fieser",
+        "Iron Horse: Lieutenant Williams",
+        "Iron Horse: Colonel Morozova and Iron Horse",
+        "Red Horizon Toxic Dark Zone",
+        "Red Horizon Balanced Dark Zone",
+        "Red Horizon Classic Dark Zone",
+        "Red Horizon Invaded Dark Zone",
+        "Red Horizon Blackout Dark Zone",
+    }
+
+    assert required <= {item.subject for item in RED_HORIZON_SEEDS}
+    assert all(record["sources"] for record in RAID_AND_DZ_RECORDS)
+    toxic = seed("Red Horizon Toxic Dark Zone")
+    blackout = seed("Red Horizon Blackout Dark Zone")
+    invaded = seed("Red Horizon Invaded Dark Zone")
+    assert toxic.content["normalization"].startswith("Active")  # type: ignore[attr-defined]
+    assert toxic.content["combat_rules"].startswith("PvE values apply")  # type: ignore[attr-defined]
+    assert blackout.content["normalization"] is False  # type: ignore[attr-defined]
+    assert blackout.content["global_pvp_balance"] is True  # type: ignore[attr-defined]
+    assert "not a single universal normalization" in invaded.content["meaning"]  # type: ignore[attr-defined]
+
+
 @pytest.mark.asyncio
 async def test_seed_preview_and_apply_are_create_only_and_idempotent() -> None:
     repository = FakeKnowledgeRepository({"Fafnir", "Iron Will"})
@@ -129,12 +159,12 @@ async def test_seed_preview_and_apply_are_create_only_and_idempotent() -> None:
     result = await apply_red_horizon_seed(repository, actor_id=42)  # type: ignore[arg-type]
     second = await apply_red_horizon_seed(repository, actor_id=42)  # type: ignore[arg-type]
 
-    assert preview.total == 148
+    assert preview.total == 148 + len(RAID_AND_DZ_RECORDS)
     assert preview.existing == 2
-    assert preview.missing == 146
-    assert len(result.created_entry_ids) == 146
+    assert preview.missing == 146 + len(RAID_AND_DZ_RECORDS)
+    assert len(result.created_entry_ids) == 146 + len(RAID_AND_DZ_RECORDS)
     assert result.skipped_existing == 2
     assert len(second.created_entry_ids) == 0
-    assert second.skipped_existing == 148
+    assert second.skipped_existing == 148 + len(RAID_AND_DZ_RECORDS)
     assert all(item["actor_id"] == 42 for item in repository.created)
     assert all(item["game_version"] == GAME_VERSION for item in repository.created)

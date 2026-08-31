@@ -8,6 +8,7 @@ import pytest
 
 from rwi_bot.bot import names
 from rwi_bot.bot.views import PlatformButton, PlatformRoleView
+from rwi_bot.cogs.onboarding import OnboardingCog, render_erin_introduction
 
 
 def interaction_for(
@@ -113,3 +114,55 @@ def test_persistent_platform_view_has_stable_independent_buttons() -> None:
         "rwi:platform:pc",
         "rwi:platform:ps",
     }
+
+
+def test_erin_introduction_is_optional_and_explains_open_ended_profile_notes() -> None:
+    message = render_erin_introduction()
+
+    assert "Enhanced Reconnaissance, Intelligence, and Navigation" in message
+    assert "Sharing any of this is optional" in message
+    assert "day-one player" in message
+    assert "Healer main" in message
+    assert "like sniper rifles" in message
+    assert "dislike Tank builds" in message
+    assert "real-world personal information" in message
+    assert "/privacy reset" in message
+
+
+@pytest.mark.asyncio
+async def test_erin_introduction_sends_once_and_audits_without_profile_data() -> None:
+    audit = SimpleNamespace(
+        has_event=AsyncMock(side_effect=[False, False]),
+        record=AsyncMock(),
+    )
+    bot = SimpleNamespace(
+        services=SimpleNamespace(audit=audit),
+        user=SimpleNamespace(id=9),
+    )
+    member = Mock(spec=discord.Member)
+    member.id = 42
+    member.send = AsyncMock()
+
+    await OnboardingCog(bot)._introduce_erin(member)  # type: ignore[arg-type]
+
+    member.send.assert_awaited_once_with(render_erin_introduction())
+    event = audit.record.await_args.args[0]
+    assert event.event_type == "member.erin_introduction_sent"
+    assert event.target_id == "42"
+    assert "profile" not in event.details or event.details["profile_collection"] == (
+        "optional_explicit_self_report"
+    )
+
+
+@pytest.mark.asyncio
+async def test_erin_introduction_does_not_repeat_after_success() -> None:
+    audit = SimpleNamespace(has_event=AsyncMock(return_value=True), record=AsyncMock())
+    bot = SimpleNamespace(services=SimpleNamespace(audit=audit), user=SimpleNamespace(id=9))
+    member = Mock(spec=discord.Member)
+    member.id = 42
+    member.send = AsyncMock()
+
+    await OnboardingCog(bot)._introduce_erin(member)  # type: ignore[arg-type]
+
+    member.send.assert_not_awaited()
+    audit.record.assert_not_awaited()

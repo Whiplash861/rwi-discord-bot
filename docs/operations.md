@@ -285,6 +285,17 @@ answer request. If a profile declaration also contains a question, ERIN writes t
 values first and answers using them. Supported values are character level 1–40, SHD
 0–1,000,000, Red Horizon Expertise 0–30, PvE/PvP mode, maximum/current item-roll
 assumptions, conditional-buff inclusion, and concise/standard/technical detail.
+Profiles also support Xbox/PC/PlayStation, PvE/PvP/Both focus, gamertag, preferred
+playstyle, and up to 20 explicit game-relevant notes. Natural notes cover experience,
+main roles, likes, and dislikes; `Add to my profile: ...` stores another note and
+`forget that ...` removes it. New members receive one private introduction after
+membership screening. Sharing profile information is optional and does not affect access.
+
+Potential real-world personal data is never written as a profile update or sent into the
+answer path. ERIN asks whether the withheld text was sensitive or game-related while
+retaining only a redacted marker. A sensitive confirmation clears process-local memory
+and removes matching legacy notes. A game-related confirmation requires the member to
+resend only a clearly labeled game detail such as a gamertag.
 
 Only self-reports are accepted; statements about another member cannot update a profile.
 In a public thread, recent public context is author-labeled while the active assumptions

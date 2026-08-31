@@ -35,6 +35,9 @@ class AnswerAssumptions(BaseModel):
     shd: int = 1000
     expertise: int = 0
     mode: str = "PvE"
+    platforms: list[str] = Field(default_factory=list)
+    preferred_playstyle: str | None = Field(default=None, max_length=120)
+    profile_notes: list[str] = Field(default_factory=list)
     maximum_item_rolls: bool = True
     include_conditional_buffs: bool = False
 

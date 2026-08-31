@@ -26,6 +26,14 @@ startup so a deployed bot cannot silently run with an empty core catalog. Skill 
 retain base stats, Skill Tier 1-6 values, Overcharge details, source pages, and their text-
 table extraction method. Broad Skill-family questions must name every current variant in
 a complete answer; otherwise ERIN asks which variant the member means.
+The same baseline includes every intended Normal-mode encounter in Operation Dark Hours
+and Operation Iron Horse, with ordered progression mechanics, wipe conditions, and
+generalized assignments such as DPS, Future support/healer, hazard tank, control room,
+generator, drone-killer, RPG, key-runner, and encounter caller. These records carry a
+Red Horizon audit date and exclude bugs, bypasses, cheeses, and speedrun exploits. Current
+Toxic, Balanced, Classic, Invaded, and Blackout Dark Zone rules are stored separately so
+ERIN does not confuse an invasion state with normalization or apply one variant's build
+assumptions to another.
 ERIN also ships a pinned, attributed 2,037-record Y8S3 community research snapshot for
 exact item, talent, attribute, Skill, mod, weapon, and specialization discovery. Those
 rows improve web-search terminology but are deliberately excluded from verified knowledge:
@@ -40,6 +48,13 @@ thread context labels each author, so multiple agents can participate without on
 member's profile being applied to another. The same database-backed profile follows a
 current server member across public threads, process restarts, and DMs. ERIN uses it
 silently instead of appending assumptions to every answer.
+After membership screening, ERIN sends one private, consent-forward introduction. Members
+may optionally supply platforms, focus, gamertag, preferred playstyle, experience, main
+roles, likes, dislikes, or any other game-relevant note. Natural profile additions and
+removals persist across threads and DMs. Suspected real-world personal data is withheld
+before persistence or model use; ERIN asks for clarification using only a redacted local
+marker, and a sensitive confirmation clears that temporary conversation memory and any
+matching legacy profile notes.
 
 Substantial factual corrections in public ERIN conversations can enter a moderated
 community-memory queue. ERIN archives the claim for experienced-member review in

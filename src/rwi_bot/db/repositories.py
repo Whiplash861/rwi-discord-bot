@@ -31,6 +31,16 @@ class AuditRepository:
             await session.flush()
             return event.id
 
+    async def exists(self, *, event_type: str, target_id: str) -> bool:
+        async with self.database.session() as session:
+            count = await session.scalar(
+                select(func.count())
+                .select_from(AuditEvent)
+                .where(AuditEvent.event_type == event_type)
+                .where(AuditEvent.target_id == target_id)
+            )
+        return bool(count)
+
 
 class UsageRepository:
     def __init__(self, database: Database) -> None:

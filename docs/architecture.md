@@ -96,6 +96,15 @@ Profile-only acknowledgements and `show my profile` queries are deterministic lo
 responses. The current member can review the same values privately with `/privacy status`,
 export them, or return them to defaults with the confirmed privacy reset.
 
+After membership screening, onboarding sends one private introduction without creating a
+profile. Members can optionally self-report platforms, PvE/PvP focus, gamertag, preferred
+playstyle, experience, main roles, likes, dislikes, or open-ended game-relevant notes.
+Suspected real-world identifiers such as a real name, birthday, phone number, address, or
+email are withheld before persistence and before an answer request. The clarification turn
+stores only a redacted marker. A sensitive confirmation scrubs matching legacy notes and
+clears the member's process-local conversation memory; a game-related confirmation asks
+the member to resend only the clearly labeled game detail.
+
 Profiles are keyed only by Discord user ID in PostgreSQL. Thread IDs, channels, and
 process-local conversation sessions do not own the values, so one saved profile follows
 the member across `ask-rwi` threads, bot restarts, and DMs while they remain a server

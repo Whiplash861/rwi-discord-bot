@@ -412,4 +412,43 @@ RELEASES: tuple[Release, ...] = (
             ),
         ),
     ),
+    Release(
+        release_id="erin-update-14",
+        update_number=14,
+        version="V0.1.13",
+        released_on=date(2026, 8, 31),
+        notes=(
+            ReleaseNote(
+                ReleaseSection.HIGH_IMPACT,
+                "Added Red Horizon-audited progression mechanics and generalized role "
+                "assignments for every Dark Hours and Iron Horse raid encounter.",
+            ),
+            ReleaseNote(
+                ReleaseSection.NEW_FEATURES,
+                "Added current Toxic, Balanced, Classic, Invaded, and Blackout Dark Zone "
+                "rules with variant-specific build principles and warnings.",
+            ),
+            ReleaseNote(
+                ReleaseSection.NEW_FEATURES,
+                "ERIN now privately introduces herself after a member joins and offers an "
+                "optional personalization interview for builds and advice.",
+            ),
+            ReleaseNote(
+                ReleaseSection.NEW_FEATURES,
+                "Member profiles now support platform, PvE/PvP focus, gamertag, preferred "
+                "playstyle, experience, main roles, likes, dislikes, and open-ended notes.",
+            ),
+            ReleaseNote(
+                ReleaseSection.PRIVACY_SAFETY,
+                "Possible real-world personal information is withheld instead of saved or "
+                "sent to the answer model; ERIN asks the member to clarify and can scrub "
+                "matching legacy notes.",
+            ),
+            ReleaseNote(
+                ReleaseSection.IMPROVEMENTS,
+                "Profile notes can be amended or forgotten naturally and remain available "
+                "to the same member across server threads, restarts, and direct messages.",
+            ),
+        ),
+    ),
 )

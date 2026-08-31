@@ -8,7 +8,12 @@ from uuid import uuid4
 
 import pytest
 
-from rwi_bot.cogs.conversation import ConversationCog, ConversationTurn
+from rwi_bot.cogs.conversation import (
+    ConversationCog,
+    ConversationTurn,
+    confirms_personal_information,
+    denies_personal_information,
+)
 from rwi_bot.domain.schemas import AnswerRequest, SourceCitation
 from rwi_bot.services.privacy import ProfileRepository
 from rwi_bot.services.qa import QuestionAnsweringService
@@ -199,3 +204,11 @@ def test_conversation_memory_can_be_cleared_per_member() -> None:
     assert (42, 1) not in cog._memory
     assert (42, 2) not in cog._memory
     assert (7, 3) in cog._memory
+
+
+def test_personal_information_clarification_is_local_and_explicit() -> None:
+    assert confirms_personal_information("Yes, that is sensitive information") is True
+    assert confirms_personal_information("private") is True
+    assert denies_personal_information("No, that is my gamertag") is True
+    assert denies_personal_information("game-related") is True
+    assert confirms_personal_information("tell me about Iron Horse") is False

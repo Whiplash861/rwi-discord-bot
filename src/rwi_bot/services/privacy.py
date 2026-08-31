@@ -17,7 +17,11 @@ from rwi_bot.db.models import (
 )
 from rwi_bot.db.session import Database
 from rwi_bot.domain.schemas import AnswerAssumptions, AnswerTier
-from rwi_bot.services.member_profiles import MemberAnswerProfile, MemberProfileUpdate
+from rwi_bot.services.member_profiles import (
+    MemberAnswerProfile,
+    MemberProfileUpdate,
+    detect_possible_personal_information,
+)
 
 
 @dataclass(frozen=True, slots=True)
@@ -82,19 +86,76 @@ class ProfileRepository:
                 profile.expertise_level = profile_update.expertise
             if profile_update.detail_tier is not None:
                 profile.detail_tier = profile_update.detail_tier.value
+            if profile_update.platforms is not None:
+                profile.platform_roles = list(profile_update.platforms)
 
             preferences = dict(profile.preferences or {})
             preference_updates = (
                 ("level", profile_update.level),
                 ("mode", profile_update.mode),
+                ("gamertag", profile_update.gamertag),
+                ("preferred_playstyle", profile_update.preferred_playstyle),
                 ("maximum_item_rolls", profile_update.maximum_item_rolls),
                 ("include_conditional_buffs", profile_update.include_conditional_buffs),
             )
             for key, value in preference_updates:
                 if value is not None:
                     preferences[key] = value
+            profile_notes = [
+                " ".join(item.split())[:300]
+                for item in preferences.get("profile_notes", [])
+                if isinstance(item, str) and item.strip()
+            ]
+            if profile_update.profile_notes_remove:
+                removal_terms = {
+                    " ".join(item.split()).casefold()
+                    for item in profile_update.profile_notes_remove
+                    if item.strip()
+                }
+                profile_notes = [
+                    note
+                    for note in profile_notes
+                    if not any(
+                        term in note.casefold() or note.casefold() in term for term in removal_terms
+                    )
+                ]
+            if profile_update.profile_notes_add:
+                existing = {item.casefold() for item in profile_notes}
+                for note in profile_update.profile_notes_add:
+                    clean_note = " ".join(note.split())[:300]
+                    if clean_note and clean_note.casefold() not in existing:
+                        profile_notes.append(clean_note)
+                        existing.add(clean_note.casefold())
+            if profile_update.profile_notes_add is not None or profile_update.profile_notes_remove:
+                preferences["profile_notes"] = profile_notes[-20:]
+            if profile_update.fields:
+                preferences["profile_customized"] = True
             profile.preferences = preferences
             return self._answer_profile(profile, persisted=True)
+
+    async def scrub_sensitive_profile_data(self, user_id: int) -> int:
+        async with self.database.session() as session:
+            profile = await session.get(UserProfile, user_id, with_for_update=True)
+            if profile is None:
+                return 0
+            preferences = dict(profile.preferences or {})
+            notes = [
+                item
+                for item in preferences.get("profile_notes", [])
+                if isinstance(item, str) and item.strip()
+            ]
+            retained_notes = [
+                item for item in notes if not detect_possible_personal_information(item)
+            ]
+            removed = len(notes) - len(retained_notes)
+            if retained_notes != notes:
+                preferences["profile_notes"] = retained_notes
+            for key in ("real_name", "birthday", "date_of_birth", "phone", "address", "email"):
+                if key in preferences:
+                    del preferences[key]
+                    removed += 1
+            profile.preferences = preferences
+            return removed
 
     async def set_learning_opt_out(
         self, user_id: int, *, opted_out: bool
@@ -300,8 +361,28 @@ class ProfileRepository:
         shd = ProfileRepository._bounded_int(profile.shd_level, 0, 1_000_000, 1000)
         expertise = ProfileRepository._bounded_int(profile.expertise_level, 0, 30, 0)
         mode = preferences.get("mode")
-        if mode not in {"PvE", "PvP"}:
+        if mode not in {"PvE", "PvP", "Both"}:
             mode = "PvE"
+        platforms = [
+            item
+            for item in (getattr(profile, "platform_roles", None) or [])
+            if isinstance(item, str) and item in {"Xbox", "PC", "PS"}
+        ]
+        playstyle = preferences.get("preferred_playstyle")
+        if not isinstance(playstyle, str) or not playstyle.strip():
+            playstyle = None
+        else:
+            playstyle = " ".join(playstyle.split())[:120]
+        gamertag = preferences.get("gamertag")
+        if not isinstance(gamertag, str) or not gamertag.strip():
+            gamertag = None
+        else:
+            gamertag = " ".join(gamertag.split())[:32]
+        profile_notes = [
+            " ".join(item.split())[:300]
+            for item in preferences.get("profile_notes", [])
+            if isinstance(item, str) and item.strip()
+        ][-20:]
         maximum_item_rolls = preferences.get("maximum_item_rolls")
         if not isinstance(maximum_item_rolls, bool):
             maximum_item_rolls = True
@@ -318,11 +399,15 @@ class ProfileRepository:
                 shd=shd,
                 expertise=expertise,
                 mode=mode,
+                platforms=platforms,
+                preferred_playstyle=playstyle,
+                profile_notes=profile_notes,
                 maximum_item_rolls=maximum_item_rolls,
                 include_conditional_buffs=include_conditional_buffs,
             ),
             detail_tier=detail_tier,
-            persisted=persisted,
+            persisted=(persisted and ProfileRepository._has_answer_customizations(profile)),
+            gamertag=gamertag,
         )
 
     @staticmethod
@@ -330,3 +415,27 @@ class ProfileRepository:
         if isinstance(value, int) and not isinstance(value, bool) and minimum <= value <= maximum:
             return value
         return default
+
+    @staticmethod
+    def _has_answer_customizations(profile: UserProfile) -> bool:
+        preferences = profile.preferences if isinstance(profile.preferences, dict) else {}
+        if preferences.get("profile_customized") is True:
+            return True
+        if profile.shd_level != 1000 or profile.expertise_level != 0:
+            return True
+        if profile.detail_tier != AnswerTier.STANDARD.value or bool(
+            getattr(profile, "platform_roles", None)
+        ):
+            return True
+        return any(
+            key in preferences
+            for key in (
+                "level",
+                "mode",
+                "gamertag",
+                "preferred_playstyle",
+                "profile_notes",
+                "maximum_item_rolls",
+                "include_conditional_buffs",
+            )
+        )

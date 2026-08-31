@@ -11,6 +11,34 @@ from rwi_bot.domain.schemas import AuditRecord
 PLATFORM_PANEL_MARKER = "RWI_PLATFORM_PANEL_V1"
 
 
+def render_erin_introduction() -> str:
+    return (
+        "Welcome to The Redwing Initiative, Agent. I'm **ERIN**—Enhanced "
+        "Reconnaissance, Intelligence, and Navigation—RWI's intelligence agent. I can "
+        "help with current Division 2 builds, encounter mechanics, progression, and "
+        "recommendations.\n\n"
+        "If you'd like personalized answers, reply with any profile details you want me "
+        "to remember, such as:\n"
+        "- platform(s): Xbox, PC, or PlayStation\n"
+        "- focus: PvE, PvP, or both\n"
+        "- SHD and Expertise levels\n"
+        "- gamertag\n"
+        "- preferred playstyle or team role\n"
+        "- any other game-relevant notes you want me to use\n\n"
+        "**Sharing any of this is optional.** It is used only to personalize the builds, "
+        "advice, and recommendations I give you. I won't create or change those profile "
+        "details unless you provide them, and you can update them naturally at any time. "
+        "Use `/privacy export` to review your saved data or `/privacy reset` to clear it.\n\n"
+        "Helpful optional notes might be `I'm a day-one player and a Healer main` or `I "
+        "like sniper rifles and dislike Tank builds.` You can also write `Add to my profile: "
+        "...` for another game-relevant preference.\n\n"
+        "You can reply in one message—for example: `Platform: PC. I play both. SHD 2500, "
+        "Expertise 20. Gamertag: AgentName. Playstyle: support and skill builds.` If "
+        "something appears to be real-world personal information, I will withhold it and "
+        "ask you to clarify instead of adding it to your profile."
+    )
+
+
 class OnboardingCog(commands.Cog):
     def __init__(self, bot: RwiBot) -> None:
         self.bot = bot
@@ -79,13 +107,12 @@ class OnboardingCog(commands.Cog):
 
     async def _onboard(self, member: discord.Member) -> None:
         agent = discord.utils.get(member.guild.roles, name=names.AGENT)
-        if agent is None:
-            return
-        if agent not in member.roles:
+        role_ready = agent is not None
+        if agent is not None and agent not in member.roles:
             try:
                 await member.add_roles(agent, reason="RWI automatic member onboarding")
             except discord.Forbidden:
-                return
+                role_ready = False
         panel = await self.ensure_platform_panel()
         channel = discord.utils.get(member.guild.text_channels, name=names.WELCOME)
         if channel is not None:
@@ -95,12 +122,48 @@ class OnboardingCog(commands.Cog):
                 f"**Agent**. Choose your platforms here: {destination}",
                 allowed_mentions=discord.AllowedMentions(users=True),
             )
-        await self.bot.services.audit.record(
+        if role_ready:
+            await self.bot.services.audit.record(
+                AuditRecord(
+                    event_type="member.agent_assigned",
+                    actor_id=self.bot.user.id if self.bot.user else None,
+                    target_type="member",
+                    target_id=str(member.id),
+                    reason="Automatic onboarding after membership screening",
+                )
+            )
+        await self._introduce_erin(member)
+
+    async def _introduce_erin(self, member: discord.Member) -> None:
+        target_id = str(member.id)
+        audit = self.bot.services.audit
+        if await audit.has_event(event_type="member.erin_introduction_sent", target_id=target_id):
+            return
+        if await audit.has_event(
+            event_type="member.erin_introduction_unavailable", target_id=target_id
+        ):
+            return
+        try:
+            await member.send(render_erin_introduction())
+        except (discord.Forbidden, discord.HTTPException) as exc:
+            await audit.record(
+                AuditRecord(
+                    event_type="member.erin_introduction_unavailable",
+                    actor_id=self.bot.user.id if self.bot.user else None,
+                    target_type="member",
+                    target_id=target_id,
+                    reason="Member DMs were unavailable during optional ERIN introduction",
+                    details={"error_type": type(exc).__name__},
+                )
+            )
+            return
+        await audit.record(
             AuditRecord(
-                event_type="member.agent_assigned",
+                event_type="member.erin_introduction_sent",
                 actor_id=self.bot.user.id if self.bot.user else None,
                 target_type="member",
-                target_id=str(member.id),
-                reason="Automatic onboarding after membership screening",
+                target_id=target_id,
+                reason="Consent-forward optional profile introduction after joining RWI",
+                details={"profile_collection": "optional_explicit_self_report"},
             )
         )

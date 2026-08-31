@@ -37,3 +37,6 @@ class AuditService:
         if self.discord_sink is not None:
             await self.discord_sink.send_audit_summary(record, event_id)
         return event_id
+
+    async def has_event(self, *, event_type: str, target_id: str) -> bool:
+        return await self.repository.exists(event_type=event_type, target_id=target_id)

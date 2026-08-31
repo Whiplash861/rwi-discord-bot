@@ -8,6 +8,7 @@ import pytest
 
 from rwi_bot.domain.schemas import AnswerTier
 from rwi_bot.services.member_profiles import (
+    detect_possible_personal_information,
     infer_member_profile_update,
     is_profile_query,
     render_member_profile,
@@ -52,6 +53,58 @@ def test_profile_update_can_precede_a_question() -> None:
     assert inferred.update.shd == 2500
     assert inferred.update.expertise == 20
     assert inferred.profile_only is False
+
+
+def test_join_profile_reply_parses_all_supported_personalization_fields() -> None:
+    inferred = infer_member_profile_update(
+        "Platform: PC and Xbox. I play both. SHD 2500, Expertise 20. "
+        "Gamertag: AgentName. Playstyle: support and skill builds."
+    )
+
+    assert inferred is not None
+    assert inferred.update.platforms == ("Xbox", "PC")
+    assert inferred.update.mode == "Both"
+    assert inferred.update.shd == 2500
+    assert inferred.update.expertise == 20
+    assert inferred.update.gamertag == "AgentName"
+    assert inferred.update.preferred_playstyle == "support and skill builds"
+    assert inferred.profile_only is True
+
+
+def test_game_experience_and_preferences_become_profile_notes() -> None:
+    inferred = infer_member_profile_update(
+        "I'm a Beta tester and day-one player. I'm a Healer main. "
+        "I like sniper rifles. I dislike Tank builds."
+    )
+
+    assert inferred is not None
+    assert inferred.update.profile_notes_add == (
+        "Experience: Beta tester",
+        "Experience: day-one player",
+        "Main role/playstyle: Healer",
+        "Likes/prefers: sniper rifles",
+        "Dislikes: Tank builds",
+    )
+    assert inferred.profile_only is True
+
+
+def test_forget_profile_preference_removes_without_readding() -> None:
+    inferred = infer_member_profile_update("Forget that I like sniper rifles")
+
+    assert inferred is not None
+    assert inferred.update.profile_notes_add is None
+    assert inferred.update.profile_notes_remove == ("Likes/prefers: sniper rifles",)
+    assert inferred.profile_only is True
+
+
+def test_possible_real_world_personal_information_is_withheld() -> None:
+    text = "My real name is Jane Doe and my phone number is 555-555-1212"
+    inferred = infer_member_profile_update(text)
+
+    assert inferred is not None
+    assert inferred.update.fields == ()
+    assert inferred.sensitive_flags == ("real name", "phone number")
+    assert detect_possible_personal_information("Gamertag: AgentName") == ()
 
 
 @pytest.mark.parametrize(

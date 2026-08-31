@@ -106,6 +106,35 @@ class ConversationCog(commands.Cog):
                 user_id=message.author.id,
             )
 
+            if prior_turn is not None and prior_turn.answer_kind == "privacy_clarification":
+                if confirms_personal_information(message.content):
+                    scrubbed = await self.bot.services.profiles.scrub_sensitive_profile_data(
+                        message.author.id
+                    )
+                    self.clear_user_memory(message.author.id)
+                    reply = (
+                        "Understood. I did not save the flagged message. I also cleared "
+                        "temporary conversation memory for this session"
+                        + (
+                            f" and removed {scrubbed} previously saved profile "
+                            f"{'entry' if scrubbed == 1 else 'entries'} that matched "
+                            "personal-data flags"
+                            if scrubbed
+                            else ""
+                        )
+                        + ". You may resend only the game-related details you want in your profile."
+                    )
+                    await destination.send(reply)
+                    return
+                if denies_personal_information(message.content):
+                    reply = (
+                        "Thanks for clarifying. I still did not retain the flagged text. "
+                        "Please resend only the game-related detail with a clear label, such "
+                        "as `Gamertag: AgentName` or `Add to my profile: day-one player`."
+                    )
+                    await destination.send(reply)
+                    return
+
             if is_source_request(message.content):
                 if prior_turn is None:
                     await destination.send(
@@ -149,6 +178,19 @@ class ConversationCog(commands.Cog):
                 else:
                     profile = await self.bot.services.profiles.get_answer_profile(message.author.id)
                 profile_reply = self._profile_update_reply(profile, profile_update)
+                if profile_update.sensitive_flags:
+                    await destination.send(profile_reply)
+                    self._remember_local_exchange(
+                        session_key=session_key,
+                        destination_id=destination.id,
+                        is_dm=is_dm,
+                        author_id=message.author.id,
+                        member_label=member_label,
+                        member_text="[possible personal information withheld]",
+                        assistant_text=profile_reply,
+                        answer_kind="privacy_clarification",
+                    )
+                    return
                 if profile_update.profile_only:
                     await destination.send(profile_reply)
                     self._remember_local_exchange(
@@ -453,6 +495,16 @@ class ConversationCog(commands.Cog):
             response = "I couldn't update your ERIN profile."
         if inference.rejected:
             response += "\n\nSkipped:\n" + "\n".join(f"- {reason}" for reason in inference.rejected)
+        if inference.sensitive_flags:
+            labels = ", ".join(inference.sensitive_flags)
+            privacy_message = (
+                "I detected possible personal information "
+                f"({labels}). I did not save or forward the flagged text. Is it personal/"
+                "sensitive information, or a game-related identifier?"
+            )
+            response = (
+                f"{response}\n\n{privacy_message}" if inference.update.fields else privacy_message
+            )
         return response
 
     async def _apply_inferred_feedback(
@@ -572,6 +624,28 @@ _CANNOT_SUPPLY_ANSWER = re.compile(
 
 def member_cannot_supply_answer(text: str) -> bool:
     return _CANNOT_SUPPLY_ANSWER.fullmatch(" ".join(text.split())) is not None
+
+
+_CONFIRMS_PERSONAL = re.compile(
+    r"^\s*(?:yes[, ]+)?(?:it|that|those|the\s+flagged\s+(?:item|information))\s+"
+    r"(?:is|are|was|were)\s+(?:personal|private|sensitive)(?:\s+information)?[.!]?\s*$|"
+    r"^\s*(?:yes[, ]+)?(?:personal|private|sensitive)(?:\s+information)?[.!]?\s*$",
+    re.IGNORECASE,
+)
+_DENIES_PERSONAL = re.compile(
+    r"^\s*(?:no[, ]+)?(?:it|that|those)\s+(?:is|are|was|were)\s+"
+    r"(?:not\s+personal|not\s+sensitive|game[- ]related|my\s+gamertag|in[- ]game)[.!]?\s*$|"
+    r"^\s*(?:no[, ]+)?(?:game[- ]related|gamertag|in[- ]game)(?:\s+information)?[.!]?\s*$",
+    re.IGNORECASE,
+)
+
+
+def confirms_personal_information(text: str) -> bool:
+    return _CONFIRMS_PERSONAL.fullmatch(" ".join(text.split())) is not None
+
+
+def denies_personal_information(text: str) -> bool:
+    return _DENIES_PERSONAL.fullmatch(" ".join(text.split())) is not None
 
 
 def split_discord_message(text: str, *, limit: int = 1950) -> list[str]:
