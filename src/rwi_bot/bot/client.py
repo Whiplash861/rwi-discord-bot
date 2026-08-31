@@ -48,6 +48,7 @@ class RwiBot(commands.Bot):
         from rwi_bot.cogs.conversation import ConversationCog
         from rwi_bot.cogs.moderation import ModerationCog
         from rwi_bot.cogs.onboarding import OnboardingCog
+        from rwi_bot.cogs.operations import OperationAlertRoleView, OperationsCog
         from rwi_bot.cogs.privacy import PrivacyCog
         from rwi_bot.cogs.releases import ReleaseNotesCog
 
@@ -58,14 +59,18 @@ class RwiBot(commands.Bot):
             )
         )
         self.add_view(CommunityClaimReviewView(self))
+        self.add_view(OperationAlertRoleView(self))
+        operations = OperationsCog(self)
         await self.add_cog(AdminCog(self))
         await self.add_cog(OnboardingCog(self))
         await self.add_cog(ModerationCog(self))
         await self.add_cog(CommunityLoadoutsCog(self))
         await self.add_cog(CommunityLearningCog(self))
+        await self.add_cog(operations)
         await self.add_cog(ConversationCog(self))
         await self.add_cog(PrivacyCog(self))
         await self.add_cog(ReleaseNotesCog(self))
+        await operations.restore_persistent_views()
 
         if self.services.settings.sync_commands:
             guild = discord.Object(id=self.services.settings.discord_guild_id)
@@ -123,6 +128,10 @@ class RwiBot(commands.Bot):
         community = self.get_cog("CommunityLoadoutsCog")
         if community is not None:
             community.schedule_sync()  # type: ignore[attr-defined]
+        operations = self.get_cog("OperationsCog")
+        if operations is not None:
+            await operations.ensure_schedule_space()  # type: ignore[attr-defined]
+            operations.schedule_start()  # type: ignore[attr-defined]
         releases = self.get_cog("ReleaseNotesCog")
         if releases is not None:
             releases.schedule_publish()  # type: ignore[attr-defined]

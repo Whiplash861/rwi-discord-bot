@@ -23,6 +23,7 @@ def test_authored_release_catalog_is_unique_and_uses_requested_format() -> None:
     assert len(ids) == len(RELEASES)
     assert len(numbers) == len(RELEASES)
     assert len(versions) == len(RELEASES)
+    assert [release.update_number for release in RELEASES] == list(range(1, len(RELEASES) + 1))
     assert release.update_number == 1
     assert release.version == "V0.1.0"
     assert release.released_on == date(2026, 8, 30)
@@ -37,10 +38,10 @@ def test_authored_release_catalog_is_unique_and_uses_requested_format() -> None:
     assert release.legacy_release_ids == ("erin-update-1-v1.22.333",)
 
     latest = RELEASES[-1]
-    assert latest.update_number == 15
-    assert latest.version == "V0.1.14"
+    assert latest.update_number == 18
+    assert latest.version == "V0.1.17"
     assert render_release_description(latest).startswith(
-        "V0.1.14\n\nAugust 31, 2026\n\n__Patch Notes__"
+        "V0.1.17\n\nAugust 31, 2026\n\n__Patch Notes__"
     )
 
 

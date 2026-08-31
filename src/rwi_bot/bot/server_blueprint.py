@@ -67,6 +67,11 @@ ROLE_SPECS = (
     RoleSpec(names.PC, colour=discord.Colour.from_rgb(92, 107, 130)),
     RoleSpec(names.PS, colour=discord.Colour.from_rgb(0, 112, 209)),
     RoleSpec(names.ROGUE_AGENT, colour=discord.Colour.from_rgb(145, 24, 24)),
+    RoleSpec(
+        names.RAID_INCURSION_MATCHMAKING,
+        colour=discord.Colour.from_rgb(229, 111, 35),
+        mentionable=True,
+    ),
 )
 
 
@@ -125,6 +130,14 @@ CATEGORY_CHANNELS: dict[str, tuple[ChannelSpec, ...]] = {
         ),
     ),
     names.MATCHMAKING: (
+        ChannelSpec(
+            names.SCHEDULED_OPERATIONS,
+            ChannelKind.TEXT,
+            "Read-only Raid and Incursion schedule, RSVP roster, and attendance reminders.",
+            access_roles=(names.AGENT, names.ROGUE_AGENT),
+            bot_access=True,
+            read_only=True,
+        ),
         ChannelSpec(
             names.XBOX_MATCHMAKING,
             ChannelKind.FORUM,
@@ -338,6 +351,40 @@ class ServerReconciler:
                 reason="Reconcile the explicitly requested ERIN patch-notes channel",
             )
         return channel
+
+    async def ensure_role(self, role_name: str) -> discord.Role:
+        """Reconcile one canonical role without touching other server structure."""
+
+        spec = next((item for item in ROLE_SPECS if item.name == role_name), None)
+        if spec is None:
+            raise ValueError(f"{role_name} is not a canonical RWI role.")
+        bot_member = self.guild.me
+        if bot_member is None:
+            raise RuntimeError("The bot member is not available in the target guild.")
+        role = discord.utils.get(self.guild.roles, name=spec.name)
+        if role is not None and role.position >= bot_member.top_role.position:
+            return role
+        permissions, _ = self._grantable_permissions(
+            spec.permissions,
+            bot_member.guild_permissions,
+        )
+        if role is None:
+            return await self.guild.create_role(
+                name=spec.name,
+                permissions=permissions,
+                colour=spec.colour,
+                hoist=spec.hoist,
+                mentionable=spec.mentionable,
+                reason="Reconcile an explicitly requested RWI role",
+            )
+        await role.edit(
+            permissions=permissions,
+            colour=spec.colour,
+            hoist=spec.hoist,
+            mentionable=spec.mentionable,
+            reason="Reconcile an explicitly requested RWI role",
+        )
+        return role
 
     async def _ensure_roles(
         self,

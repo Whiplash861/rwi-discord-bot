@@ -5,7 +5,13 @@ from unittest.mock import Mock
 import discord
 
 from rwi_bot.bot import names
-from rwi_bot.bot.server_blueprint import ROLE_SPECS, ChannelKind, ChannelSpec, ServerReconciler
+from rwi_bot.bot.server_blueprint import (
+    CATEGORY_CHANNELS,
+    ROLE_SPECS,
+    ChannelKind,
+    ChannelSpec,
+    ServerReconciler,
+)
 
 
 def role_permissions(name: str) -> discord.Permissions:
@@ -118,3 +124,16 @@ def test_patch_notes_channel_is_read_only_for_community_roles() -> None:
     assert overwrites[agent].create_public_threads is False
     assert overwrites[rogue].send_messages is False
     assert overwrites[bot_member].send_messages is True
+
+
+def test_scheduled_operations_channel_is_read_only_and_matchmaking_role_is_mentionable() -> None:
+    channel = next(
+        spec
+        for spec in CATEGORY_CHANNELS[names.MATCHMAKING]
+        if spec.name == names.SCHEDULED_OPERATIONS
+    )
+    role = next(spec for spec in ROLE_SPECS if spec.name == names.RAID_INCURSION_MATCHMAKING)
+
+    assert channel.read_only is True
+    assert channel.bot_access is True
+    assert role.mentionable is True

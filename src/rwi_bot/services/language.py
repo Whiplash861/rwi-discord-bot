@@ -17,6 +17,12 @@ DOMAIN_ALIASES: dict[str, tuple[str, ...]] = {
     "armor regeneration": ("armor regen", "armour regen", "regen"),
     "expertise": ("expertese", "expertice", "exptertise"),
     "prototype augment": ("proto augment", "prototype mod", "proto aug"),
+    "damage to targets out of cover": (
+        "dtoc",
+        "dttooc",
+        "damage to target out of cover",
+        "out of cover damage",
+    ),
     "tinkering station": ("tinker station", "tinkering bench", "workbench"),
     "Broken Rain": ("brokenrain", "brocken rain", "broken reign"),
 }

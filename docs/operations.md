@@ -325,6 +325,35 @@ Community indexing is limited to public starter posts in the configured
 indexed. Edits refresh the sanitized local copy, message or thread deletion removes it,
 and a bounded startup synchronization covers at most 100 active or archived threads.
 
+## Scheduled operations
+
+With automatic server bootstrap enabled, startup reconciles the mentionable `Raid &
+Incursion Matchmaking` opt-in role and the member-readable, bot-writable
+`#scheduled-operations` channel under MATCHMAKING. The channel denies member messages;
+all interaction happens through persistent components. Its pinned alert panel lets a
+member add or remove the notification role without a paid provider call.
+
+Members can write requests such as `Set up a Broken Rain run in 2 days` in DMs,
+`#ask-rwi`, or another guild channel. ERIN always asks for the organizer's role, then asks
+for any missing supported activity, date, time, or timezone. Supported timezone labels
+are ET/CT/MT/PT (including standard/daylight abbreviations) and UTC/GMT. Events must be at
+least five minutes and no more than 180 days in the future. Drafts expire after 20 minutes
+and `cancel` abandons them without writing an event.
+
+The final post pings only the opt-in matchmaking role. Members choose a role to RSVP
+Going, or use Going/Undecided, Maybe, and Withdraw controls. Going respects the operation
+capacity; Maybe is the standby list. One hour before start, ERIN mentions every active
+RSVP once and offers Confirm attendance or Withdraw. PostgreSQL stores UTC start times,
+roster state, confirmation timestamps, and the Discord presentation pointers. Persistent
+views are restored during startup, and completed operations age out of the active view
+set six hours after start.
+
+Explicit damage calculations should include a base value and labeled percentages, for
+example: `Show me the damage math: base damage 100000, weapon damage 120%, TWD 25%, HSD
+100%, CHD 150%, DTA 6%, DTOC 10%. The shot is a critical headshot against an armored
+target out of cover.` ERIN validates the 60% CHC cap and shows each bucket, condition,
+multiplier, and running result. Source links remain hidden until the member asks for them.
+
 ## Backup
 
 Database backups must be written outside the container and runtime volume. Create the

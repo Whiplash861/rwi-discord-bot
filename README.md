@@ -75,6 +75,19 @@ only when the member says they cannot supply the missing information. Ticket ale
 the original question, the specific failure, prior checks, and the requested research.
 Talent and mechanic explanations surface supported activation, deactivation, limitation,
 and interaction details in the first breakdown rather than waiting for a follow-up.
+DTOC and DTTOOC both resolve to Damage to Targets Out of Cover. Explicit weapon-damage
+calculation requests use a deterministic sequence that displays every substitution and
+running result across Weapon Damage, Total Weapon Damage, the shared active HSD/CHD
+bucket, DTA or DTH, DTOC, team effects in their verified categories, and independent
+amplifiers.
+
+Members can ask ERIN in a DM, `#ask-rwi`, or another server channel to schedule Broken
+Rain, Paradise Lost, Dark Hours, or Iron Horse. ERIN collects the organizer's role and
+any missing date, time, or timezone, then publishes an RSVP roster in the read-only
+`#scheduled-operations` channel. Members can opt into the Raid & Incursion Matchmaking
+alert role, choose their operation role, join the standby list, or withdraw. Events and
+RSVPs survive restarts, and ERIN asks active RSVPs to confirm attendance one hour before
+the scheduled start.
 Every deployed application revision is also represented in the community-readable,
 read-only `#erin-patch-notes` index. Authored releases use severity-grouped notes;
 deployment fingerprinting produces a categorized fallback when a release manifest was

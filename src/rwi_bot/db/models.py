@@ -66,6 +66,18 @@ class CommunityClaimStatus(StrEnum):
     EXPLOIT = "exploit"
 
 
+class ScheduledOperationStatus(StrEnum):
+    SCHEDULED = "scheduled"
+    CANCELLED = "cancelled"
+    COMPLETED = "completed"
+
+
+class OperationRsvpStatus(StrEnum):
+    GOING = "going"
+    MAYBE = "maybe"
+    WITHDRAWN = "withdrawn"
+
+
 class KnowledgeEntry(UUIDPrimaryKeyMixin, TimestampMixin, Base):
     __tablename__ = "knowledge_entries"
     __table_args__ = (
@@ -285,6 +297,42 @@ class CommunityClaim(UUIDPrimaryKeyMixin, TimestampMixin, Base):
     reviewed_by_user_id: Mapped[int | None] = mapped_column(BigInteger)
     review_note: Mapped[str | None] = mapped_column(Text)
     reviewed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+
+
+class ScheduledOperation(UUIDPrimaryKeyMixin, TimestampMixin, Base):
+    __tablename__ = "scheduled_operations"
+
+    guild_id: Mapped[int] = mapped_column(BigInteger, nullable=False, index=True)
+    organizer_user_id: Mapped[int] = mapped_column(BigInteger, nullable=False, index=True)
+    activity: Mapped[str] = mapped_column(String(120), nullable=False, index=True)
+    activity_type: Mapped[str] = mapped_column(String(30), nullable=False, index=True)
+    organizer_role: Mapped[str] = mapped_column(String(40), nullable=False)
+    start_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False, index=True)
+    capacity: Mapped[int] = mapped_column(Integer, nullable=False)
+    notes: Mapped[str | None] = mapped_column(Text)
+    source_channel_id: Mapped[int | None] = mapped_column(BigInteger)
+    announcement_channel_id: Mapped[int | None] = mapped_column(BigInteger)
+    announcement_message_id: Mapped[int | None] = mapped_column(BigInteger, unique=True)
+    reminder_message_id: Mapped[int | None] = mapped_column(BigInteger, unique=True)
+    matchmaking_role_id: Mapped[int | None] = mapped_column(BigInteger)
+    reminder_sent_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    status: Mapped[str] = mapped_column(
+        String(30), default=ScheduledOperationStatus.SCHEDULED, nullable=False, index=True
+    )
+
+
+class OperationRsvp(TimestampMixin, Base):
+    __tablename__ = "operation_rsvps"
+
+    operation_id: Mapped[UUID] = mapped_column(
+        ForeignKey("scheduled_operations.id", ondelete="CASCADE"), primary_key=True
+    )
+    discord_user_id: Mapped[int] = mapped_column(BigInteger, primary_key=True)
+    status: Mapped[str] = mapped_column(
+        String(20), default=OperationRsvpStatus.GOING, nullable=False, index=True
+    )
+    selected_role: Mapped[str] = mapped_column(String(40), nullable=False)
+    confirmed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
 
 
 class Feedback(UUIDPrimaryKeyMixin, Base):

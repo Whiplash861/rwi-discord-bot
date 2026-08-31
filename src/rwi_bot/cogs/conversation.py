@@ -19,6 +19,11 @@ from rwi_bot.domain.schemas import (
     SourceCitation,
 )
 from rwi_bot.services.community_learning import infer_community_claim, is_teaching_meta
+from rwi_bot.services.damage_math import (
+    calculate_weapon_hit,
+    parse_damage_question,
+    render_damage_breakdown,
+)
 from rwi_bot.services.feedback import FeedbackSentiment, InferredFeedback, infer_feedback
 from rwi_bot.services.language import interpret_locally, question_signature
 from rwi_bot.services.member_profiles import (
@@ -95,6 +100,10 @@ class ConversationCog(commands.Cog):
             moderation = self.bot.get_cog("ModerationCog")
             if moderation is not None and await moderation.handle_message(message):  # type: ignore[attr-defined]
                 return
+
+        operations = self.bot.get_cog("OperationsCog")
+        if operations is not None and await operations.maybe_handle_message(message):  # type: ignore[attr-defined]
+            return
 
         destination = await self._destination(message)
         session_key = (message.author.id, destination.id)
@@ -175,6 +184,31 @@ class ConversationCog(commands.Cog):
                 else:
                     for chunk in split_discord_message(render_sources(prior_turn.citations)):
                         await destination.send(chunk)
+                return
+
+            damage_inputs = parse_damage_question(message.content)
+            if damage_inputs is not None:
+                try:
+                    damage_reply = render_damage_breakdown(calculate_weapon_hit(damage_inputs))
+                except ValueError as exc:
+                    await destination.send(
+                        "I couldn't run that damage sequence because one of the supplied "
+                        f"values is invalid: **{exc}**. Correct the value and try again."
+                    )
+                    return
+                for chunk in split_discord_message(damage_reply):
+                    await destination.send(chunk)
+                self._remember_local_exchange(
+                    session_key=session_key,
+                    destination_id=destination.id,
+                    is_dm=is_dm,
+                    author_id=message.author.id,
+                    member_label=member_label,
+                    member_text=message.content,
+                    assistant_text=damage_reply,
+                    answer_kind="calculation",
+                    citations=_DAMAGE_MATH_CITATIONS,
+                )
                 return
 
             if inferred is not None and inferred.feedback_only:
@@ -603,6 +637,7 @@ class ConversationCog(commands.Cog):
         member_text: str,
         assistant_text: str,
         answer_kind: str = "profile",
+        citations: tuple[SourceCitation, ...] = (),
     ) -> None:
         turn = ConversationTurn(
             member=member_text[:1200],
@@ -610,6 +645,7 @@ class ConversationCog(commands.Cog):
             author_id=author_id,
             member_label=member_label,
             answer_kind=answer_kind,
+            citations=citations,
             is_dm=is_dm,
         )
         self._memory[session_key].append(turn)
@@ -762,6 +798,18 @@ _PROFILE_INTERVIEW_QUESTIONS = (
     "**Question 6 of 6 — Additional notes**\nShare any other game-relevant experience, "
     "preferences, likes, or dislikes you want me to remember. For example: `Beta tester "
     "and day-one player; likes sniper rifles; dislikes Tank builds.`",
+)
+_DAMAGE_MATH_CITATIONS = (
+    SourceCitation(
+        title="Damage Output (& Calculation)",
+        url="https://www.s-i-n.co.uk/div2/builds/dmg/",
+        source_type="community_reference",
+    ),
+    SourceCitation(
+        title="The Division 2 DPS & Build Calculator",
+        url="https://djtickle.com/calculator",
+        source_type="community_reference",
+    ),
 )
 _PROFILE_INTERVIEW_REQUEST = re.compile(
     r"\b(?:personalization|personalisation|onboarding|profile|new[- ]member)\s+"

@@ -249,6 +249,33 @@ open review work, and quarantined answer caches. `/rwi cache-quarantine` is a se
 confirmed typed action: it stops a suspect shared answer from being served and records
 the state transition without altering verified knowledge.
 
+## Operation scheduling
+
+Natural scheduling requests are intercepted locally before the answer pipeline, so they
+do not consume OpenAI budget or become game-knowledge questions. A short process-local
+draft collects the organizer's operation role plus any missing activity, date, time, and
+timezone. Only complete future drafts become durable `scheduled_operations` and
+`operation_rsvps` rows. Times are normalized to UTC after daylight-saving-aware ET, CT,
+MT, PT, or UTC parsing.
+
+The read-only `#scheduled-operations` presentation channel contains a pinned opt-in alert
+role selector and one persistent RSVP view per operation. Selecting a role records a
+Going RSVP; Maybe and Withdraw maintain a separate standby state. The organizer is added
+as Going in the role collected during the interview. Discord message identifiers are
+presentation pointers only—the database remains authoritative. On restart, ERIN restores
+views for every active announcement and reminder. A background dispatcher sends one
+attendance check to non-withdrawn RSVPs during the final hour and marks it sent
+transactionally to prevent reconnect duplicates.
+
+## Damage calculation order
+
+Explicit single-projectile calculations use structured decimal inputs and never delegate
+arithmetic to generated prose. ERIN shows base weapon damage, the additive Weapon Damage
+bucket, Total Weapon Damage, the shared active HSD/CHD hit bucket, the qualifying DTA or
+DTH target layer, DTOC/DTTOOC when the target is out of cover, and every independent
+amplifier. Team effects enter the category established by their current wording and
+verified behavior rather than an invented generic team multiplier.
+
 ## Emergency boundary
 
 `MaintenanceManager` serializes a durable JSON state file using atomic replacement. A

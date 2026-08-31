@@ -474,4 +474,74 @@ RELEASES: tuple[Release, ...] = (
             ),
         ),
     ),
+    Release(
+        release_id="erin-update-16",
+        update_number=16,
+        version="V0.1.15",
+        released_on=date(2026, 8, 31),
+        notes=(
+            ReleaseNote(
+                ReleaseSection.HIGH_IMPACT,
+                "Added durable Raid and Incursion scheduling with guided organizer-role, "
+                "date, time, and timezone collection from member DMs or server channels.",
+            ),
+            ReleaseNote(
+                ReleaseSection.NEW_FEATURES,
+                "Added a read-only scheduled-operations channel, opt-in matchmaking alert "
+                "role, role-aware RSVP roster, standby list, and attendance controls.",
+            ),
+            ReleaseNote(
+                ReleaseSection.NEW_FEATURES,
+                "ERIN now pings active RSVPs one hour before an operation and records their "
+                "confirmation or withdrawal across process and desktop restarts.",
+            ),
+            ReleaseNote(
+                ReleaseSection.IMPROVEMENTS,
+                "Added DTOC as an alias for Damage to Targets Out of Cover and expanded "
+                "weapon calculations into an ordered, fully shown bucket sequence.",
+            ),
+            ReleaseNote(
+                ReleaseSection.IMPROVEMENTS,
+                "Damage breakdowns now distinguish additive Weapon Damage, Total Weapon "
+                "Damage, HSD/CHD, target layers, DTOC, team effects, and amplifiers.",
+            ),
+            ReleaseNote(
+                ReleaseSection.MAINTENANCE,
+                "Scheduling uses daylight-saving-aware timezones and PostgreSQL-backed "
+                "events and RSVPs, with persistent Discord controls restored at startup.",
+            ),
+        ),
+    ),
+    Release(
+        release_id="automatic-c72efd2ce168db74",
+        update_number=17,
+        version="V0.1.16",
+        released_on=date(2026, 8, 31),
+        automatic=True,
+        notes=(
+            ReleaseNote(
+                ReleaseSection.MAINTENANCE,
+                "Recorded the live scheduler startup refinement through ERIN's automatic "
+                "deployment fingerprint and chronological patch-note fallback.",
+            ),
+        ),
+    ),
+    Release(
+        release_id="erin-update-18",
+        update_number=18,
+        version="V0.1.17",
+        released_on=date(2026, 8, 31),
+        notes=(
+            ReleaseNote(
+                ReleaseSection.FIXES,
+                "The scheduling feature now creates and reconciles its opt-in Raid & "
+                "Incursion Matchmaking role even when full automatic server bootstrap is off.",
+            ),
+            ReleaseNote(
+                ReleaseSection.MAINTENANCE,
+                "Completed live migration, role, channel, pinned alert panel, persistent "
+                "component, and container health verification for the scheduler rollout.",
+            ),
+        ),
+    ),
 )
