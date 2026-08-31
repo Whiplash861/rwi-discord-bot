@@ -35,7 +35,21 @@ def render_erin_introduction() -> str:
         "You can reply in one message—for example: `Platform: PC. I play both. SHD 2500, "
         "Expertise 20. Gamertag: AgentName. Playstyle: support and skill builds.` If "
         "something appears to be real-world personal information, I will withhold it and "
-        "ask you to clarify instead of adding it to your profile."
+        "ask you to clarify instead of adding it to your profile. If you prefer one "
+        "question at a time, say `Start my personalization interview`."
+    )
+
+
+def render_erin_interview_start() -> str:
+    return (
+        "Absolutely. I'm **ERIN**—Enhanced Reconnaissance, Intelligence, and Navigation—"
+        "RWI's intelligence agent. I'll take you through the same optional profile setup "
+        "offered to new members. Your answers only personalize my builds, advice, and "
+        "recommendations; you can say `skip` for any question or `stop interview` at any "
+        "time. Please share only game-related details you want saved.\n\n"
+        "**Question 1 of 6 — Platform**\n"
+        "Which platform or platforms do you play The Division 2 on: PC, Xbox, or "
+        "PlayStation?"
     )
 
 

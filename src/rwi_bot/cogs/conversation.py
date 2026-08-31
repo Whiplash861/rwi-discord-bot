@@ -11,6 +11,7 @@ from discord.ext import commands
 
 from rwi_bot.bot import names
 from rwi_bot.bot.client import RwiBot
+from rwi_bot.cogs.onboarding import render_erin_interview_start
 from rwi_bot.domain.schemas import (
     AnswerRequest,
     AnswerResult,
@@ -67,6 +68,7 @@ class ConversationCog(commands.Cog):
         self._public_memory: defaultdict[int, deque[ConversationTurn]] = defaultdict(
             lambda: deque(maxlen=6)
         )
+        self._profile_interviews: dict[int, int] = {}
 
     @commands.Cog.listener()
     async def on_message(self, message: discord.Message) -> None:
@@ -134,6 +136,31 @@ class ConversationCog(commands.Cog):
                     )
                     await destination.send(reply)
                     return
+
+            if is_dm and is_profile_interview_request(message.content):
+                self._profile_interviews[message.author.id] = 0
+                reply = render_erin_interview_start()
+                await destination.send(reply)
+                self._remember_local_exchange(
+                    session_key=session_key,
+                    destination_id=destination.id,
+                    is_dm=True,
+                    author_id=message.author.id,
+                    member_label=member_label,
+                    member_text=message.content,
+                    assistant_text=reply,
+                    answer_kind="profile_interview",
+                )
+                return
+
+            if is_dm and message.author.id in self._profile_interviews:
+                await self._handle_profile_interview_response(
+                    message=message,
+                    destination=destination,
+                    session_key=session_key,
+                    member_label=member_label,
+                )
+                return
 
             if is_source_request(message.content):
                 if prior_turn is None:
@@ -432,6 +459,117 @@ class ConversationCog(commands.Cog):
             parts.append(f"Member {label}: {turn.member}\nERIN answering {label}: {turn.assistant}")
         return "\n\n".join(parts)[:6000]
 
+    async def _handle_profile_interview_response(
+        self,
+        *,
+        message: discord.Message,
+        destination: discord.abc.Messageable,
+        session_key: tuple[int, int],
+        member_label: str,
+    ) -> None:
+        user_id = message.author.id
+        step_index = self._profile_interviews[user_id]
+        response = message.content.strip()
+
+        if is_profile_interview_stop(response):
+            self._profile_interviews.pop(user_id, None)
+            current_profile = await self.bot.services.profiles.get_answer_profile(user_id)
+            reply = (
+                "Interview stopped. I kept only the game-profile details you explicitly "
+                "saved. You can restart it whenever you want.\n\n"
+                + render_member_profile(current_profile)
+            )
+            await destination.send(reply)
+            self._remember_local_exchange(
+                session_key=session_key,
+                destination_id=message.channel.id,
+                is_dm=True,
+                author_id=user_id,
+                member_label=member_label,
+                member_text=message.content,
+                assistant_text=reply,
+                answer_kind="profile_interview",
+            )
+            return
+
+        acknowledgment = "Skipped."
+        profile: MemberAnswerProfile | None = None
+        if not is_profile_interview_skip(response):
+            normalized = profile_interview_update_text(step_index, response)
+            inference = infer_member_profile_update(normalized)
+            if inference is None:
+                await destination.send(
+                    "I couldn't map that answer to this profile field. Use the format in "
+                    "the question, say `skip`, or say `stop interview`.\n\n"
+                    + profile_interview_question(step_index)
+                )
+                return
+            if inference.update.fields:
+                profile = await self.bot.services.profiles.update_answer_profile(
+                    user_id,
+                    inference.update,
+                )
+                await self.bot.services.audit.record(
+                    AuditRecord(
+                        event_type="profile.answer_preferences_updated",
+                        actor_id=user_id,
+                        target_type="user_profile",
+                        target_id="self",
+                        reason="Explicit member self-report during optional profile interview",
+                        details={
+                            "fields": list(inference.update.fields),
+                            "is_dm": True,
+                            "interview_step": step_index + 1,
+                        },
+                    )
+                )
+            else:
+                profile = await self.bot.services.profiles.get_answer_profile(user_id)
+            if inference.sensitive_flags:
+                reply = self._profile_update_reply(profile, inference)
+                await destination.send(reply)
+                self._remember_local_exchange(
+                    session_key=session_key,
+                    destination_id=message.channel.id,
+                    is_dm=True,
+                    author_id=user_id,
+                    member_label=member_label,
+                    member_text="[possible personal information withheld]",
+                    assistant_text=reply,
+                    answer_kind="privacy_clarification",
+                )
+                return
+            if not inference.update.fields:
+                reply = self._profile_update_reply(profile, inference)
+                await destination.send(f"{reply}\n\n{profile_interview_question(step_index)}")
+                return
+            saved_fields = ", ".join(field.replace("_", " ") for field in inference.update.fields)
+            acknowledgment = f"Saved: {saved_fields}."
+
+        next_step = step_index + 1
+        if next_step < len(_PROFILE_INTERVIEW_QUESTIONS):
+            self._profile_interviews[user_id] = next_step
+            reply = f"{acknowledgment}\n\n{profile_interview_question(next_step)}"
+        else:
+            self._profile_interviews.pop(user_id, None)
+            profile = profile or await self.bot.services.profiles.get_answer_profile(user_id)
+            reply = (
+                f"{acknowledgment}\n\n**Personalization interview complete.** You can "
+                "change or remove any profile detail at any time.\n\n"
+                + render_member_profile(profile)
+            )
+        await destination.send(reply)
+        self._remember_local_exchange(
+            session_key=session_key,
+            destination_id=message.channel.id,
+            is_dm=True,
+            author_id=user_id,
+            member_label=member_label,
+            member_text=message.content,
+            assistant_text=reply,
+            answer_kind="profile_interview",
+        )
+
     def clear_user_memory(self, user_id: int) -> int:
         keys = [key for key in self._memory if key[0] == user_id]
         for key in keys:
@@ -609,6 +747,91 @@ class ConversationCog(commands.Cog):
         chunks = split_discord_message(body)
         for chunk in chunks:
             await destination.send(chunk)
+
+
+_PROFILE_INTERVIEW_QUESTIONS = (
+    "**Question 1 of 6 — Platform**\nWhich platform or platforms do you play The "
+    "Division 2 on: PC, Xbox, or PlayStation?",
+    "**Question 2 of 6 — Focus**\nDo you mainly play PvE, PvP, or both?",
+    "**Question 3 of 6 — Progression**\nWhat are your current SHD and Expertise "
+    "levels? For example: `SHD 2500, Expertise 20`.",
+    "**Question 4 of 6 — Game identity**\nWould you like to save a gamertag or Ubisoft "
+    "Connect name? This is optional; do not provide your real name.",
+    "**Question 5 of 6 — Playstyle**\nWhat roles or playstyles do you prefer? For "
+    "example: `Healer main`, `sniper`, `close-range DPS`, or `team support`.",
+    "**Question 6 of 6 — Additional notes**\nShare any other game-relevant experience, "
+    "preferences, likes, or dislikes you want me to remember. For example: `Beta tester "
+    "and day-one player; likes sniper rifles; dislikes Tank builds.`",
+)
+_PROFILE_INTERVIEW_REQUEST = re.compile(
+    r"\b(?:personalization|personalisation|onboarding|profile|new[- ]member)\s+"
+    r"(?:interview|questions?|setup)\b|"
+    r"\bpretend\s+(?:that\s+)?i(?:'m|\s+am)\s+(?:a\s+)?new\s+member\b",
+    re.IGNORECASE,
+)
+_PROFILE_INTERVIEW_SKIP = re.compile(
+    r"^\s*(?:skip|pass|none|n/?a|no\s+thanks?|prefer\s+not\s+to\s+(?:say|share))"
+    r"[.!]?\s*$",
+    re.IGNORECASE,
+)
+_PROFILE_INTERVIEW_STOP = re.compile(
+    r"^\s*(?:stop|cancel|end|quit)(?:\s+(?:the\s+)?interview)?[.!]?\s*$",
+    re.IGNORECASE,
+)
+
+
+def is_profile_interview_request(text: str) -> bool:
+    return _PROFILE_INTERVIEW_REQUEST.search(" ".join(text.split())) is not None
+
+
+def is_profile_interview_skip(text: str) -> bool:
+    return _PROFILE_INTERVIEW_SKIP.fullmatch(" ".join(text.split())) is not None
+
+
+def is_profile_interview_stop(text: str) -> bool:
+    return _PROFILE_INTERVIEW_STOP.fullmatch(" ".join(text.split())) is not None
+
+
+def profile_interview_question(step_index: int) -> str:
+    return _PROFILE_INTERVIEW_QUESTIONS[step_index]
+
+
+def profile_interview_update_text(step_index: int, text: str) -> str:
+    clean = " ".join(text.split())
+    if step_index == 0:
+        return (
+            clean
+            if re.search(r"\bplatforms?\s*[:=]", clean, re.IGNORECASE)
+            else (f"Platform: {clean}")
+        )
+    if step_index == 1:
+        lowered = clean.casefold()
+        if "both" in lowered or ("pve" in lowered and "pvp" in lowered):
+            return "I play both"
+        if "pvp" in lowered:
+            return "I play PvP"
+        if "pve" in lowered:
+            return "I play PvE"
+        return clean
+    if step_index == 2:
+        return clean
+    if step_index == 3:
+        return (
+            clean
+            if re.search(r"\b(?:gamertag|ubisoft)", clean, re.IGNORECASE)
+            else (f"Gamertag: {clean}")
+        )
+    if step_index == 4:
+        return (
+            clean
+            if re.search(r"\bplaystyle\s*[:=]", clean, re.IGNORECASE)
+            else (f"Playstyle: {clean}")
+        )
+    return (
+        clean
+        if re.search(r"\b(?:add|save|note|remember)\b.{0,30}\bprofile\b", clean, re.IGNORECASE)
+        else f"Add to my profile: {clean}"
+    )
 
 
 _CANNOT_SUPPLY_ANSWER = re.compile(

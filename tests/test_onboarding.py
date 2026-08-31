@@ -126,6 +126,7 @@ def test_erin_introduction_is_optional_and_explains_open_ended_profile_notes() -
     assert "like sniper rifles" in message
     assert "dislike Tank builds" in message
     assert "real-world personal information" in message
+    assert "Start my personalization interview" in message
     assert "/privacy reset" in message
 
 

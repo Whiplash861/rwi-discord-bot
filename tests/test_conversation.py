@@ -10,7 +10,9 @@ import pytest
 from rwi_bot.cogs.conversation import (
     ConversationCog,
     ConversationTurn,
+    is_profile_interview_request,
     member_cannot_supply_answer,
+    profile_interview_update_text,
     split_discord_message,
 )
 from rwi_bot.db.models import CacheState
@@ -102,6 +104,109 @@ def test_private_dm_context_does_not_include_public_thread_memory() -> None:
     assert summary is not None
     assert "private answer" in summary
     assert "public answer" not in summary
+
+
+def test_dm_personalization_interview_intent_matches_member_simulation_request() -> None:
+    assert is_profile_interview_request(
+        "I want you to take me through the personalization interview that you would send "
+        "to brand new members. Pretend I am a new member."
+    )
+    assert is_profile_interview_request("Start my profile setup")
+    assert not is_profile_interview_request("How do I get through the Dark Hours raid?")
+
+
+def test_profile_interview_answers_are_labeled_for_the_existing_profile_parser() -> None:
+    assert profile_interview_update_text(0, "PC and Xbox") == "Platform: PC and Xbox"
+    assert profile_interview_update_text(1, "Mostly PvE, but some PvP") == "I play both"
+    assert profile_interview_update_text(3, "AgentName") == "Gamertag: AgentName"
+    assert profile_interview_update_text(4, "Healer main") == "Playstyle: Healer main"
+    assert profile_interview_update_text(5, "day-one player") == (
+        "Add to my profile: day-one player"
+    )
+
+
+@pytest.mark.asyncio
+async def test_profile_interview_saves_answer_and_advances_to_next_question() -> None:
+    profile = MemberAnswerProfile(
+        assumptions=AnswerAssumptions(platforms=["PC"]),
+        detail_tier=AnswerTier.STANDARD,
+        persisted=True,
+    )
+    profiles = SimpleNamespace(
+        update_answer_profile=AsyncMock(return_value=profile),
+        get_answer_profile=AsyncMock(return_value=profile),
+    )
+    audit = SimpleNamespace(record=AsyncMock())
+    cog = ConversationCog(
+        cast(
+            Any,
+            SimpleNamespace(
+                services=SimpleNamespace(
+                    profiles=profiles,
+                    audit=audit,
+                )
+            ),
+        )
+    )
+    cog._profile_interviews[42] = 0
+    destination = SimpleNamespace(send=AsyncMock())
+    message = SimpleNamespace(
+        author=SimpleNamespace(id=42),
+        content="PC",
+        channel=SimpleNamespace(id=99),
+    )
+
+    await cog._handle_profile_interview_response(
+        message=cast(Any, message),
+        destination=cast(Any, destination),
+        session_key=(42, 99),
+        member_label="Agent",
+    )
+
+    update = profiles.update_answer_profile.call_args.args[1]
+    assert update.platforms == ("PC",)
+    assert cog._profile_interviews[42] == 1
+    assert "Question 2 of 6" in destination.send.call_args.args[0]
+    audit.record.assert_awaited_once()
+
+
+@pytest.mark.asyncio
+async def test_profile_interview_withholds_possible_personal_information() -> None:
+    profile = MemberAnswerProfile(assumptions=AnswerAssumptions())
+    profiles = SimpleNamespace(
+        update_answer_profile=AsyncMock(return_value=profile),
+        get_answer_profile=AsyncMock(return_value=profile),
+    )
+    cog = ConversationCog(
+        cast(
+            Any,
+            SimpleNamespace(
+                services=SimpleNamespace(
+                    profiles=profiles,
+                    audit=SimpleNamespace(record=AsyncMock()),
+                )
+            ),
+        )
+    )
+    cog._profile_interviews[42] = 5
+    destination = SimpleNamespace(send=AsyncMock())
+    message = SimpleNamespace(
+        author=SimpleNamespace(id=42),
+        content="My birthday is January 1",
+        channel=SimpleNamespace(id=99),
+    )
+
+    await cog._handle_profile_interview_response(
+        message=cast(Any, message),
+        destination=cast(Any, destination),
+        session_key=(42, 99),
+        member_label="Agent",
+    )
+
+    profiles.update_answer_profile.assert_not_awaited()
+    assert cog._profile_interviews[42] == 5
+    assert "possible personal information" in destination.send.call_args.args[0]
+    assert cog._memory[(42, 99)][-1].member == "[possible personal information withheld]"
 
 
 def test_any_public_participant_can_build_on_the_latest_erin_answer() -> None:

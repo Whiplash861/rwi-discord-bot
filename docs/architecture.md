@@ -112,6 +112,10 @@ member. Answer generation uses those values silently. ERIN mentions a setting on
 it materially explains a recommendation, resolves an ambiguity, or the member asks; no
 standard assumptions footer is appended.
 
+An explicit DM request for the personalization/onboarding interview enters a six-step local
+state machine. Interview replies reuse the deterministic profile parser and privacy filter;
+they never enter the game-knowledge answer or unanswered-ticket path.
+
 All current-game paths share the `Y8S3 Red Horizon` version in their cache signature.
 Local knowledge and Community Builds retrieval are constrained to that version, and the
 August 27, 2026 launch date is passed to the answer model as a hard freshness boundary.

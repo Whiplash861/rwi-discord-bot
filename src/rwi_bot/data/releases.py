@@ -451,4 +451,27 @@ RELEASES: tuple[Release, ...] = (
             ),
         ),
     ),
+    Release(
+        release_id="erin-update-15",
+        update_number=15,
+        version="V0.1.14",
+        released_on=date(2026, 8, 31),
+        notes=(
+            ReleaseNote(
+                ReleaseSection.FIXES,
+                "DM requests for the new-member personalization interview now enter the "
+                "profile workflow instead of being treated as unanswered game questions.",
+            ),
+            ReleaseNote(
+                ReleaseSection.NEW_FEATURES,
+                "Added a guided six-question profile interview covering platform, focus, "
+                "progression, gamertag, playstyle, and open-ended game preferences.",
+            ),
+            ReleaseNote(
+                ReleaseSection.PRIVACY_SAFETY,
+                "Every interview field is optional, supports skip or stop, and uses the "
+                "same personal-information withholding and clarification safeguards.",
+            ),
+        ),
+    ),
 )

@@ -55,6 +55,8 @@ removals persist across threads and DMs. Suspected real-world personal data is w
 before persistence or model use; ERIN asks for clarification using only a redacted local
 marker, and a sensitive confirmation clears that temporary conversation memory and any
 matching legacy profile notes.
+Members who prefer a guided setup can ask ERIN in DMs to start the personalization
+interview; she then collects six optional profile categories one question at a time.
 
 Substantial factual corrections in public ERIN conversations can enter a moderated
 community-memory queue. ERIN archives the claim for experienced-member review in

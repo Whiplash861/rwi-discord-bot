@@ -290,6 +290,8 @@ playstyle, and up to 20 explicit game-relevant notes. Natural notes cover experi
 main roles, likes, and dislikes; `Add to my profile: ...` stores another note and
 `forget that ...` removes it. New members receive one private introduction after
 membership screening. Sharing profile information is optional and does not affect access.
+In DMs, `Start my personalization interview` (and equivalent onboarding/profile-interview
+requests) starts a guided six-question flow. Members may skip any field or stop at any time.
 
 Potential real-world personal data is never written as a profile update or sent into the
 answer path. ERIN asks whether the withheld text was sensitive or game-related while
