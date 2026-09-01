@@ -8,6 +8,10 @@ from rwi_bot.config import Settings
 from rwi_bot.db.repositories import AuditRepository, DisciplineRepository, UsageRepository
 from rwi_bot.db.session import Database
 from rwi_bot.services.audit import AuditService
+from rwi_bot.services.autonomous_research import (
+    AutonomousResearchService,
+    AutonomyStateStore,
+)
 from rwi_bot.services.budget import BudgetGuard
 from rwi_bot.services.community import CommunityLoadoutRepository
 from rwi_bot.services.community_learning import CommunityClaimRepository
@@ -19,6 +23,7 @@ from rwi_bot.services.qa import QuestionAnsweringService
 from rwi_bot.services.reference_catalog import Division2ReferenceCatalog
 from rwi_bot.services.releases import ReleaseHistoryRepository
 from rwi_bot.services.seeding import apply_red_horizon_seed
+from rwi_bot.services.video_inspection import VideoInspectionService
 
 
 @dataclass(slots=True)
@@ -41,6 +46,8 @@ class AppServices:
     operations: OperationRepository
     ai: RwiOpenAIClient
     qa: QuestionAnsweringService
+    video_inspection: VideoInspectionService
+    autonomous_research: AutonomousResearchService
 
 
 async def build_services(settings: Settings) -> AppServices:
@@ -94,6 +101,34 @@ async def build_services(settings: Settings) -> AppServices:
         current_game_version=settings.current_game_version,
         current_game_version_started_on=settings.current_game_version_started_on,
     )
+    video_inspection = VideoInspectionService(
+        ai=ai,
+        audit=audit,
+        enabled=settings.video_inspection_enabled,
+        maximum_duration_seconds=settings.video_max_duration_seconds,
+        maximum_bytes=settings.video_max_bytes,
+        sample_frames=settings.video_sample_frames,
+        ffmpeg_binary=settings.ffmpeg_binary,
+        ffprobe_binary=settings.ffprobe_binary,
+    )
+    autonomous_research = AutonomousResearchService(
+        ai=ai,
+        knowledge=knowledge,
+        cache=cache,
+        qa=qa,
+        audit=audit,
+        state_store=AutonomyStateStore(
+            settings.runtime_dir / "autonomy-state.json",
+            initial_game_version=settings.current_game_version,
+            initial_started_on=settings.current_game_version_started_on,
+        ),
+        owner_user_id=settings.owner_user_id,
+        enabled=settings.autonomous_research_enabled,
+        full_sweep_hours=settings.autonomous_full_sweep_hours,
+        maximum_findings=settings.autonomous_max_findings_per_run,
+        auto_promote_official=settings.autonomous_auto_promote_official,
+    )
+    await autonomous_research.initialize()
     return AppServices(
         settings=settings,
         database=database,
@@ -113,4 +148,6 @@ async def build_services(settings: Settings) -> AppServices:
         operations=operations,
         ai=ai,
         qa=qa,
+        video_inspection=video_inspection,
+        autonomous_research=autonomous_research,
     )

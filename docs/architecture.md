@@ -30,8 +30,9 @@ original Discord post. Security, moderation, and immutable audit records remain 
 and are identified as such before reset.
 
 PostgreSQL is authoritative for versioned application data. Discord is an interaction
-and review surface. The local runtime volume holds the emergency maintenance state so a
-database outage cannot silently reactivate paid or automated work.
+and review surface. The local runtime volume holds the emergency maintenance state and
+the last successful autonomous-research checkpoint so a database outage cannot silently
+reactivate paid work or forget the active season boundary.
 
 ## Request path
 
@@ -116,11 +117,45 @@ An explicit DM request for the personalization/onboarding interview enters a six
 state machine. Interview replies reuse the deterministic profile parser and privacy filter;
 they never enter the game-knowledge answer or unanswered-ticket path.
 
-All current-game paths share the `Y8S3 Red Horizon` version in their cache signature.
-Local knowledge and Community Builds retrieval are constrained to that version, and the
-August 27, 2026 launch date is passed to the answer model as a hard freshness boundary.
-Older material may explain history but cannot support present-day stats, acquisition
-routes, system behavior, bugs, or fixes.
+All current-game paths share the runtime active version in their cache signature. The
+initial value is `Y8S3 Red Horizon`, and its August 27, 2026 launch date is the initial
+hard freshness boundary. A retrieved official season announcement can advance both
+values; that transition stales reusable answers from the former version. Older material
+may explain history but cannot support present-day stats, acquisition routes, system
+behavior, bugs, or fixes.
+
+## Short gameplay-video path
+
+One attached MP4, MOV, M4V, WebM, MKV, or AVI recording can enter the answer path when it
+is no larger than the configured byte limit and its decoded media duration is at most 30
+seconds. Filename and claimed MIME type are not trusted: FFprobe verifies an actual video
+stream, dimensions, and duration. FFmpeg samples a bounded set of ordered JPEG frames;
+the Responses API receives those frames as non-stored image inputs with approximate
+timestamps. ERIN describes visible evidence and temporal gaps, never claims audio was
+analyzed, and does not promote observations to shared game truth.
+
+The raw upload and extracted frames live only in a temporary directory that is removed
+before Discord receives the answer. Audit state contains duration, byte count, frame
+count, and retention status—not the filename, raw bytes, frame content, or member text.
+Unsupported, oversized, corrupt, overlong, or slow-decoding files fail closed.
+
+## Guarded autonomous research
+
+A single process-locked monitor checks the live game every configured interval and runs a
+full curated sweep at least daily. Autonomous calls use their own spending class, which
+cannot consume the member budget reserve. The search plan prioritizes Ubisoft and the
+exact official Known Issues Trello URL; full sweeps also gather creator-video, wiki,
+forum, Reddit, Q&A, and player-feedback leads. Every returned finding must cite a URL
+actually retained from the provider's web-search output.
+
+A season transition requires a newer or equal dated boundary plus at least one retrieved
+official citation. It changes the runtime game version, persists the checkpoint, and
+stales all active or candidate answer caches. A finding can auto-promote only when it is
+material, at least 0.95 confidence, supported entirely by official citations, and has a
+known publication date at or after the active season boundary. Everything else is stored
+as a candidate and summarized in `#technician-lab`; community material can never promote
+itself. Failures retain the prior season and knowledge state and write a human-readable
+audit event. Durable maintenance disables the loop and manual research execution.
 
 Normal Discord answers omit explicit citations and source links. Citations remain attached
 to the in-process conversation turn, and a source-only follow-up returns that stored list
@@ -198,8 +233,9 @@ requirements, distinguishes gear and weapon Exotic limits, and records the defau
 combination counts. An impossible result is considered proven only when every legal
 combination was evaluated; capped searches are labeled incomplete instead.
 
-An answer produced from the web remains externally sourced. It is not promoted to
-verified knowledge automatically.
+An ordinary member answer produced from the web remains externally sourced and is not
+promoted automatically. Only the separate guarded research pipeline can auto-promote a
+strictly official, dated finding under the constraints above.
 
 Substantial factual follow-ups to ERIN's own public answers are detected locally using a
 conservative assertion threshold; questions, short opinions, DMs, and opted-out member

@@ -783,6 +783,16 @@ class CacheRepository:
         async with self.database.session() as session:
             return await _invalidate_cache_dependencies(session, revision_id)
 
+    async def invalidate_all(self) -> int:
+        """Mark every reusable answer stale after a global game-version transition."""
+        async with self.database.session() as session:
+            result = await session.execute(
+                update(AnswerCache)
+                .where(AnswerCache.state.in_([CacheState.ACTIVE.value, CacheState.CANDIDATE.value]))
+                .values(state=CacheState.STALE.value)
+            )
+            return int(cast(Any, result).rowcount or 0)
+
 
 async def _invalidate_cache_dependencies(session: AsyncSession, revision_id: UUID) -> int:
     statement = (

@@ -47,6 +47,14 @@ def test_settings_reject_inverted_spam_thresholds() -> None:
         valid_settings(spam_burst_messages=10, spam_severe_messages=9)
 
 
+def test_settings_reject_inverted_autonomy_intervals() -> None:
+    with pytest.raises(ValidationError, match="full sweep interval"):
+        valid_settings(
+            autonomous_research_interval_hours=24,
+            autonomous_full_sweep_hours=12,
+        )
+
+
 def test_settings_repr_does_not_reveal_secrets() -> None:
     settings = valid_settings()
 

@@ -58,6 +58,19 @@ class Settings(BaseSettings):
     current_game_version_started_on: date = date(2026, 8, 27)
     community_loadout_indexing_enabled: bool = True
 
+    video_inspection_enabled: bool = True
+    video_max_duration_seconds: int = Field(default=30, ge=1, le=60)
+    video_max_bytes: int = Field(default=50_000_000, ge=1_000_000, le=100_000_000)
+    video_sample_frames: int = Field(default=12, ge=4, le=20)
+    ffmpeg_binary: str = "ffmpeg"
+    ffprobe_binary: str = "ffprobe"
+
+    autonomous_research_enabled: bool = True
+    autonomous_research_interval_hours: int = Field(default=6, ge=1, le=168)
+    autonomous_full_sweep_hours: int = Field(default=24, ge=6, le=720)
+    autonomous_max_findings_per_run: int = Field(default=20, ge=1, le=50)
+    autonomous_auto_promote_official: bool = True
+
     log_level: str = "INFO"
     runtime_dir: Path = Path("/data/runtime")
     auto_bootstrap_server: bool = False
@@ -117,6 +130,12 @@ class Settings(BaseSettings):
     def reserve_fits_budget(self) -> Settings:
         if self.member_reserve_usd > self.openai_hard_budget_usd:
             raise ValueError("member reserve cannot exceed the hard budget")
+        return self
+
+    @model_validator(mode="after")
+    def autonomy_intervals_are_ordered(self) -> Settings:
+        if self.autonomous_full_sweep_hours < self.autonomous_research_interval_hours:
+            raise ValueError("autonomous full sweep interval cannot be below check interval")
         return self
 
     @model_validator(mode="after")

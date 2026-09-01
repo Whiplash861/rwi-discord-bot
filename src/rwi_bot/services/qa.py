@@ -98,6 +98,11 @@ class QuestionAnsweringService:
         self.current_game_version_started_on = current_game_version_started_on
         self.log = structlog.get_logger("qa")
 
+    def set_current_game_version(self, game_version: str, started_on: date) -> None:
+        """Atomically switch the freshness boundary used by future answer requests."""
+        self.current_game_version = game_version
+        self.current_game_version_started_on = started_on
+
     async def answer(self, request: AnswerRequest) -> AnswerResult:
         correlation_id = uuid4()
         if self.maintenance.halted:

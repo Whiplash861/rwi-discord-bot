@@ -681,4 +681,42 @@ RELEASES: tuple[Release, ...] = (
             ),
         ),
     ),
+    Release(
+        release_id="erin-update-23",
+        update_number=23,
+        version="V0.1.22",
+        released_on=date(2026, 8, 31),
+        notes=(
+            ReleaseNote(
+                ReleaseSection.NEW_FEATURES,
+                "ERIN can now visually inspect one user-supplied Division 2 gameplay video "
+                "up to 30 seconds using ordered timestamped frames.",
+            ),
+            ReleaseNote(
+                ReleaseSection.PRIVACY_SAFETY,
+                "Gameplay recordings and extracted frames are temporary, filenames are not "
+                "audited, audio is excluded, and raw media is deleted before the reply.",
+            ),
+            ReleaseNote(
+                ReleaseSection.HIGH_IMPACT,
+                "Added guarded autonomous game-update research with official season detection, "
+                "dynamic freshness boundaries, and automatic stale-cache invalidation.",
+            ),
+            ReleaseNote(
+                ReleaseSection.PRIVACY_SAFETY,
+                "Only dated, high-confidence official findings can auto-promote; creator, "
+                "forum, Q&A, Reddit, and player findings remain review-gated candidates.",
+            ),
+            ReleaseNote(
+                ReleaseSection.NEW_FEATURES,
+                "Staff can inspect autonomous research state or request a full cross-source "
+                "sweep with the new research-status and research-now commands.",
+            ),
+            ReleaseNote(
+                ReleaseSection.MAINTENANCE,
+                "Added FFmpeg media verification, configurable video and research limits, "
+                "budget-reserved autonomy, safe failure audits, and regression coverage.",
+            ),
+        ),
+    ),
 )

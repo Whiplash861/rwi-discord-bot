@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from datetime import datetime
 from uuid import UUID
 
 import discord
@@ -103,6 +104,62 @@ class AdminCog(commands.Cog):
             ephemeral=True,
         )
 
+    @rwi.command(
+        name="research-status",
+        description="Show ERIN's autonomous game-update research state",
+    )
+    async def research_status(self, interaction: discord.Interaction) -> None:
+        if not self._maintenance_operator(interaction):
+            await self._deny(interaction)
+            return
+        state = await self.bot.services.autonomous_research.status()
+        last_check = (
+            discord.utils.format_dt(datetime.fromisoformat(state.last_check_at), style="R")
+            if state.last_check_at
+            else "Never"
+        )
+        await interaction.response.send_message(
+            f"**Active game version:** {state.current_game_version}\n"
+            f"**Season boundary:** {state.season_started_on}\n"
+            f"**Last check:** {last_check}\n"
+            f"**Last status:** {state.last_status}\n"
+            f"**Consecutive failures:** {state.consecutive_failures}\n\n"
+            f"{state.last_summary}",
+            ephemeral=True,
+        )
+
+    @rwi.command(
+        name="research-now",
+        description="Run a guarded full game-update research sweep now",
+    )
+    async def research_now(self, interaction: discord.Interaction) -> None:
+        if not self._maintenance_operator(interaction):
+            await self._deny(interaction)
+            return
+        if self.bot.services.maintenance.halted:
+            await interaction.response.send_message(
+                "Autonomous research is disabled while ERIN is in maintenance mode.",
+                ephemeral=True,
+            )
+            return
+        await interaction.response.defer(ephemeral=True, thinking=True)
+        try:
+            outcome = await self.bot.services.autonomous_research.run_once(force_full=True)
+        except Exception:
+            await interaction.followup.send(
+                "The research sweep failed safely. No game-version or knowledge changes were "
+                "applied; see `rwi-bot-ops` for the diagnostic event.",
+                ephemeral=True,
+            )
+            return
+        await interaction.followup.send(
+            f"Research complete for **{self.bot.services.qa.current_game_version}**. "
+            f"Promoted **{outcome.promoted}** official findings, staged "
+            f"**{outcome.staged}** for review, and skipped **{outcome.duplicates}** duplicates.\n\n"
+            f"{outcome.summary}",
+            ephemeral=True,
+        )
+
     @rwi.command(name="resume", description="Run health checks and leave maintenance mode")
     @app_commands.describe(force="Owner-only override when a critical health check fails")
     async def resume(self, interaction: discord.Interaction, force: bool = False) -> None:
@@ -141,6 +198,9 @@ class AdminCog(commands.Cog):
             releases = self.bot.get_cog("ReleaseNotesCog")
             if releases is not None:
                 releases.schedule_publish()  # type: ignore[attr-defined]
+            autonomy = self.bot.get_cog("AutonomyCog")
+            if autonomy is not None:
+                autonomy.schedule_start()  # type: ignore[attr-defined]
         await interaction.followup.send(f"{heading}\n\n" + "\n".join(lines), ephemeral=True)
 
     @rwi.command(

@@ -4,7 +4,11 @@ ENV PYTHONDONTWRITEBYTECODE=1 \
     PYTHONUNBUFFERED=1 \
     PIP_DISABLE_PIP_VERSION_CHECK=1
 
-RUN groupadd --system rwi && useradd --system --gid rwi --create-home rwi
+RUN apt-get update \
+    && apt-get install --no-install-recommends --yes ffmpeg \
+    && rm -rf /var/lib/apt/lists/* \
+    && groupadd --system rwi \
+    && useradd --system --gid rwi --create-home rwi
 
 WORKDIR /app
 COPY pyproject.toml README.md ./

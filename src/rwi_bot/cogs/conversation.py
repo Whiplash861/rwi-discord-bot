@@ -35,6 +35,7 @@ from rwi_bot.services.member_profiles import (
 )
 from rwi_bot.services.rate_limit import MemberRateLimiter
 from rwi_bot.services.sources import hide_source_links, is_source_request, render_sources
+from rwi_bot.services.video_inspection import VideoInspectionError
 
 
 @dataclass(slots=True)
@@ -77,7 +78,13 @@ class ConversationCog(commands.Cog):
 
     @commands.Cog.listener()
     async def on_message(self, message: discord.Message) -> None:
-        if message.author.bot or not message.content.strip():
+        video_service = getattr(self.bot.services, "video_inspection", None)
+        video_attachments = [
+            attachment
+            for attachment in getattr(message, "attachments", ())
+            if video_service is not None and video_service.supports_attachment(attachment)
+        ]
+        if message.author.bot or (not message.content.strip() and not video_attachments):
             return
         is_dm = isinstance(message.channel, discord.DMChannel)
         if is_dm:
@@ -109,6 +116,57 @@ class ConversationCog(commands.Cog):
         session_key = (message.author.id, destination.id)
         member_label = self._member_label(message.author.display_name)
         async with self._locks[session_key]:
+            if video_attachments:
+                assert video_service is not None
+                if len(video_attachments) > 1:
+                    await destination.send(
+                        "Send one gameplay recording at a time so I can preserve its sequence "
+                        "and give you a precise inspection."
+                    )
+                    return
+                retry_after = await self.rate_limiter.acquire(message.author.id)
+                if retry_after is not None:
+                    seconds = max(int(retry_after.total_seconds()), 1)
+                    await message.reply(
+                        f"You've reached the fair-use limit. Try again in about {seconds} seconds."
+                    )
+                    return
+                try:
+                    async with destination.typing():
+                        inspection = await video_service.inspect(
+                            video_attachments[0],
+                            question=message.content,
+                            user_id=message.author.id,
+                        )
+                except VideoInspectionError as exc:
+                    await destination.send(str(exc))
+                    return
+                reply = (
+                    f"{inspection.text}\n\n"
+                    f"*Visual inspection: {inspection.sampled_frames} sampled frames across "
+                    f"{inspection.duration_seconds:.1f}s. Audio was not analyzed, and the raw "
+                    "recording was discarded after inspection.*"
+                )
+                for chunk in split_discord_message(reply):
+                    await destination.send(chunk)
+                self._remember_local_exchange(
+                    session_key=session_key,
+                    destination_id=destination.id,
+                    is_dm=is_dm,
+                    author_id=message.author.id,
+                    member_label=member_label,
+                    member_text=(
+                        "[short gameplay recording] "
+                        + (
+                            message.content[:1000]
+                            if message.content.strip()
+                            else "General visual inspection requested."
+                        )
+                    ),
+                    assistant_text=inspection.text,
+                    answer_kind="video_inspection",
+                )
+                return
             prior_turn = self._memory[session_key][-1] if self._memory[session_key] else None
             inferred = infer_feedback(message.content)
             outcome = await self._apply_inferred_feedback(
@@ -770,7 +828,7 @@ class ConversationCog(commands.Cog):
             assumptions=request.assumptions.model_dump(mode="json"),
             constraints={
                 **interpreted.constraints,
-                "current_game_version": self.bot.services.settings.current_game_version,
+                "current_game_version": self.bot.services.qa.current_game_version,
             },
         )
 

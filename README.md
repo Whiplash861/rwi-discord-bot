@@ -6,7 +6,7 @@ Tom Clancy's The Division 2. It combines a versioned community knowledge library
 deterministic game calculations, Technician governance, and tightly budgeted OpenAI
 Responses API calls.
 
-The current catalog target is **Y8S3 Red Horizon**. ERIN can search structured claim
+The bundled baseline catalog target is **Y8S3 Red Horizon**. ERIN can search structured claim
 content—not only item titles—and can locally reference privacy-sanitized starter posts
 from the server's Community Builds forum before considering an OpenAI request. Community
 loadouts are presented as player submissions. Red Horizon's August 27, 2026 launch is
@@ -80,6 +80,22 @@ calculation requests use a deterministic sequence that displays every substituti
 running result across Weapon Damage, Total Weapon Damage, the shared active HSD/CHD
 bucket, DTA or DTH, DTOC, team effects in their verified categories, and independent
 amplifiers.
+
+Members can attach one gameplay recording up to 30 seconds in a DM or `#ask-rwi` request.
+ERIN verifies the real media stream and duration, samples ordered high-resolution frames,
+and analyzes visible HUD, loadout, combat, and mechanic changes with timestamp context.
+She labels inference, does not claim to hear audio, never stores the upload or filename,
+and records only privacy-safe technical metadata after the temporary media is deleted.
+
+ERIN also runs a budget-isolated game-update monitor every six hours and a full curated
+research sweep at least daily. It checks Ubisoft and the official Known Issues Trello,
+then surveys current creator videos, community references, Q&A forums, Reddit, and player
+discussion for corroborative leads. A new active season requires retrieved official
+evidence. Strict, dated, high-confidence official changes may enter active knowledge;
+community, creator, forum, and player findings remain candidates for Technician review.
+Verified season transitions update the answer freshness boundary and invalidate older
+answer caches. Staff can inspect this state with `/rwi research-status` or request a full
+sweep with `/rwi research-now`; maintenance mode stops all autonomous work.
 
 Members can ask ERIN in a DM, `#ask-rwi`, or another server channel to schedule Broken
 Rain, Paradise Lost, Dark Hours, or Iron Horse. ERIN collects the organizer's role and

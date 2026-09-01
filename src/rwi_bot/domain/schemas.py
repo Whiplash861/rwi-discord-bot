@@ -1,8 +1,8 @@
 from __future__ import annotations
 
-from datetime import UTC, datetime
+from datetime import UTC, date, datetime
 from enum import StrEnum
-from typing import Any
+from typing import Any, Literal
 from uuid import UUID
 
 from pydantic import BaseModel, Field, HttpUrl
@@ -114,3 +114,27 @@ class AuditRecord(BaseModel):
     reason: str | None = None
     correlation_id: UUID | None = None
     details: dict[str, Any] = Field(default_factory=dict)
+
+
+class GameResearchFinding(BaseModel):
+    subject: str = Field(min_length=1, max_length=300)
+    entity_type: str = Field(min_length=1, max_length=80)
+    claim_key: str = Field(min_length=1, max_length=160)
+    summary: str = Field(min_length=1, max_length=2000)
+    content: dict[str, Any]
+    context: dict[str, Any] = Field(default_factory=dict)
+    confidence: float = Field(ge=0.0, le=1.0)
+    evidence_class: Literal["official", "corroborated_community", "community_unverified"]
+    source_urls: list[HttpUrl] = Field(default_factory=list)
+    material_change: bool = False
+
+
+class GameResearchReport(BaseModel):
+    change_detected: bool
+    current_game_version: str = Field(min_length=1, max_length=80)
+    season_name: str = Field(min_length=1, max_length=120)
+    season_started_on: date | None = None
+    summary: str = Field(min_length=1, max_length=3000)
+    official_evidence_urls: list[HttpUrl] = Field(default_factory=list)
+    findings: list[GameResearchFinding] = Field(default_factory=list)
+    unresolved_questions: list[str] = Field(default_factory=list)

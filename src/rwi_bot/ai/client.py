@@ -1,7 +1,9 @@
 from __future__ import annotations
 
 import asyncio
+import json
 from dataclasses import dataclass
+from datetime import UTC, datetime
 from decimal import Decimal
 from enum import StrEnum
 from typing import Any
@@ -15,8 +17,9 @@ from tenacity import retry, retry_if_exception_type, stop_after_attempt, wait_ex
 
 from rwi_bot.ai.prompts import RWI_ANSWER_INSTRUCTIONS
 from rwi_bot.db.repositories import UsageRepository
-from rwi_bot.domain.schemas import ConfidenceLabel, SourceCitation
+from rwi_bot.domain.schemas import ConfidenceLabel, GameResearchReport, SourceCitation
 from rwi_bot.services.budget import (
+    BudgetDeniedError,
     BudgetGuard,
     SpendingClass,
     UsageAmounts,
@@ -46,6 +49,14 @@ class OpenAIAnswer:
     complete: bool = True
     incomplete_reason: str | None = None
     evidence_confidence: ConfidenceLabel = ConfidenceLabel.UNKNOWN
+
+
+@dataclass(slots=True)
+class OpenAIResearchResult:
+    report: GameResearchReport
+    citations: list[SourceCitation]
+    response_id: str
+    usage: UsageAmounts
 
 
 class RwiOpenAIClient:
@@ -104,6 +115,208 @@ class RwiOpenAIClient:
                 search_scope=search_scope,
                 spending_class=spending_class,
             )
+        finally:
+            await self.breaker.abandon(permit)
+
+    async def inspect_video_frames(
+        self,
+        *,
+        question: str,
+        frame_data_urls: tuple[str, ...],
+        timestamps: tuple[float, ...],
+        user_id: int,
+        correlation_id: UUID,
+    ) -> OpenAIAnswer:
+        """Inspect bounded, ordered gameplay frames without retaining the upload."""
+        if not frame_data_urls or len(frame_data_urls) != len(timestamps):
+            raise ValueError("video inspection requires matching frames and timestamps")
+        if self.maintenance.halted:
+            raise OpenAIUnavailableError("RWI is in maintenance mode.")
+        permit = await self.breaker.acquire()
+        if permit is None:
+            raise OpenAIUnavailableError("The OpenAI circuit breaker is open.")
+        model = self.complex_model
+        content: list[dict[str, Any]] = [
+            {
+                "type": "input_text",
+                "text": (
+                    "The member supplied a short The Division 2 gameplay recording. "
+                    f"Their request is: {question}\n\n"
+                    "Frames follow in chronological order and each label gives its approximate "
+                    "timestamp. Inspect visible UI, gear, stats, combat events, mechanics, and "
+                    "sequence. Clearly separate direct observations from inference. Do not claim "
+                    "to hear audio. Never infer identity or retain personal information. If the "
+                    "frames do not establish an answer, say exactly what is missing."
+                ),
+            }
+        ]
+        for frame, timestamp in zip(frame_data_urls, timestamps, strict=True):
+            content.append(
+                {"type": "input_text", "text": f"Approximate timestamp: {timestamp:.1f}s"}
+            )
+            content.append({"type": "input_image", "image_url": frame, "detail": "high"})
+        kwargs: dict[str, Any] = {
+            "model": model,
+            "instructions": (
+                "You are ERIN, RWI's Division 2 intelligence agent. Analyze only the supplied "
+                "recording frames and established game knowledge. Be precise, concise, and "
+                "honest about temporal gaps. Do not expose sources unless asked."
+            ),
+            "input": [{"role": "user", "content": content}],
+            "max_output_tokens": 2200,
+            "reasoning": {"effort": "medium"},
+            "store": False,
+        }
+        try:
+            async with self._semaphore:
+                async with self.budget.reserve(SpendingClass.MEMBER_ANSWER, Decimal("0.35")):
+                    response = await self._create_response(kwargs)
+                    text, citations, search_calls = _extract_output(response)
+                    usage = _extract_usage(response, search_calls)
+                    complete, incomplete_reason = _completion_state(
+                        response,
+                        output_tokens=usage.output_tokens,
+                        output_token_limit=2200,
+                    )
+                    await self.breaker.success()
+                    await self.usage_repository.append(
+                        operation="video_inspection",
+                        model=model,
+                        input_tokens=usage.input_tokens,
+                        cached_input_tokens=usage.cached_input_tokens,
+                        cache_write_tokens=usage.cache_write_tokens,
+                        output_tokens=usage.output_tokens,
+                        tool_calls=0,
+                        estimated_cost=estimate_cost(model, usage),
+                        user_id=user_id,
+                        correlation_id=correlation_id,
+                    )
+            return OpenAIAnswer(
+                text=text,
+                citations=citations,
+                response_id=str(getattr(response, "id", "unknown")),
+                usage=usage,
+                web_search_calls=0,
+                complete=complete,
+                incomplete_reason=incomplete_reason,
+            )
+        except BudgetDeniedError as exc:
+            raise OpenAIUnavailableError(
+                "The configured answer budget cannot accept this video inspection."
+            ) from exc
+        except Exception as exc:
+            await self.breaker.failure()
+            raise OpenAIUnavailableError("Video inspection is temporarily unavailable.") from exc
+        finally:
+            await self.breaker.abandon(permit)
+
+    async def research_game_updates(
+        self,
+        *,
+        current_game_version: str,
+        current_season_started_on: str,
+        full_sweep: bool,
+        actor_id: int | None,
+        correlation_id: UUID,
+        maximum_findings: int,
+    ) -> OpenAIResearchResult:
+        """Search for current game changes and return a machine-validated research report."""
+        if self.maintenance.halted:
+            raise OpenAIUnavailableError("RWI is in maintenance mode.")
+        permit = await self.breaker.acquire()
+        if permit is None:
+            raise OpenAIUnavailableError("The OpenAI circuit breaker is open.")
+        model = self.complex_model
+        allowed_domains = self._search_domains(WebSearchScope.CURATED)
+        prompt = (
+            f"Today is {datetime.now(UTC).date().isoformat()}. ERIN currently treats "
+            f"{current_game_version!r}, beginning "
+            f"{current_season_started_on}, as the active The Division 2 game version. "
+            "Determine whether an official season, title update, patch, balance change, known "
+            "issue, fix, or systems change has appeared since then. Prioritize Ubisoft pages "
+            "and the official known-issues Trello board. "
+            + (
+                "Also survey current creator videos, community references, Q&A forums, Reddit, "
+                "and player discussion for leads and reported effects."
+                if full_sweep
+                else "Use community material only to understand an official change you find."
+            )
+            + f" Return no more than {maximum_findings} distinct findings. Every finding must "
+            "name its evidence class as official, corroborated_community, or community_unverified. "
+            "Put the supporting publication date in context.published_on as YYYY-MM-DD when it "
+            "can be established; omit it rather than guessing. "
+            "Never represent community consensus as an official fact. Use source URLs actually "
+            "opened during this search. Output only JSON matching this shape: "
+            '{"change_detected":true,"current_game_version":"...","season_name":"...",'
+            '"season_started_on":"YYYY-MM-DD or null","summary":"...",'
+            '"official_evidence_urls":["https://..."],"findings":[{"subject":"...",'
+            '"entity_type":"patch|season|item|talent|skill|activity|bug|system",'
+            '"claim_key":"...","summary":"...","content":{},"context":{},'
+            '"confidence":0.0,"evidence_class":"official|corroborated_community|'
+            'community_unverified","source_urls":["https://..."],'
+            '"material_change":true}],"unresolved_questions":[]}'
+        )
+        web_tool: dict[str, Any] = {"type": "web_search"}
+        if allowed_domains:
+            web_tool["filters"] = {"allowed_domains": list(allowed_domains)}
+        kwargs: dict[str, Any] = {
+            "model": model,
+            "instructions": (
+                "You are ERIN's guarded autonomous research engine. Search before answering. "
+                "Report only evidence you actually retrieved, preserve uncertainty, and emit "
+                "valid JSON with no Markdown fences or commentary."
+            ),
+            "input": prompt,
+            "tools": [web_tool],
+            "tool_choice": "required",
+            "include": ["web_search_call.action.sources"],
+            "max_output_tokens": 4000,
+            "reasoning": {"effort": "high"},
+            "store": False,
+        }
+        try:
+            async with self._semaphore:
+                async with self.budget.reserve(SpendingClass.AUTONOMOUS_RESEARCH, Decimal("0.60")):
+                    response = await self._create_response(kwargs)
+                    text, citations, search_calls = _extract_output(
+                        response,
+                        official_domains=self.official_domains,
+                        official_urls=self.official_urls,
+                        community_domains=self.community_domains,
+                    )
+                    usage = _extract_usage(response, search_calls)
+                    report = GameResearchReport.model_validate_json(_json_payload(text))
+                    await self.breaker.success()
+                    await self.usage_repository.append(
+                        operation="autonomous_game_research",
+                        model=model,
+                        input_tokens=usage.input_tokens,
+                        cached_input_tokens=usage.cached_input_tokens,
+                        cache_write_tokens=usage.cache_write_tokens,
+                        output_tokens=usage.output_tokens,
+                        tool_calls=usage.web_search_calls,
+                        estimated_cost=estimate_cost(model, usage),
+                        user_id=actor_id,
+                        correlation_id=correlation_id,
+                    )
+            return OpenAIResearchResult(
+                report=report,
+                citations=citations,
+                response_id=str(getattr(response, "id", "unknown")),
+                usage=usage,
+            )
+        except BudgetDeniedError as exc:
+            raise OpenAIUnavailableError(
+                "The autonomous research budget is currently reserved for member answers."
+            ) from exc
+        except Exception as exc:
+            await self.breaker.failure()
+            self.log.warning(
+                "autonomous_research_failed",
+                correlation_id=str(correlation_id),
+                error_type=type(exc).__name__,
+            )
+            raise OpenAIUnavailableError("Autonomous game research failed.") from exc
         finally:
             await self.breaker.abandon(permit)
 
@@ -383,6 +596,24 @@ def classify_external_source(
 def _hostname_matches(hostname: str, domain: str) -> bool:
     clean_domain = domain.casefold().strip().lstrip(".")
     return hostname == clean_domain or hostname.endswith(f".{clean_domain}")
+
+
+def _json_payload(text: str) -> str:
+    clean = text.strip()
+    if clean.startswith("```"):
+        lines = clean.splitlines()
+        if lines and lines[0].startswith("```"):
+            lines = lines[1:]
+        if lines and lines[-1].strip() == "```":
+            lines = lines[:-1]
+        clean = "\n".join(lines).strip()
+    start = clean.find("{")
+    end = clean.rfind("}")
+    if start < 0 or end < start:
+        raise ValueError("research response did not contain a JSON object")
+    payload = clean[start : end + 1]
+    json.loads(payload)
+    return payload
 
 
 def _extract_usage(response: Any, web_search_calls: int) -> UsageAmounts:

@@ -247,7 +247,14 @@ def automatic_release(
         )
     if _matches(
         changed,
-        ("src/rwi_bot/services/qa", "services/knowledge", "src/rwi_bot/data/", "ai/prompts"),
+        (
+            "src/rwi_bot/services/qa",
+            "services/knowledge",
+            "services/autonomous_research",
+            "services/video_inspection",
+            "src/rwi_bot/data/",
+            "ai/prompts",
+        ),
     ):
         notes.append(
             ReleaseNote(

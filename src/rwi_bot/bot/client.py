@@ -40,6 +40,7 @@ class RwiBot(commands.Bot):
 
     async def setup_hook(self) -> None:
         from rwi_bot.cogs.admin import AdminCog
+        from rwi_bot.cogs.autonomy import AutonomyCog
         from rwi_bot.cogs.community import CommunityLoadoutsCog
         from rwi_bot.cogs.community_learning import (
             CommunityClaimReviewView,
@@ -62,6 +63,7 @@ class RwiBot(commands.Bot):
         self.add_view(OperationAlertRoleView(self))
         operations = OperationsCog(self)
         await self.add_cog(AdminCog(self))
+        await self.add_cog(AutonomyCog(self))
         await self.add_cog(OnboardingCog(self))
         await self.add_cog(ModerationCog(self))
         await self.add_cog(CommunityLoadoutsCog(self))
@@ -135,6 +137,9 @@ class RwiBot(commands.Bot):
         releases = self.get_cog("ReleaseNotesCog")
         if releases is not None:
             releases.schedule_publish()  # type: ignore[attr-defined]
+        autonomy = self.get_cog("AutonomyCog")
+        if autonomy is not None:
+            autonomy.schedule_start()  # type: ignore[attr-defined]
 
     async def ensure_global_identity(self) -> None:
         user = self.user
@@ -257,14 +262,25 @@ class RwiBot(commands.Bot):
         return results
 
     async def send_audit_summary(self, record: AuditRecord, event_id: UUID) -> None:
-        if record.event_type.startswith("answer.") or record.event_type == "release.published":
+        if (
+            record.event_type.startswith("answer.")
+            or record.event_type == "release.published"
+            or record.event_type == "autonomy.research_started"
+            or record.event_type == "autonomy.no_change"
+        ):
             return
         guild = self.get_guild(self.services.settings.discord_guild_id)
         if guild is None:
             return
         target_name = (
             names.TECHNICIAN_LAB
-            if record.event_type.startswith("knowledge.unanswered")
+            if (
+                record.event_type.startswith("knowledge.unanswered")
+                or (
+                    record.event_type.startswith("autonomy.")
+                    and int(record.details.get("staged_for_review", 0)) > 0
+                )
+            )
             else names.BOT_OPS
         )
         channel = discord.utils.get(guild.text_channels, name=target_name)
@@ -319,6 +335,63 @@ def build_audit_summary_embed(record: AuditRecord, event_id: UUID) -> discord.Em
             embed.add_field(name="Requested by", value=f"<@{record.actor_id}>")
         if record.target_id:
             embed.add_field(name="Ticket ID", value=f"`{record.target_id}`", inline=False)
+        return embed
+
+    if record.event_type.startswith("autonomy."):
+        details = record.details
+        colour = (
+            discord.Colour.red()
+            if record.event_type == "autonomy.research_failed"
+            else discord.Colour.green()
+            if record.event_type == "autonomy.season_transition"
+            else discord.Colour.orange()
+        )
+        title = (
+            "ERIN detected a new Division 2 season"
+            if record.event_type == "autonomy.season_transition"
+            else "ERIN autonomous research failed safely"
+            if record.event_type == "autonomy.research_failed"
+            else "ERIN completed a game-update check"
+        )
+        embed = discord.Embed(
+            title=title,
+            description=(record.reason or "No research summary was returned.")[:2000],
+            colour=colour,
+            timestamp=datetime.now(UTC),
+        )
+        if record.target_id:
+            embed.add_field(name="Active game version", value=record.target_id, inline=False)
+        if record.event_type != "autonomy.research_failed":
+            cache_result = (
+                "failed (new version signatures still prevent old-cache reuse)"
+                if details.get("cache_invalidation_failed")
+                else str(details.get("stale_answer_caches", 0))
+            )
+            embed.add_field(
+                name="Knowledge handling",
+                value=(
+                    "Official findings promoted: "
+                    f"**{details.get('promoted_official_findings', 0)}**\n"
+                    f"Findings staged for review: **{details.get('staged_for_review', 0)}**\n"
+                    f"Duplicate findings skipped: **{details.get('duplicates_skipped', 0)}**\n"
+                    f"Answer caches invalidated: **{cache_result}**"
+                ),
+                inline=False,
+            )
+            staged_subjects = details.get("staged_subjects") or []
+            if staged_subjects:
+                embed.add_field(
+                    name="Technician review queue",
+                    value="\n".join(f"• {str(item)[:150]}" for item in staged_subjects)[:1024],
+                    inline=False,
+                )
+        else:
+            embed.add_field(
+                name="Safety result",
+                value="No game-version or knowledge-base changes were applied.",
+                inline=False,
+            )
+        embed.set_footer(text=f"Research event {event_id}")
         return embed
 
     embed = discord.Embed(

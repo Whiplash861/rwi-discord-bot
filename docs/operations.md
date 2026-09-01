@@ -35,6 +35,21 @@ therefore a useful signal that the search returned no usable source links.
 starter posts are indexed. ERIN's server nickname is reconciled idempotently on each
 Discord connection and does not change the application ID, credentials, or permissions.
 
+`RWI_VIDEO_INSPECTION_ENABLED`, `RWI_VIDEO_MAX_DURATION_SECONDS`,
+`RWI_VIDEO_MAX_BYTES`, and `RWI_VIDEO_SAMPLE_FRAMES` bound gameplay-video processing.
+The container includes FFmpeg/FFprobe; changing `RWI_FFMPEG_BINARY` or
+`RWI_FFPROBE_BINARY` is intended only for a controlled non-container deployment. Raw
+recordings and sampled frames are temporary and must never be copied into logs, audits,
+knowledge entries, backups, or source control.
+
+`RWI_AUTONOMOUS_RESEARCH_ENABLED` controls the live update monitor.
+`RWI_AUTONOMOUS_RESEARCH_INTERVAL_HOURS` sets lightweight check cadence, while
+`RWI_AUTONOMOUS_FULL_SWEEP_HOURS` sets the maximum interval between cross-source sweeps.
+The full interval cannot be shorter than the check interval. Maximum findings and strict
+official auto-promotion are separately configurable. Autonomous calls cannot spend the
+member reserve. Use `/rwi research-status` to inspect the checkpoint and
+`/rwi research-now` to request a staff-authorized full sweep.
+
 ERIN also reconciles only the explicitly requested `#erin-patch-notes` channel on a
 healthy Discord connection. The channel is readable but not writable by Agent and Rogue
 Agent roles. This targeted operation does not reconcile other channels or the role
