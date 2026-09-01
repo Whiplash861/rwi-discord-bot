@@ -2,7 +2,9 @@ from __future__ import annotations
 
 import asyncio
 import hashlib
+import html
 import json
+import re
 from collections.abc import Awaitable, Callable
 from dataclasses import dataclass
 from datetime import UTC, date, datetime, timedelta
@@ -20,9 +22,11 @@ from rwi_bot.domain.schemas import (
     RotationResearchReport,
     SourceCitation,
     TargetedLootAssignment,
+    VendorStockEntry,
 )
 
 JsonFetcher = Callable[[str], Awaitable[object]]
+TextFetcher = Callable[[str], Awaitable[str]]
 
 
 class RotationCacheState(BaseModel):
@@ -55,6 +59,13 @@ class CalendarEvent:
     scheduled_active_end: datetime | None = None
     cycle_seed: datetime | None = None
     cycle_duration: int | None = None
+
+
+@dataclass(frozen=True, slots=True)
+class VendorFeed:
+    updated_at: datetime
+    source_url: str
+    items: tuple[VendorStockEntry, ...]
 
 
 @dataclass(frozen=True, slots=True)
@@ -138,9 +149,14 @@ class RotationService:
         current_game_version: Callable[[], str],
         escalation_url: str,
         calendar_url: str,
+        vendor_page_url: str | None = None,
+        vendor_gear_url: str | None = None,
+        vendor_weapons_url: str | None = None,
+        vendor_mods_url: str | None = None,
         web_refresh_hours: int,
         enabled: bool,
         fetch_json: JsonFetcher | None = None,
+        fetch_text: TextFetcher | None = None,
     ) -> None:
         self.ai = ai
         self.state_store = state_store
@@ -148,9 +164,14 @@ class RotationService:
         self.current_game_version = current_game_version
         self.escalation_url = escalation_url
         self.calendar_url = calendar_url
+        self.vendor_page_url = vendor_page_url
+        self.vendor_gear_url = vendor_gear_url
+        self.vendor_weapons_url = vendor_weapons_url
+        self.vendor_mods_url = vendor_mods_url
         self.web_refresh_hours = web_refresh_hours
         self.enabled = enabled
         self.fetch_json = fetch_json or self._fetch_json
+        self.fetch_text = fetch_text or self._fetch_text
         self._state: RotationCacheState | None = None
         self._lock = asyncio.Lock()
 
@@ -179,10 +200,12 @@ class RotationService:
             direct_results = await asyncio.gather(
                 self.fetch_json(self.escalation_url),
                 self.fetch_json(self.calendar_url),
+                self._load_vendor_feed(),
                 return_exceptions=True,
             )
             escalation: EscalationRotation | None = None
             calendar: tuple[CalendarEvent, ...] = ()
+            vendor_feed: VendorFeed | None = None
             if isinstance(direct_results[0], BaseException):
                 warnings.append("The structured Escalation feed was unavailable.")
             else:
@@ -197,6 +220,13 @@ class RotationService:
                     calendar = _parse_calendar(direct_results[1])
                 except (TypeError, ValueError, KeyError):
                     warnings.append("The reset calendar feed returned an invalid response.")
+            if isinstance(direct_results[2], BaseException):
+                warnings.append("The structured weekly vendor feed was unavailable or invalid.")
+            elif isinstance(direct_results[2], VendorFeed):
+                vendor_feed = direct_results[2]
+                if vendor_feed.updated_at < current - timedelta(days=8):
+                    warnings.append("The weekly vendor feed was older than eight days.")
+                    vendor_feed = None
 
             web_researched = force_web or _web_research_due(
                 state.last_web_research_at,
@@ -236,6 +266,7 @@ class RotationService:
                 escalation=escalation,
                 calendar=calendar,
                 web_items=accepted_items,
+                vendor_feed=vendor_feed,
             )
             state.last_refresh_at = current
             state.last_status = "completed" if not warnings else "partial"
@@ -269,6 +300,41 @@ class RotationService:
             response = await client.get(url)
             response.raise_for_status()
             return response.json()
+
+    @staticmethod
+    async def _fetch_text(url: str) -> str:
+        timeout = httpx.Timeout(15.0, connect=5.0)
+        headers = {"User-Agent": "ERIN-RWI-Rotation-Monitor/1.0"}
+        async with httpx.AsyncClient(
+            timeout=timeout,
+            follow_redirects=True,
+            headers=headers,
+        ) as client:
+            response = await client.get(url)
+            response.raise_for_status()
+            return response.text
+
+    async def _load_vendor_feed(self) -> VendorFeed | None:
+        urls = (
+            self.vendor_page_url,
+            self.vendor_gear_url,
+            self.vendor_weapons_url,
+            self.vendor_mods_url,
+        )
+        if any(url is None for url in urls):
+            return None
+        page_url, gear_url, weapons_url, mods_url = (str(url) for url in urls)
+        page, gear, weapons, mods = await asyncio.gather(
+            self.fetch_text(page_url),
+            self.fetch_json(gear_url),
+            self.fetch_json(weapons_url),
+            self.fetch_json(mods_url),
+        )
+        return _parse_vendor_feed(
+            page,
+            (gear, weapons, mods),
+            source_url=page_url,
+        )
 
 
 def _parse_escalation(payload: object, today: date) -> EscalationRotation:
@@ -335,6 +401,108 @@ def _parse_calendar(payload: object) -> tuple[CalendarEvent, ...]:
     return tuple(events)
 
 
+def _parse_vendor_feed(
+    page: str,
+    payloads: tuple[object, ...],
+    *,
+    source_url: str,
+) -> VendorFeed:
+    modified_match = re.search(
+        r'<meta\s+property=["\']article:modified_time["\']\s+'
+        r'content=["\']([^"\']+)["\']',
+        page,
+        flags=re.IGNORECASE,
+    )
+    if modified_match is None:
+        raise ValueError("vendor page did not expose a modification timestamp")
+    updated_at = _optional_datetime(modified_match.group(1))
+    if updated_at is None:
+        raise ValueError("vendor page modification timestamp was invalid")
+    vendor_names = {
+        "cassie": "Cassie Mendoza",
+        "cassie mendoza": "Cassie Mendoza",
+        "clan": "Clan Vendor",
+        "countdown": "Countdown Requisition",
+        "dz east": "Dark Zone East Vendor",
+        "dz south": "Dark Zone South Vendor",
+        "dz west": "Dark Zone West Vendor",
+    }
+    items: list[VendorStockEntry] = []
+    for payload in payloads:
+        if not isinstance(payload, list):
+            raise TypeError("vendor inventory was not a list")
+        for raw_item in payload:
+            item = _mapping(raw_item)
+            vendor = vendor_names.get(str(item.get("vendor") or "").strip().casefold())
+            if vendor is None:
+                continue
+            category = str(item.get("type") or "other").strip().casefold()
+            if category not in {"gear", "weapon", "mod", "cache", "other"}:
+                category = "other"
+            name = _clean_vendor_text(item.get("name"))
+            if not name:
+                continue
+            items.append(
+                VendorStockEntry(
+                    vendor=vendor,
+                    category=category,
+                    name=name,
+                    details=_vendor_item_details(item, category),
+                )
+            )
+    if not items:
+        raise ValueError("vendor inventory contained no relevant stock")
+    return VendorFeed(updated_at=updated_at, source_url=source_url, items=tuple(items))
+
+
+def _vendor_item_details(item: dict[str, Any], category: str) -> str | None:
+    parts: list[str] = []
+    rarity = str(item.get("rarity") or "").casefold()
+    if "named" in rarity:
+        parts.append("Named")
+    if category == "gear":
+        parts.extend(
+            _clean_vendor_text(item.get(key))
+            for key in ("brand", "slot", "core", "attributes", "talents")
+        )
+    elif category == "weapon":
+        weapon_stats = " / ".join(
+            part
+            for part in (
+                f"{_clean_vendor_text(item.get('dmg'))} DMG"
+                if _clean_vendor_text(item.get("dmg"))
+                else "",
+                f"{_clean_vendor_text(item.get('rpm'))} RPM"
+                if _clean_vendor_text(item.get("rpm"))
+                else "",
+                f"{_clean_vendor_text(item.get('mag'))} MAG"
+                if _clean_vendor_text(item.get("mag"))
+                else "",
+            )
+            if part
+        )
+        parts.extend(
+            (
+                weapon_stats,
+                _clean_vendor_text(item.get("talent")),
+                _clean_vendor_text(item.get("attribute1")),
+                _clean_vendor_text(item.get("attribute2")),
+                _clean_vendor_text(item.get("attribute3")),
+            )
+        )
+    else:
+        parts.append(_clean_vendor_text(item.get("attributes")))
+    clean_parts = [part for part in parts if part]
+    return " · ".join(clean_parts)[:500] or None
+
+
+def _clean_vendor_text(value: object) -> str:
+    text = html.unescape(str(value or ""))
+    text = re.sub(r"<br\s*/?>", " · ", text, flags=re.IGNORECASE)
+    text = re.sub(r"<[^>]+>", "", text)
+    return " ".join(text.split()).strip(" ·")
+
+
 def _accepted_web_items(
     report: RotationResearchReport | None,
     citations: tuple[SourceCitation, ...],
@@ -373,9 +541,19 @@ def _accepted_web_items(
             continue
         if item.kind == "descent_pool" and item.descent is None:
             continue
-        if item.kind == "dark_zone_mode" and {
-            assignment.zone for assignment in item.dark_zones
-        } != {"Dark Zone East", "Dark Zone South", "Dark Zone West"}:
+        if item.kind == "dark_zone_mode":
+            if {assignment.zone for assignment in item.dark_zones} != {
+                "Dark Zone East",
+                "Dark Zone South",
+                "Dark Zone West",
+            }:
+                continue
+            if any(
+                not assignment.faction or not assignment.targeted_loot
+                for assignment in item.dark_zones
+            ):
+                continue
+        if item.kind == "vendor_stock" and not item.vendor_stock:
             continue
         accepted.append(item)
     return tuple(accepted)
@@ -407,6 +585,7 @@ def _build_publications(
     escalation: EscalationRotation | None,
     calendar: tuple[CalendarEvent, ...],
     web_items: tuple[RotationResearchItem, ...],
+    vendor_feed: VendorFeed | None,
 ) -> tuple[RotationPublication, ...]:
     daily_reset = _next_weekday_reset(now, weekday=None, hour=8)
     weekly_reset = _next_weekday_reset(now, weekday=1, hour=8)
@@ -415,6 +594,7 @@ def _build_publications(
     by_kind: dict[str, RotationResearchItem] = {
         item.kind: item for item in web_items if item.kind != "other_rotation"
     }
+    vendor_stock = _merged_vendor_stock(vendor_feed, by_kind.get("vendor_stock"))
 
     daily_fields: list[RotationField] = []
     daily_images: list[RotationImage] = []
@@ -465,11 +645,41 @@ def _build_publications(
     seasonal_fields: list[RotationField] = [
         RotationField("Active Now", _event_list(active)),
         RotationField("Coming Up", _event_list(upcoming)),
-        RotationField("Dark Zone Rotation", _dark_zone_rotation(by_kind.get("dark_zone_mode"))),
     ]
     for item in web_items:
         if item.kind == "other_rotation":
             seasonal_fields.append(RotationField(item.title, _item_value(item)))
+    dark_zone_fields = list(_dark_zone_fields(by_kind.get("dark_zone_mode")))
+    dark_zone_fields.append(RotationField("━━ DARK ZONE VENDORS ━━", "\u200b"))
+    for vendor in (
+        "Dark Zone East Vendor",
+        "Dark Zone South Vendor",
+        "Dark Zone West Vendor",
+    ):
+        dark_zone_fields.extend(_vendor_fields(vendor, vendor_stock))
+    vendor_fields: list[RotationField] = []
+    if vendor_feed is not None:
+        vendor_fields.append(
+            RotationField(
+                "Feed Last Confirmed",
+                _discord_time(vendor_feed.updated_at),
+                inline=True,
+            )
+        )
+    for vendor in (
+        "Cassie Mendoza",
+        "Danny Weaver",
+        "Countdown Requisition",
+        "Clan Vendor",
+    ):
+        fields = _vendor_fields(vendor, vendor_stock)
+        if fields:
+            vendor_fields.extend(fields)
+        else:
+            vendor_fields.append(RotationField(vendor, _vendor_unavailable_message(vendor)))
+    vendor_fields.append(
+        RotationField("Next Vendor Reset", _discord_time(vendor_reset), inline=True)
+    )
     timer_fields = (
         RotationField("Daily Targeted Loot & Projects", _discord_time(daily_reset)),
         RotationField("Weekly Invasion, Projects & Raids", _discord_time(weekly_reset)),
@@ -512,10 +722,30 @@ def _build_publications(
         RotationPublication(
             key="seasonal-rotations",
             channel_name="seasonal-rotations",
-            title=f"Seasonal & Dark Zone Rotations — {date_label}",
-            description="Active and upcoming seasonal events plus current DZ intelligence.",
+            title=f"Seasonal Rotations — {date_label}",
+            description="Active and upcoming seasonal, Manhunt, and event intelligence.",
             fields=tuple(seasonal_fields),
             marker="ERIN_ROTATION:seasonal-rotations",
+        ),
+        RotationPublication(
+            key="dark-zone-rotations",
+            channel_name="dark-zone-rotations",
+            title=f"Dark Zone Rotations — {date_label}",
+            description=(
+                "Current faction, DZ type, targeted loot, and vendor inventory for each zone."
+            ),
+            fields=tuple(dark_zone_fields[:25]),
+            marker="ERIN_ROTATION:dark-zone-rotations",
+        ),
+        RotationPublication(
+            key="vendors",
+            channel_name="vendors",
+            title=f"Special Vendor Stock — {date_label}",
+            description=(
+                "Cassie Mendoza, Danny Weaver, Countdown Requisition, and Clan stock only."
+            ),
+            fields=tuple(vendor_fields[:25]),
+            marker="ERIN_ROTATION:vendors",
         ),
         RotationPublication(
             key="reset-timers",
@@ -601,17 +831,117 @@ def _descent_talent_fields(item: RotationResearchItem | None) -> tuple[RotationF
     )
 
 
-def _dark_zone_rotation(item: RotationResearchItem | None) -> str:
+def _dark_zone_fields(item: RotationResearchItem | None) -> tuple[RotationField, ...]:
     if item is None or len(item.dark_zones) != 3:
-        return "*A complete current East / South / West assignment is not available yet.*"
-    order = {"Dark Zone East": 0, "Dark Zone South": 1, "Dark Zone West": 2}
-    lines = []
-    for assignment in sorted(item.dark_zones, key=lambda entry: order[entry.zone]):
-        loot = (
-            f" — Targeted Loot: **{assignment.targeted_loot}**" if assignment.targeted_loot else ""
+        return (
+            RotationField(
+                "Current DZ State",
+                (
+                    "ERIN is still searching dated in-game reports for all three zones; "
+                    "older rotation patterns are not substituted for live data."
+                ),
+            ),
         )
-        lines.append(f"• **{assignment.zone}:** {assignment.mode}{loot}")
-    return _limit("\n".join(lines), 1024)
+    order = {"Dark Zone East": 0, "Dark Zone South": 1, "Dark Zone West": 2}
+    fields: list[RotationField] = []
+    for assignment in sorted(item.dark_zones, key=lambda entry: order[entry.zone]):
+        fields.append(
+            RotationField(
+                assignment.zone,
+                "\n".join(
+                    (
+                        f"**Faction:** {assignment.faction}",
+                        f"**DZ Type:** {assignment.mode}",
+                        f"**Targeted Loot:** {assignment.targeted_loot}",
+                    )
+                ),
+            )
+        )
+    return tuple(fields)
+
+
+def _merged_vendor_stock(
+    feed: VendorFeed | None,
+    researched: RotationResearchItem | None,
+) -> tuple[VendorStockEntry, ...]:
+    merged: dict[tuple[str, str, str], VendorStockEntry] = {}
+    if researched is not None:
+        for item in researched.vendor_stock:
+            merged[(item.vendor, item.category, item.name.casefold())] = item
+    if feed is not None:
+        for item in feed.items:
+            merged[(item.vendor, item.category, item.name.casefold())] = item
+    return tuple(
+        sorted(
+            merged.values(),
+            key=lambda item: (item.vendor, item.category, item.name.casefold()),
+        )
+    )
+
+
+def _vendor_fields(
+    vendor: str,
+    stock: tuple[VendorStockEntry, ...],
+) -> tuple[RotationField, ...]:
+    entries = [item for item in stock if item.vendor == vendor]
+    if not entries:
+        return ()
+    fields: list[RotationField] = []
+    labels = {
+        "gear": "Gear",
+        "weapon": "Weapons",
+        "mod": "Mods",
+        "cache": "Caches",
+        "other": "Other",
+    }
+    for category in ("gear", "weapon", "mod", "cache", "other"):
+        lines = [_vendor_stock_line(item) for item in entries if item.category == category]
+        chunks = _chunk_lines(lines, maximum=1024)
+        for index, chunk in enumerate(chunks, 1):
+            suffix = f" ({index}/{len(chunks)})" if len(chunks) > 1 else ""
+            fields.append(
+                RotationField(
+                    f"{vendor} — {labels[category]}{suffix}",
+                    chunk,
+                )
+            )
+    return tuple(fields)
+
+
+def _vendor_stock_line(item: VendorStockEntry) -> str:
+    details = f" — {item.details}" if item.details else ""
+    return _limit(f"• **{item.name}**{details}", 1000)
+
+
+def _chunk_lines(lines: list[str], *, maximum: int) -> tuple[str, ...]:
+    chunks: list[str] = []
+    current: list[str] = []
+    current_length = 0
+    for line in lines:
+        extra = len(line) + (1 if current else 0)
+        if current and current_length + extra > maximum:
+            chunks.append("\n".join(current))
+            current = []
+            current_length = 0
+        current.append(line)
+        current_length += len(line) + (1 if len(current) > 1 else 0)
+    if current:
+        chunks.append("\n".join(current))
+    return tuple(chunks)
+
+
+def _vendor_unavailable_message(vendor: str) -> str:
+    if vendor == "Cassie Mendoza":
+        return (
+            "Cassie's stock is added after she opens on Wednesday. ERIN will publish it "
+            "as soon as the dated weekly feed updates."
+        )
+    if vendor == "Danny Weaver":
+        return (
+            "Danny Weaver's Textile cache quantities are not exposed by the structured "
+            "vendor feed. ERIN is checking dated community reports each research cycle."
+        )
+    return "The current structured inventory is temporarily unavailable."
 
 
 def _escalation_loot(rotation: EscalationRotation | None) -> str:

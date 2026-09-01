@@ -19,6 +19,10 @@ from rwi_bot.services.rotations import RotationService, RotationStateStore
 NOW = datetime(2026, 9, 1, 12, tzinfo=UTC)
 ESCALATION_URL = "https://example.invalid/escalation.json"
 CALENDAR_URL = "https://example.invalid/calendar.json"
+VENDOR_PAGE_URL = "https://example.invalid/vendors/"
+VENDOR_GEAR_URL = "https://example.invalid/gear.json"
+VENDOR_WEAPONS_URL = "https://example.invalid/weapons.json"
+VENDOR_MODS_URL = "https://example.invalid/mods.json"
 
 
 def escalation_payload(day: str = "2026-09-01") -> dict[str, object]:
@@ -112,7 +116,47 @@ def build_service(
             return escalation_payload("2026-09-02" if stale_escalation else "2026-09-01")
         if url == CALENDAR_URL:
             return calendar_payload()
+        if url == VENDOR_GEAR_URL:
+            return [
+                {
+                    "type": "gear",
+                    "rarity": "header-named",
+                    "vendor": "Clan",
+                    "name": "The Setup",
+                    "brand": "Uzina Getica",
+                    "slot": "Backpack",
+                    "core": '<span class="icon-defensive"></span>170,000 Armor',
+                    "attributes": "10% Hazard Protection",
+                    "talents": "Perfectly Opportunistic",
+                }
+            ]
+        if url == VENDOR_WEAPONS_URL:
+            return [
+                {
+                    "type": "weapon",
+                    "rarity": "header-named",
+                    "vendor": "Countdown",
+                    "name": "The Grudge",
+                    "dmg": "52,000",
+                    "rpm": 900,
+                    "mag": 32,
+                    "talent": "Perfect Vindictive",
+                }
+            ]
+        if url == VENDOR_MODS_URL:
+            return [
+                {
+                    "type": "mod",
+                    "vendor": "DZ East",
+                    "name": "Offensive System: Firearms",
+                    "attributes": "5% Critical Hit Chance",
+                }
+            ]
         raise AssertionError(f"unexpected URL: {url}")
+
+    async def fetch_text(url: str) -> str:
+        assert url == VENDOR_PAGE_URL
+        return '<meta property="article:modified_time" content="2026-08-26T06:21:15+00:00">'
 
     return RotationService(
         ai=cast(Any, ai),
@@ -121,9 +165,14 @@ def build_service(
         current_game_version=lambda: "Y8S3 Red Horizon",
         escalation_url=ESCALATION_URL,
         calendar_url=CALENDAR_URL,
+        vendor_page_url=VENDOR_PAGE_URL,
+        vendor_gear_url=VENDOR_GEAR_URL,
+        vendor_weapons_url=VENDOR_WEAPONS_URL,
+        vendor_mods_url=VENDOR_MODS_URL,
         web_refresh_hours=6,
         enabled=True,
         fetch_json=fetch_json,
+        fetch_text=fetch_text,
     )
 
 
@@ -215,7 +264,7 @@ async def test_collect_builds_all_rotation_posts_from_dated_feeds_and_gated_web(
 
     snapshot = await service.collect(now=NOW)
 
-    assert len(snapshot.publications) == 5
+    assert len(snapshot.publications) == 7
     by_key = {publication.key: publication for publication in snapshot.publications}
     daily_text = "\n".join(field.value for field in by_key["daily-targeted-loot"].fields)
     weekly_text = "\n".join(field.value for field in by_key["weekly-mission-rotations"].fields)
@@ -234,6 +283,11 @@ async def test_collect_builds_all_rotation_posts_from_dated_feeds_and_gated_web(
     assert embeds[1].image.url == "https://images.example.invalid/dc.png"
     assert "<t:1788393600:F>" in descent_text  # 2026-09-03 00:00 UTC
     assert "SHD Exposed" in seasonal_text
+    vendor_text = "\n".join(field.value for field in by_key["vendors"].fields)
+    dark_zone_text = "\n".join(field.value for field in by_key["dark-zone-rotations"].fields)
+    assert "The Setup" in vendor_text
+    assert "The Grudge" in vendor_text
+    assert "Offensive System: Firearms" in dark_zone_text
     assert snapshot.warnings == ()
 
 
@@ -383,7 +437,7 @@ async def test_partial_invasion_descent_and_dark_zone_reports_are_not_published(
 
     weekly = next(item for item in snapshot.publications if item.key == "weekly-mission-rotations")
     descent = next(item for item in snapshot.publications if item.key == "descent-rotation")
-    seasonal = next(item for item in snapshot.publications if item.key == "seasonal-rotations")
+    dark_zone = next(item for item in snapshot.publications if item.key == "dark-zone-rotations")
     assert "Awaiting a complete dated set" in weekly.fields[1].value
     assert "current named pool has not been established" in descent.fields[0].value
-    assert "complete current East / South / West" in seasonal.fields[2].value
+    assert "still searching dated in-game reports" in dark_zone.fields[0].value

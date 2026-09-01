@@ -99,14 +99,14 @@ sweep with `/rwi research-now`; maintenance mode stops all autonomous work.
 
 ERIN maintains a read-only `ROTATIONS` category with current targeted loot,
 Escalation requisitions and missions, weekly activities, Descent talent-pool timing,
-seasonal events, Dark Zone intelligence, and reset timers. Structured Escalation and
-calendar feeds update the reliable core; exact regional maps, weekly assignments, and
-talent-pool names publish only when current dated web evidence clears a strict confidence
-gate. Regional loot can publish as dated map images or a categorized location list with
-separate mission, area, Classified Assignment, Raid, and off-map sections. Invasion,
-Descent, and Dark Zone reports must be complete before they publish. The five posts are
-edited in place rather than repeated, and Discord timestamps render in each member's
-local time.
+seasonal events, dedicated Dark Zone intelligence, special vendor stock, and reset timers.
+Structured Escalation, calendar, and weekly vendor feeds update the reliable core; exact
+regional maps, weekly assignments, and talent-pool names publish only when current dated web
+evidence clears a strict confidence gate. Regional loot can publish as dated map images or a
+categorized location list with separate mission, area, Classified Assignment, Raid, and
+off-map sections. Invasion, Descent, and Dark Zone reports must be complete before they
+publish. The seven posts are edited in place rather than repeated, and Discord timestamps
+render in each member's local time.
 
 Members can ask ERIN in a DM, `#ask-rwi`, or another server channel to schedule Broken
 Rain, Paradise Lost, Dark Hours, or Iron Horse. ERIN collects the organizer's role and

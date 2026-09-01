@@ -865,4 +865,39 @@ RELEASES: tuple[Release, ...] = (
             ),
         ),
     ),
+    Release(
+        release_id="erin-update-30",
+        update_number=30,
+        version="V0.1.29",
+        released_on=date(2026, 9, 1),
+        notes=(
+            ReleaseNote(
+                ReleaseSection.HIGH_IMPACT,
+                "Added dedicated read-only #dark-zone-rotations and #vendors channels under "
+                "ROTATIONS.",
+            ),
+            ReleaseNote(
+                ReleaseSection.NEW_FEATURES,
+                "ERIN now publishes structured Clan, Countdown, and Dark Zone vendor stock from "
+                "the dated Ruben Alamina weekly feed, and automatically adds Cassie stock when "
+                "that feed updates.",
+            ),
+            ReleaseNote(
+                ReleaseSection.NEW_FEATURES,
+                "Dark Zone reports now carry the occupying faction, exact zone type, targeted "
+                "loot, and each zone vendor's inventory.",
+            ),
+            ReleaseNote(
+                ReleaseSection.IMPROVEMENTS,
+                "Live rotation discovery now searches the open web independently for targeted "
+                "loot, Invasions, Legendary projects, Classified Assignments, Descent, Dark "
+                "Zones, Cassie, and Danny Weaver while retaining dated evidence gates.",
+            ),
+            ReleaseNote(
+                ReleaseSection.MAINTENANCE,
+                "Promoted Ruben Alamina, Division Timers, When SHD, and Raigulus to verified "
+                "community-reference sources for current rotation research.",
+            ),
+        ),
+    ),
 )

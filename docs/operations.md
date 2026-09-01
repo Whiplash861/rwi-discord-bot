@@ -53,10 +53,14 @@ member reserve. Use `/rwi research-status` to inspect the checkpoint and
 `RWI_ROTATION_UPDATES_ENABLED` controls the Rotation publisher.
 `RWI_ROTATION_REFRESH_MINUTES` controls direct-feed refreshes and
 `RWI_ROTATION_WEB_REFRESH_HOURS` bounds the more expensive corroborating web pass.
-`RWI_ROTATION_ESCALATION_URL` and `RWI_ROTATION_CALENDAR_URL` must remain bounded HTTPS
-JSON endpoints. Staff can inspect state with `/rwi rotations-status` or immediately
-refresh all posts and force web research with `/rwi rotations-now`. Maintenance mode
-stops both scheduled and manual rotation research.
+`RWI_ROTATION_ESCALATION_URL`, `RWI_ROTATION_CALENDAR_URL`, and the four
+`RWI_ROTATION_VENDOR_*_URL` values must remain bounded HTTPS endpoints. The vendor page
+provides a dated update marker; its gear, weapon, and mod JSON feeds are filtered to Cassie,
+Clan, Countdown, and the three Dark Zone vendors. Danny Weaver remains a dated open-web
+research target because the structured feed does not expose his Textile cache quantities.
+Staff can inspect state with `/rwi rotations-status` or immediately refresh all posts and
+force open-web research with `/rwi rotations-now`. Maintenance mode stops both scheduled and
+manual rotation research.
 
 ERIN also reconciles only the explicitly requested `#erin-patch-notes` channel on a
 healthy Discord connection. The channel is readable but not writable by Agent and Rogue

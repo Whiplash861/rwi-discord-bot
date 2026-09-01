@@ -35,6 +35,8 @@ DAILY_TARGETED_LOOT = "daily-targeted-loot"
 WEEKLY_MISSION_ROTATIONS = "weekly-mission-rotations"
 DESCENT_ROTATION = "descent-rotation"
 SEASONAL_ROTATIONS = "seasonal-rotations"
+DARK_ZONE_ROTATIONS = "dark-zone-rotations"
+VENDORS = "vendors"
 RESET_TIMERS = "reset-timers"
 COUNCIL = "council"
 COUNCIL_VOICE = "Council Meeting Room"
@@ -51,5 +53,7 @@ ROTATION_CHANNELS = (
     WEEKLY_MISSION_ROTATIONS,
     DESCENT_ROTATION,
     SEASONAL_ROTATIONS,
+    DARK_ZONE_ROTATIONS,
+    VENDORS,
     RESET_TIMERS,
 )

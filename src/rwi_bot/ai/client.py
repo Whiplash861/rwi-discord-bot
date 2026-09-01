@@ -438,11 +438,18 @@ class RwiOpenAIClient:
             "order within a tie. For the weekly Invasion, require exactly three Main Missions, "
             "the Invaded Stronghold, then Tidal Basin. For Descent, require the current named "
             "pool and include its talent lists when the live source displays them. For Dark "
-            "Zone rotation, require current assignments for East, South, and West, including "
-            "targeted loot when visible. Also look for the current Legendary completion project, "
-            "free Classified Assignment, and any other material rotation. Check current Division "
-            "community bot/source pages such as ProtoTrack and ISAC, but do not claim they expose "
-            "data that they do not publish. Do not infer a deterministic order from old history. "
+            "Zone rotation, require current assignments for East, South, and West with the "
+            "occupying faction, exact DZ type (Blackout, Toxic, Normalized, or Invaded), and "
+            "targeted loot. Search separately for the current Legendary completion project and "
+            "free Classified Assignment. Search current vendor pages, weekly Reddit threads, "
+            "videos, Q&A forums, bot dashboards, and other searchable sites for Cassie Mendoza, "
+            "Danny Weaver/Textile Vendor, Countdown Requisition, Clan, and Dark Zone vendor "
+            "stock. General settlement vendors are out of scope. Check sources such as Ruben "
+            "Alamina, Division Timers, ProtoTrack, ISAC, Raigulus, and current dated in-game "
+            "screenshots, but do not claim they expose data they do not publish. Run an "
+            "independent search for every requested target; do not stop after finding one "
+            "rotation. Do not "
+            "infer a deterministic order from old history. "
             "Omit anything whose current value cannot be established. Every item must have a "
             "validity date and URLs actually opened during this search. Community claims need "
             "corroboration; label single-source reports community_unverified. Return no "
@@ -450,7 +457,7 @@ class RwiOpenAIClient:
             '{"as_of":"YYYY-MM-DD","summary":"...","items":[{'
             '"kind":"targeted_loot_dc|targeted_loot_nyc|targeted_loot_brooklyn|'
             "invaded_missions|legendary_project|descent_pool|classified_assignment|"
-            'dark_zone_mode|other_rotation","title":"...","details":["..."],'
+            'dark_zone_mode|vendor_stock|other_rotation","title":"...","details":["..."],'
             '"targeted_loot":[{"category":"main_or_invaded_mission|area|'
             'classified_assignment|raid|other_location","location":"...",'
             '"loot":"...","map_order":0}],"map_images":[{"label":"...",'
@@ -459,14 +466,18 @@ class RwiOpenAIClient:
             '"descent":{"name":"...","offensive_talents":["..."],'
             '"defensive_talents":["..."],"utility_talents":["..."],'
             '"exotic_talents":["..."]},"dark_zones":[{"zone":"Dark Zone East|'
-            'Dark Zone South|Dark Zone West","mode":"...","targeted_loot":"... or null"}],'
+            'Dark Zone South|Dark Zone West","mode":"...","faction":"...",'
+            '"targeted_loot":"..."}],"vendor_stock":[{"vendor":"Cassie Mendoza|'
+            "Danny Weaver|Countdown Requisition|Clan Vendor|Dark Zone East Vendor|"
+            'Dark Zone South Vendor|Dark Zone West Vendor","category":"gear|weapon|mod|'
+            'cache|other","name":"...","details":"... or null"}],'
             '"valid_from":"YYYY-MM-DD","valid_until":"YYYY-MM-DD or null",'
             '"confidence":0.0,"evidence_class":"official|corroborated_community|'
             'community_unverified","source_urls":["https://..."]}],'
             '"unavailable":["..."]}'
         )
         web_tool: dict[str, Any] = {"type": "web_search"}
-        allowed_domains = self._search_domains(WebSearchScope.CURATED)
+        allowed_domains = self._search_domains(WebSearchScope.OPEN)
         if allowed_domains:
             web_tool["filters"] = {"allowed_domains": list(allowed_domains)}
         kwargs: dict[str, Any] = {
@@ -962,6 +973,10 @@ def classify_external_source(
     reference_domains = (
         "prototrack.gg",
         "siriusarc7.github.io",
+        "raigulus.github.io",
+        "rubenalamina.mx",
+        "divisiontimers.com",
+        "when.shd.support",
         "github.com",
         "raw.githubusercontent.com",
     )

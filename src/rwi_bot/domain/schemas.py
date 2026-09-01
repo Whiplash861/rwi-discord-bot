@@ -175,7 +175,23 @@ class DescentTalentPoolRotation(BaseModel):
 class DarkZoneRotationAssignment(BaseModel):
     zone: Literal["Dark Zone East", "Dark Zone South", "Dark Zone West"]
     mode: str = Field(min_length=1, max_length=80)
+    faction: str | None = Field(default=None, max_length=120)
     targeted_loot: str | None = Field(default=None, max_length=120)
+
+
+class VendorStockEntry(BaseModel):
+    vendor: Literal[
+        "Cassie Mendoza",
+        "Danny Weaver",
+        "Countdown Requisition",
+        "Clan Vendor",
+        "Dark Zone East Vendor",
+        "Dark Zone South Vendor",
+        "Dark Zone West Vendor",
+    ]
+    category: Literal["gear", "weapon", "mod", "cache", "other"]
+    name: str = Field(min_length=1, max_length=160)
+    details: str | None = Field(default=None, max_length=500)
 
 
 class RotationResearchItem(BaseModel):
@@ -188,6 +204,7 @@ class RotationResearchItem(BaseModel):
         "descent_pool",
         "classified_assignment",
         "dark_zone_mode",
+        "vendor_stock",
         "other_rotation",
     ]
     title: str = Field(min_length=1, max_length=200)
@@ -197,6 +214,7 @@ class RotationResearchItem(BaseModel):
     invaded: InvadedMissionRotation | None = None
     descent: DescentTalentPoolRotation | None = None
     dark_zones: list[DarkZoneRotationAssignment] = Field(default_factory=list, max_length=3)
+    vendor_stock: list[VendorStockEntry] = Field(default_factory=list, max_length=120)
     valid_from: date
     valid_until: date | None = None
     confidence: float = Field(ge=0.0, le=1.0)

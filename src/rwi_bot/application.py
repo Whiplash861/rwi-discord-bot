@@ -138,6 +138,10 @@ async def build_services(settings: Settings) -> AppServices:
         current_game_version=lambda: qa.current_game_version,
         escalation_url=settings.rotation_escalation_url,
         calendar_url=settings.rotation_calendar_url,
+        vendor_page_url=settings.rotation_vendor_page_url,
+        vendor_gear_url=settings.rotation_vendor_gear_url,
+        vendor_weapons_url=settings.rotation_vendor_weapons_url,
+        vendor_mods_url=settings.rotation_vendor_mods_url,
         web_refresh_hours=settings.rotation_web_refresh_hours,
         enabled=settings.rotation_updates_enabled,
     )

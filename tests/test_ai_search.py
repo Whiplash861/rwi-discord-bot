@@ -333,7 +333,7 @@ async def test_autonomous_research_uses_a_short_bounded_official_pass(
 
 
 @pytest.mark.asyncio
-async def test_rotation_research_requires_bounded_curated_web_search(tmp_path: Path) -> None:
+async def test_rotation_research_uses_open_web_search_with_evidence_gates(tmp_path: Path) -> None:
     maintenance = MaintenanceManager(tmp_path)
     await maintenance.load()
     usage = RecordingUsage()
@@ -366,12 +366,7 @@ async def test_rotation_research_requires_bounded_curated_web_search(tmp_path: P
     assert responses.kwargs["model"] == "gpt-5.6-terra"
     assert responses.kwargs["tool_choice"] == "required"
     assert "text" not in responses.kwargs
-    assert responses.kwargs["tools"] == [
-        {
-            "type": "web_search",
-            "filters": {"allowed_domains": ["ubisoft.com", "prototrack.gg", "when.shd.support"]},
-        }
-    ]
+    assert responses.kwargs["tools"] == [{"type": "web_search"}]
     assert usage.records[0]["operation"] == "rotation_research"
 
 
@@ -876,6 +871,13 @@ def test_external_source_trust_is_classified_by_exact_target() -> None:
         False,
     )
     assert classify_external_source("https://siriusarc7.github.io/TD2_GARL/", **arguments) == (
+        "community_reference",
+        False,
+    )
+    assert classify_external_source(
+        "https://rubenalamina.mx/the-division-weekly-vendor-reset/", **arguments
+    ) == ("community_reference", False)
+    assert classify_external_source("https://raigulus.github.io/division-2/loot/", **arguments) == (
         "community_reference",
         False,
     )

@@ -51,6 +51,7 @@ class Settings(BaseSettings):
         "divisiontimers.com",
         "thedivisiondispatch.com",
         "siriusarc7.github.io",
+        "raigulus.github.io",
         "github.com",
         "raw.githubusercontent.com",
         "rubenalamina.mx",
@@ -83,6 +84,10 @@ class Settings(BaseSettings):
     rotation_web_refresh_hours: int = Field(default=6, ge=1, le=48)
     rotation_escalation_url: str = "https://hi-dep.github.io/division2/data/event/index.json"
     rotation_calendar_url: str = "https://when.shd.support/api/v1/calendar/"
+    rotation_vendor_page_url: str = "https://rubenalamina.mx/the-division-weekly-vendor-reset/"
+    rotation_vendor_gear_url: str = "https://rubenalamina.mx/division/gear.json"
+    rotation_vendor_weapons_url: str = "https://rubenalamina.mx/division/weapons.json"
+    rotation_vendor_mods_url: str = "https://rubenalamina.mx/division/mods.json"
 
     log_level: str = "INFO"
     runtime_dir: Path = Path("/data/runtime")
@@ -117,7 +122,14 @@ class Settings(BaseSettings):
             raise ValueError("official search URLs must use HTTPS")
         return value
 
-    @field_validator("rotation_escalation_url", "rotation_calendar_url")
+    @field_validator(
+        "rotation_escalation_url",
+        "rotation_calendar_url",
+        "rotation_vendor_page_url",
+        "rotation_vendor_gear_url",
+        "rotation_vendor_weapons_url",
+        "rotation_vendor_mods_url",
+    )
     @classmethod
     def valid_rotation_urls(cls, value: str) -> str:
         if not value.startswith("https://") or len(value) > 500:

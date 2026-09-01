@@ -14,3 +14,12 @@ project.
 
 ERIN treats this snapshot as discovery-only community material. It is not represented as
 official Ubisoft data or as verified current-game evidence by itself.
+
+## Division 2 Weekly Vendor Reset
+
+ERIN reads current weekly vendor listings from
+[`rubenalamina.mx`](https://rubenalamina.mx/the-division-weekly-vendor-reset/), maintained by
+Ruben Alamina and community contributors. ERIN preserves the page's update timestamp, filters
+the inventory to the special vendors requested by RWI, and identifies it as a verified
+community reference rather than official Ubisoft data. Ubisoft retains ownership of the
+underlying game names and item data.
