@@ -582,4 +582,103 @@ RELEASES: tuple[Release, ...] = (
             ),
         ),
     ),
+    Release(
+        release_id="erin-update-20",
+        update_number=20,
+        version="V0.1.19",
+        released_on=date(2026, 8, 31),
+        notes=(
+            ReleaseNote(
+                ReleaseSection.HIGH_IMPACT,
+                "Added shared query intelligence that resolves likely names and syntax into "
+                "multiple focused searches across ERIN's current local knowledge.",
+            ),
+            ReleaseNote(
+                ReleaseSection.FIXES,
+                "ERIN now rejects high-scoring but unrelated local records instead of using "
+                "them to avoid a required current-evidence web search.",
+            ),
+            ReleaseNote(
+                ReleaseSection.FIXES,
+                "Fixed the DM personalization interview's Ubisoft/gamertag label detection so "
+                "already labeled answers are stored cleanly.",
+            ),
+            ReleaseNote(
+                ReleaseSection.IMPROVEMENTS,
+                "Expanded Division shorthand, typo handling, intent recognition, and mode, "
+                "difficulty, role, platform, and group-size constraint extraction.",
+            ),
+            ReleaseNote(
+                ReleaseSection.IMPROVEMENTS,
+                "Comparisons, acquisitions, builds, and complete-scope requests now receive "
+                "task-specific response plans and stricter completeness checks.",
+            ),
+            ReleaseNote(
+                ReleaseSection.IMPROVEMENTS,
+                "Expanded ERIN's knowledge curriculum for buildcraft, combat mathematics, "
+                "Raids, Dark Zone rules, progression, and live-service status.",
+            ),
+            ReleaseNote(
+                ReleaseSection.NEW_FEATURES,
+                "Raid and Incursion scheduling now understands more activity aliases, weekday "
+                "dates, 24-hour time, noon or midnight, and specialist RSVP roles.",
+            ),
+            ReleaseNote(
+                ReleaseSection.MAINTENANCE,
+                "Added ranked multi-query retrieval, superseded-guide filtering, prompt v15, "
+                "and broader regression coverage for ERIN's upgraded reasoning path.",
+            ),
+        ),
+    ),
+    Release(
+        release_id="erin-update-21",
+        update_number=21,
+        version="V0.1.20",
+        released_on=date(2026, 8, 31),
+        notes=(
+            ReleaseNote(
+                ReleaseSection.FIXES,
+                "Tightened canonical stat resolution after live verification so generic "
+                "terms such as Armor cannot override a specific Armor Regeneration request.",
+            ),
+            ReleaseNote(
+                ReleaseSection.IMPROVEMENTS,
+                "Reference discovery now expands ERIN's Division aliases before matching, "
+                "while generic catalog labels remain search hints instead of answer targets.",
+            ),
+            ReleaseNote(
+                ReleaseSection.MAINTENANCE,
+                "Added a regression for the 6% Armor Regen request and revalidated typo, "
+                "intent, evidence-routing, and canonical-name behavior.",
+            ),
+        ),
+    ),
+    Release(
+        release_id="erin-update-22",
+        update_number=22,
+        version="V0.1.21",
+        released_on=date(2026, 8, 31),
+        notes=(
+            ReleaseNote(
+                ReleaseSection.FIXES,
+                "Restored natural acquisition wording such as how to get an item and where "
+                "an item drops without misclassifying percentage-stat build targets.",
+            ),
+            ReleaseNote(
+                ReleaseSection.FIXES,
+                "Exact item and talent names now outrank higher-scoring fuzzy prefixes, "
+                "preventing Vigil from displacing Vigilance in interaction questions.",
+            ),
+            ReleaseNote(
+                ReleaseSection.IMPROVEMENTS,
+                "Expanded typo discovery around natural phrases such as how a talent works "
+                "and improved descriptive build-review intent detection.",
+            ),
+            ReleaseNote(
+                ReleaseSection.MAINTENANCE,
+                "Added query-matrix regressions for acquisition, stat goals, comparisons, "
+                "talent interactions, encounter guides, and profile-aware build reviews.",
+            ),
+        ),
+    ),
 )

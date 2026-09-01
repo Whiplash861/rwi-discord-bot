@@ -170,6 +170,7 @@ ENCOUNTERS: tuple[EncounterEntity, ...] = (
 
 _ENCOUNTER_LANGUAGE = (
     "beat",
+    "beet",
     "defeat",
     "kill",
     "clear",
@@ -202,6 +203,7 @@ _FUZZY_STOP_WORDS = {
     "and",
     "at",
     "beat",
+    "beet",
     "boss",
     "build",
     "can",
@@ -256,7 +258,10 @@ def predict_encounter_request(question: str) -> EncounterPrediction | None:
         allow_ambiguous=has_entity_question_language,
     )
 
-    if encounter is None and has_encounter_language:
+    should_resolve_encounter = has_encounter_language or bool(
+        activity is not None and _fuzzy_fragment(normalized, activity)
+    )
+    if encounter is None and should_resolve_encounter:
         encounter, encounter_score, ambiguous_matches = _fuzzy_encounter(normalized, activity)
         if ambiguous_matches:
             activities = {item.activity for item in ambiguous_matches}
@@ -272,7 +277,8 @@ def predict_encounter_request(question: str) -> EncounterPrediction | None:
                     f"I found more than one possible encounter: {options}. Which one do you mean?"
                 ),
             )
-        if encounter is not None and encounter_score < 0.84:
+        safe_threshold = 0.80 if activity is not None else 0.84
+        if encounter is not None and encounter_score < safe_threshold:
             return EncounterPrediction(
                 activity=encounter.activity,
                 encounter=None,

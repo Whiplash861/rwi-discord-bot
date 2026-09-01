@@ -129,9 +129,33 @@ class KnowledgeRepository:
         limit: int = 8,
         game_version: str | None = None,
     ) -> list[KnowledgeHit]:
-        normalized = normalize_text(query)
-        subject_similarity = func.similarity(KnowledgeEntry.normalized_subject, normalized)
-        content_similarity = func.word_similarity(normalized, KnowledgeEntry.search_text)
+        return await self.search_many((query,), limit=limit, game_version=game_version)
+
+    async def search_many(
+        self,
+        queries: tuple[str, ...] | list[str],
+        *,
+        limit: int = 8,
+        game_version: str | None = None,
+    ) -> list[KnowledgeHit]:
+        normalized_queries = tuple(
+            dict.fromkeys(normalized for query in queries if (normalized := normalize_text(query)))
+        )
+        if not normalized_queries:
+            return []
+        subject_scores = [
+            func.similarity(KnowledgeEntry.normalized_subject, query)
+            for query in normalized_queries
+        ]
+        content_scores = [
+            func.word_similarity(query, KnowledgeEntry.search_text) for query in normalized_queries
+        ]
+        subject_similarity = (
+            subject_scores[0] if len(subject_scores) == 1 else func.greatest(*subject_scores)
+        )
+        content_similarity = (
+            content_scores[0] if len(content_scores) == 1 else func.greatest(*content_scores)
+        )
         similarity = func.greatest(subject_similarity, content_similarity)
         statement = (
             select(KnowledgeEntry, similarity.label("score"))
@@ -141,7 +165,11 @@ class KnowledgeRepository:
                 selectinload(KnowledgeEntry.revisions),
                 selectinload(KnowledgeEntry.sources).selectinload(KnowledgeSource.source),
             )
-            .order_by(desc("score"), KnowledgeEntry.verified_at.desc().nullslast())
+            .order_by(
+                KnowledgeEntry.normalized_subject.in_(normalized_queries).desc(),
+                desc("score"),
+                KnowledgeEntry.verified_at.desc().nullslast(),
+            )
             .limit(limit)
         )
         if game_version is not None:
@@ -888,7 +916,7 @@ def knowledge_context(hits: list[KnowledgeHit]) -> tuple[str, list[UUID], list[S
     revision_ids: list[UUID] = []
     citations: list[SourceCitation] = []
     seen_urls: set[str] = set()
-    for hit in hits:
+    for rank, hit in enumerate(hits, start=1):
         entry = hit.entry
         revision = next(
             (item for item in entry.revisions if item.revision_number == entry.current_revision),
@@ -899,6 +927,8 @@ def knowledge_context(hits: list[KnowledgeHit]) -> tuple[str, list[UUID], list[S
         blocks.append(
             json.dumps(
                 {
+                    "retrieval_rank": rank,
+                    "retrieval_similarity": round(hit.similarity, 4),
                     "entry_id": str(entry.id),
                     "subject": entry.subject,
                     "entity_type": entry.entity_type,

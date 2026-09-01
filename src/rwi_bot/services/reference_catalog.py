@@ -9,7 +9,7 @@ from typing import Any
 
 from rapidfuzz import fuzz
 
-from rwi_bot.services.language import normalize_text
+from rwi_bot.services.language import expand_aliases, normalize_text
 
 _STOP_WORDS = {
     "a",
@@ -19,9 +19,11 @@ _STOP_WORDS = {
     "and",
     "are",
     "can",
+    "compare",
     "current",
     "do",
     "does",
+    "explain",
     "for",
     "get",
     "have",
@@ -40,6 +42,11 @@ _STOP_WORDS = {
     "where",
     "which",
     "with",
+    "work",
+    "working",
+    "works",
+    "versus",
+    "vs",
 }
 _TOKEN = re.compile(r"[a-z0-9][a-z0-9+'-]*", re.IGNORECASE)
 _CATEGORY_TERMS = {
@@ -47,6 +54,7 @@ _CATEGORY_TERMS = {
     "augments",
     "attribute",
     "attributes",
+    "backpack",
     "chest",
     "exotic",
     "gear",
@@ -58,6 +66,20 @@ _CATEGORY_TERMS = {
     "talents",
     "weapon",
     "weapons",
+}
+_GENERIC_REFERENCE_NAMES = {
+    "accuracy",
+    "armor",
+    "damage",
+    "gear",
+    "health",
+    "magazine size",
+    "reload speed",
+    "skill",
+    "stability",
+    "talent",
+    "weapon",
+    "weapon damage",
 }
 
 
@@ -85,6 +107,7 @@ class ReferenceRecord:
 class ReferenceHit:
     record: ReferenceRecord
     score: float
+    match_kind: str = "overlap"
 
 
 class Division2ReferenceCatalog:
@@ -103,10 +126,14 @@ class Division2ReferenceCatalog:
     def search(self, query: str, *, limit: int = 8) -> list[ReferenceHit]:
         if limit < 1:
             raise ValueError("Reference result limit must be positive.")
-        normalized = normalize_text(query)
+        normalized = expand_aliases(query)
         terms = _meaningful_terms(normalized)
         if not terms:
             return []
+        specific_terms = terms - _CATEGORY_TERMS
+        name_fragment = " ".join(
+            token for token in _TOKEN.findall(normalized) if token in specific_terms
+        )
 
         hits: list[ReferenceHit] = []
         for record in self.records:
@@ -114,19 +141,42 @@ class Division2ReferenceCatalog:
             record_terms = _meaningful_terms(record.search_text)
             overlap = terms & record_terms
             category_match = _category_match(terms, record)
-            exact_name = bool(name and name in normalized)
-            if not overlap and not category_match:
+            exact_name = bool(name and re.search(rf"(?<!\w){re.escape(name)}(?!\w)", normalized))
+            fuzzy_name = (
+                fuzz.WRatio(name_fragment, name) / 100
+                if name and len(name_fragment.replace(" ", "")) >= 4
+                else 0.0
+            )
+            typo_name = (
+                bool(specific_terms)
+                and not overlap.intersection(specific_terms)
+                and fuzzy_name >= 0.82
+            )
+            if not overlap and not category_match and not typo_name:
                 continue
-            specific_terms = terms - _CATEGORY_TERMS
-            if specific_terms and not exact_name and not overlap.intersection(specific_terms):
+            if (
+                specific_terms
+                and not exact_name
+                and not overlap.intersection(specific_terms)
+                and not typo_name
+            ):
                 continue
             fuzzy = fuzz.token_set_ratio(normalized, name) / 100 if name else 0.0
             coverage = len(overlap) / len(terms)
             score = max(0.55 + 0.45 * coverage if exact_name else 0.0, 0.7 * coverage + 0.3 * fuzzy)
             if category_match:
                 score = max(score, 0.45 + 0.25 * coverage)
+            match_kind = "exact" if exact_name else "fuzzy" if typo_name else "overlap"
+            if typo_name:
+                score = max(score, fuzzy_name * 0.92)
             if score >= 0.42:
-                hits.append(ReferenceHit(record=record, score=min(score, 1.0)))
+                hits.append(
+                    ReferenceHit(
+                        record=record,
+                        score=min(score, 1.0),
+                        match_kind=match_kind,
+                    )
+                )
         hits.sort(key=lambda hit: (-hit.score, hit.record.name, hit.record.source_file))
         return hits[:limit]
 
@@ -147,6 +197,10 @@ def reference_scope_prompt(hits: list[ReferenceHit], snapshot: ReferenceSnapshot
         "material current claim with the normal Red Horizon evidence rules. Source: "
         f"{snapshot.source}@{snapshot.commit[:12]} ({snapshot.license}).\n" + "\n".join(rows)
     )
+
+
+def is_specific_reference_hit(hit: ReferenceHit) -> bool:
+    return normalize_text(hit.record.name) not in _GENERIC_REFERENCE_NAMES
 
 
 def _load_snapshot(path: Path) -> ReferenceSnapshot:

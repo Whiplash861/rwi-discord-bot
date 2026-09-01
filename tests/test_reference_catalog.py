@@ -44,3 +44,14 @@ def test_reference_catalog_ignores_empty_or_nonsemantic_queries() -> None:
     catalog = Division2ReferenceCatalog.packaged()
 
     assert catalog.search("what is it") == []
+
+
+def test_reference_catalog_resolves_likely_item_and_talent_typos() -> None:
+    catalog = Division2ReferenceCatalog.packaged()
+
+    glass_cannon = catalog.search("How does Glas Canon work?")
+    vigilance = catalog.search("Explain the Viglance backpack talent")
+
+    assert glass_cannon[0].record.name == "Glass Cannon"
+    assert glass_cannon[0].match_kind == "fuzzy"
+    assert any(hit.record.name == "Vigilance" for hit in vigilance)

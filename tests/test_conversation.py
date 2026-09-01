@@ -119,6 +119,7 @@ def test_profile_interview_answers_are_labeled_for_the_existing_profile_parser()
     assert profile_interview_update_text(0, "PC and Xbox") == "Platform: PC and Xbox"
     assert profile_interview_update_text(1, "Mostly PvE, but some PvP") == "I play both"
     assert profile_interview_update_text(3, "AgentName") == "Gamertag: AgentName"
+    assert profile_interview_update_text(3, "Ubisoft: AgentName") == "Ubisoft: AgentName"
     assert profile_interview_update_text(4, "Healer main") == "Playstyle: Healer main"
     assert profile_interview_update_text(5, "day-one player") == (
         "Add to my profile: day-one player"

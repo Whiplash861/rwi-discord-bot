@@ -866,7 +866,7 @@ def profile_interview_update_text(step_index: int, text: str) -> str:
     if step_index == 3:
         return (
             clean
-            if re.search(r"\b(?:gamertag|ubisoft)", clean, re.IGNORECASE)
+            if re.search(r"\b(?:gamertag|ubisoft)\b", clean, re.IGNORECASE)
             else (f"Gamertag: {clean}")
         )
     if step_index == 4:

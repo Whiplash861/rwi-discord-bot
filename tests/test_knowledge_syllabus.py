@@ -11,7 +11,7 @@ from rwi_bot.services.knowledge_syllabus import (
 def test_syllabus_covers_every_requested_knowledge_domain() -> None:
     keys = {domain.key for domain in KNOWLEDGE_SYLLABUS}
 
-    assert len(KNOWLEDGE_SYLLABUS) == 15
+    assert len(KNOWLEDGE_SYLLABUS) == 21
     assert len(keys) == len(KNOWLEDGE_SYLLABUS)
     assert {
         "exotic_gear",
@@ -29,6 +29,12 @@ def test_syllabus_covers_every_requested_knowledge_domain() -> None:
         "lore",
         "enemy_factions",
         "incursion_bosses",
+        "buildcraft",
+        "combat_math",
+        "raids",
+        "dark_zone",
+        "progression",
+        "live_service",
     } == keys
     assert all(len(domain.required_facets) >= 5 for domain in KNOWLEDGE_SYLLABUS)
     assert all(url.startswith("https://") for url in CURRENT_Y8S3_PRIMARY_REFERENCES)
@@ -47,6 +53,10 @@ def test_syllabus_routes_specific_member_questions() -> None:
     assert [domain.key for domain in identify_knowledge_domains("Explain Wright's mechanics")] == [
         "incursion_bosses"
     ]
+    assert [
+        domain.key
+        for domain in identify_knowledge_domains("Show DTOC damage math for my healer build")
+    ] == ["buildcraft", "combat_math"]
 
 
 def test_syllabus_prompt_marks_reference_pages_as_discovery_not_evidence() -> None:

@@ -18,22 +18,44 @@ from rwi_bot.db.session import Database
 
 SERVER_TIMEZONE = ZoneInfo("America/New_York")
 ACTIVITIES: tuple[tuple[str, str, int, tuple[str, ...]], ...] = (
-    ("Broken Rain", "incursion", 4, ("broken rain", "brokenrain")),
-    ("Paradise Lost", "incursion", 4, ("paradise lost",)),
-    ("Operation Dark Hours", "raid", 8, ("dark hours", "operation dark hours")),
-    ("Operation Iron Horse", "raid", 8, ("iron horse", "operation iron horse")),
+    ("Broken Rain", "incursion", 4, ("broken rain", "brokenrain", "broken reign")),
+    (
+        "Paradise Lost",
+        "incursion",
+        4,
+        ("paradise lost", "meret estate", "merit estate"),
+    ),
+    ("Operation Dark Hours", "raid", 8, ("dark hours", "operation dark hours", "odh")),
+    (
+        "Operation Iron Horse",
+        "raid",
+        8,
+        ("iron horse", "operation iron horse", "ih raid"),
+    ),
 )
-OPERATION_ROLES = ("Tank", "Healer", "DPS", "Support", "Mechanics", "Undecided")
+OPERATION_ROLES = (
+    "Tank",
+    "Healer",
+    "DPS",
+    "Support",
+    "Mechanics",
+    "Crowd Control",
+    "Drone Killer",
+    "Kite",
+    "Undecided",
+)
 
 _REQUEST_INTENT = re.compile(
     r"\b(?:schedule|organize|organise|plan|set\s+up|create)\b.{0,160}"
     r"\b(?:run|raid|incursion|operation|event)\b|"
     r"\b(?:schedule|organize|organise|plan|set\s+up|create)\b.{0,160}"
-    r"\b(?:broken\s*rain|paradise\s+lost|dark\s+hours|iron\s+horse)\b",
+    r"\b(?:broken\s*rain|broken\s+reign|paradise\s+lost|mer[ei]t\s+estate|"
+    r"dark\s+hours|iron\s+horse)\b",
     re.IGNORECASE,
 )
 _ROLE = re.compile(
-    r"\b(tank|healer|dps|support|mechanics?|undecided|not\s+sure)\b",
+    r"\b(tank|healer|medic|dps|damage|support|mechanics?|crowd\s+control|cc|"
+    r"drone\s+killer|kite|kiter|undecided|not\s+sure)\b",
     re.IGNORECASE,
 )
 _TIME = re.compile(
@@ -41,8 +63,31 @@ _TIME = re.compile(
     r"mt|mst|mdt|pt|pst|pdt|utc|gmt))?",
     re.IGNORECASE,
 )
+_TIME_24 = re.compile(
+    r"\b(?:at\s*)?([01]?\d|2[0-3]):([0-5]\d)\b(?:\s*(et|est|edt|ct|cst|cdt|"
+    r"mt|mst|mdt|pt|pst|pdt|utc|gmt))?",
+    re.IGNORECASE,
+)
+_SPECIAL_TIME = re.compile(
+    r"\b(?:at\s+)?(noon|midnight)\b(?:\s*(et|est|edt|ct|cst|cdt|"
+    r"mt|mst|mdt|pt|pst|pdt|utc|gmt))?",
+    re.IGNORECASE,
+)
 _ISO_DATE = re.compile(r"\b(20\d{2})-(\d{1,2})-(\d{1,2})\b")
 _RELATIVE_DAYS = re.compile(r"\bin\s+(\d{1,3})\s+days?\b", re.IGNORECASE)
+_WEEKDAY = re.compile(
+    r"\b(?:(this|next)\s+)?(monday|tuesday|wednesday|thursday|friday|saturday|sunday)\b",
+    re.IGNORECASE,
+)
+_WEEKDAYS = {
+    "monday": 0,
+    "tuesday": 1,
+    "wednesday": 2,
+    "thursday": 3,
+    "friday": 4,
+    "saturday": 5,
+    "sunday": 6,
+}
 _ZONE_NAMES = {
     "et": "America/New_York",
     "est": "America/New_York",
@@ -252,6 +297,16 @@ def parse_operation_role(text: str) -> str | None:
     value = match.group(1).casefold()
     if value in {"mechanic", "mechanics"}:
         return "Mechanics"
+    if value in {"medic"}:
+        return "Healer"
+    if value in {"damage"}:
+        return "DPS"
+    if value in {"crowd control", "cc"}:
+        return "Crowd Control"
+    if value == "drone killer":
+        return "Drone Killer"
+    if value in {"kite", "kiter"}:
+        return "Kite"
     if value in {"not sure", "undecided"}:
         return "Undecided"
     return value.upper() if value == "dps" else value.title()
@@ -298,6 +353,13 @@ def _date_from_text(text: str, *, current: datetime) -> date | None:
             return date(int(match.group(1)), int(match.group(2)), int(match.group(3)))
         except ValueError:
             return None
+    if match := _WEEKDAY.search(text):
+        qualifier = (match.group(1) or "").casefold()
+        target_weekday = _WEEKDAYS[match.group(2).casefold()]
+        days_ahead = (target_weekday - current.weekday()) % 7
+        if days_ahead == 0 and qualifier == "next":
+            days_ahead = 7
+        return current.date() + timedelta(days=days_ahead)
     for date_format in ("%B %d", "%b %d"):
         for match in re.finditer(r"\b([A-Za-z]+\s+\d{1,2})\b", text):
             try:
@@ -313,17 +375,26 @@ def _date_from_text(text: str, *, current: datetime) -> date | None:
 
 
 def _time_and_zone(text: str) -> tuple[time | None, ZoneInfo | None]:
-    if not (match := _TIME.search(text)):
+    if match := _TIME.search(text):
+        hour = int(match.group(1))
+        minute = int(match.group(2) or 0)
+        if not 1 <= hour <= 12 or minute > 59:
+            return None, None
+        if match.group(3).casefold() == "pm" and hour != 12:
+            hour += 12
+        elif match.group(3).casefold() == "am" and hour == 12:
+            hour = 0
+        zone_key = (match.group(4) or "").casefold()
+    elif match := _TIME_24.search(text):
+        hour = int(match.group(1))
+        minute = int(match.group(2))
+        zone_key = (match.group(3) or "").casefold()
+    elif match := _SPECIAL_TIME.search(text):
+        hour = 12 if match.group(1).casefold() == "noon" else 0
+        minute = 0
+        zone_key = (match.group(2) or "").casefold()
+    else:
         return None, None
-    hour = int(match.group(1))
-    minute = int(match.group(2) or 0)
-    if not 1 <= hour <= 12 or minute > 59:
-        return None, None
-    if match.group(3).casefold() == "pm" and hour != 12:
-        hour += 12
-    elif match.group(3).casefold() == "am" and hour == 12:
-        hour = 0
-    zone_key = (match.group(4) or "").casefold()
     zone = ZoneInfo(_ZONE_NAMES[zone_key]) if zone_key else None
     return time(hour=hour, minute=minute), zone
 

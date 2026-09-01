@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from datetime import date
+from typing import cast
 from urllib.parse import urlparse
 from uuid import UUID, uuid4
 
@@ -29,6 +30,7 @@ from rwi_bot.services.encounter_intent import (
 )
 from rwi_bot.services.knowledge import (
     CacheRepository,
+    KnowledgeHit,
     KnowledgeRepository,
     TicketRepository,
     knowledge_context,
@@ -38,6 +40,13 @@ from rwi_bot.services.knowledge_syllabus import knowledge_scope_prompt
 from rwi_bot.services.language import interpret_locally, question_signature
 from rwi_bot.services.maintenance import MaintenanceManager
 from rwi_bot.services.privacy import ProfileRepository
+from rwi_bot.services.query_intelligence import (
+    build_query_plan,
+    prefer_latest_guide_hits,
+    query_plan_scope_prompt,
+    relevant_hits_for_plan,
+    retrieval_supports_plan,
+)
 from rwi_bot.services.reference_catalog import (
     Division2ReferenceCatalog,
     reference_scope_prompt,
@@ -125,20 +134,22 @@ class QuestionAnsweringService:
                 ),
                 learning_opt_out=learning_opt_out,
             )
-        retrieval_query = (
-            encounter_prediction.search_query
-            if encounter_prediction is not None
-            else interpreted.normalized_question
-        )
         skill_family_request = identify_broad_skill_family(request.question)
         reference_hits = (
-            self.reference_catalog.search(retrieval_query)
+            self.reference_catalog.search(request.question)
             if self.reference_catalog is not None
             else []
         )
+        query_plan = build_query_plan(
+            interpreted=interpreted,
+            encounter=encounter_prediction,
+            reference_hits=reference_hits,
+        )
+        retrieval_query = query_plan.primary_query
         request_scope_parts = [
             value
             for value in (
+                query_plan_scope_prompt(query_plan),
                 skill_scope_prompt(skill_family_request) if skill_family_request else None,
                 encounter_scope_prompt(encounter_prediction)
                 if encounter_prediction is not None
@@ -231,6 +242,8 @@ class QuestionAnsweringService:
                 if self.reference_catalog is not None and reference_hits
                 else None
             ),
+            "canonical_targets": list(query_plan.canonical_targets),
+            "query_target_kind": query_plan.target_kind,
         }
         signature = question_signature(
             interpreted.normalized_question,
@@ -295,8 +308,9 @@ class QuestionAnsweringService:
                 learning_opt_out=learning_opt_out,
             )
 
-        hits = await self.knowledge.search(
-            retrieval_query,
+        hits = await _search_knowledge(
+            self.knowledge,
+            query_plan.retrieval_queries,
             limit=(
                 16
                 if encounter_prediction is not None
@@ -305,7 +319,29 @@ class QuestionAnsweringService:
             ),
             game_version=self.current_game_version,
         )
-        context, revision_ids, knowledge_citations = knowledge_context(hits)
+        hits = prefer_latest_guide_hits(hits)
+        local_retrieval_supported = retrieval_supports_plan(hits, query_plan)
+        if hits and not local_retrieval_supported:
+            await self.audit.record(
+                AuditRecord(
+                    event_type="answer.local_retrieval_rejected",
+                    actor_id=request.user_id,
+                    target_type="knowledge_search",
+                    correlation_id=correlation_id,
+                    reason=(
+                        "Retrieved entries did not directly support the resolved target, so "
+                        "ERIN required an external current-evidence check."
+                    ),
+                    details={
+                        "canonical_targets": list(query_plan.canonical_targets),
+                        "top_similarity": round(hits[0].similarity, 3),
+                        "retrieved_subjects": [hit.entry.subject for hit in hits[:5]],
+                        "is_dm": request.is_dm,
+                    },
+                )
+            )
+        usable_hits = relevant_hits_for_plan(hits, query_plan) if local_retrieval_supported else []
+        context, revision_ids, knowledge_citations = knowledge_context(usable_hits)
         reviewed_context = community_claim_context(community_claim_hits)
         if reviewed_context:
             context = f"{context}\n\n{reviewed_context}" if context else reviewed_context
@@ -329,7 +365,7 @@ class QuestionAnsweringService:
 
         used_web = False
         try:
-            if hits or community_claim_hits:
+            if usable_hits or community_claim_hits:
                 generated = await self.ai.answer(
                     input_text=input_text,
                     user_id=request.user_id,
@@ -352,11 +388,12 @@ class QuestionAnsweringService:
                 self.log.info(
                     "answer_web_escalation",
                     correlation_id=str(correlation_id),
-                    local_knowledge_hits=len(hits),
+                    local_knowledge_hits=len(usable_hits),
+                    rejected_local_hits=len(hits) - len(usable_hits),
                     community_claim_hits=len(community_claim_hits),
                 )
                 web_input_text = input_text
-                if hits or community_claim_hits:
+                if usable_hits or community_claim_hits:
                     web_input_text = compose_answer_input(
                         question=request.question,
                         member_name=request.member_name,
@@ -533,8 +570,7 @@ class QuestionAnsweringService:
                 normalized_intent=(
                     IntentKind.MISSION_GUIDE.value
                     if encounter_prediction is not None
-                    and encounter_prediction.request_kind
-                    in {"encounter_guide", "activity_guide"}
+                    and encounter_prediction.request_kind in {"encounter_guide", "activity_guide"}
                     else interpreted.intent.value
                 ),
                 entities=interpreted.entities,
@@ -767,6 +803,22 @@ def _merge_citations(
             seen.add(key)
             merged.append(citation)
     return merged
+
+
+async def _search_knowledge(
+    repository: KnowledgeRepository,
+    queries: tuple[str, ...],
+    *,
+    limit: int,
+    game_version: str,
+) -> list[KnowledgeHit]:
+    search_many = getattr(repository, "search_many", None)
+    if callable(search_many):
+        return cast(
+            list[KnowledgeHit],
+            await search_many(queries, limit=limit, game_version=game_version),
+        )
+    return await repository.search(queries[0], limit=limit, game_version=game_version)
 
 
 def render_community_loadouts(hits: list[CommunityLoadoutHit], *, game_version: str) -> str:
