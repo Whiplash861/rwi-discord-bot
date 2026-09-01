@@ -719,4 +719,22 @@ RELEASES: tuple[Release, ...] = (
             ),
         ),
     ),
+    Release(
+        release_id="erin-update-24",
+        update_number=24,
+        version="V0.1.23",
+        released_on=date(2026, 8, 31),
+        notes=(
+            ReleaseNote(
+                ReleaseSection.FIXES,
+                "Extended the provider deadline for full autonomous source sweeps after the "
+                "first live run safely stopped at the normal answer timeout.",
+            ),
+            ReleaseNote(
+                ReleaseSection.MAINTENANCE,
+                "Short gameplay-video analysis now also has its own bounded media-aware request "
+                "deadline without changing ordinary answer latency controls.",
+            ),
+        ),
+    ),
 )

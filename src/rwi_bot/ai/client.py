@@ -166,6 +166,7 @@ class RwiOpenAIClient:
             "max_output_tokens": 2200,
             "reasoning": {"effort": "medium"},
             "store": False,
+            "timeout": 90.0,
         }
         try:
             async with self._semaphore:
@@ -273,6 +274,7 @@ class RwiOpenAIClient:
             "max_output_tokens": 4000,
             "reasoning": {"effort": "high"},
             "store": False,
+            "timeout": 120.0,
         }
         try:
             async with self._semaphore:

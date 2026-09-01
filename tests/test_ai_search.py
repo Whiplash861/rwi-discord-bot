@@ -68,6 +68,30 @@ class CompletionRetryResponses:
         )
 
 
+class CapturingResearchResponse:
+    def __init__(self) -> None:
+        self.kwargs: dict[str, object] = {}
+
+    async def create(self, **kwargs: object) -> SimpleNamespace:
+        self.kwargs = kwargs
+        return SimpleNamespace(
+            id="research-response",
+            status="completed",
+            output_text=(
+                '{"change_detected":false,"current_game_version":"Y8S3 Red Horizon",'
+                '"season_name":"Red Horizon","season_started_on":"2026-08-27",'
+                '"summary":"No change found.","official_evidence_urls":[],'
+                '"findings":[],"unresolved_questions":[]}'
+            ),
+            output=[],
+            usage=SimpleNamespace(
+                input_tokens=100,
+                output_tokens=100,
+                input_tokens_details=SimpleNamespace(cached_tokens=0, cache_write_tokens=0),
+            ),
+        )
+
+
 def test_curated_search_combines_official_live_and_community_domains() -> None:
     client = cast(RwiOpenAIClient, object.__new__(RwiOpenAIClient))
     client.official_domains = ("ubisoft.com",)
@@ -178,6 +202,44 @@ async def test_token_cutoff_is_regenerated_concisely_before_return(tmp_path: Pat
     assert result.evidence_confidence is ConfidenceLabel.HIGH
     assert result.usage.output_tokens == 2400
     assert usage.records[0]["operation"] == "answer_retry"
+
+
+@pytest.mark.asyncio
+async def test_autonomous_research_has_a_longer_bounded_provider_deadline(
+    tmp_path: Path,
+) -> None:
+    maintenance = MaintenanceManager(tmp_path)
+    await maintenance.load()
+    usage = RecordingUsage()
+    responses = CapturingResearchResponse()
+    client = RwiOpenAIClient(
+        api_key="test-placeholder",
+        maintenance=maintenance,
+        budget=BudgetGuard(
+            cast(Any, usage),
+            hard_limit=Decimal("25"),
+            member_reserve=Decimal("5"),
+        ),
+        usage_repository=cast(Any, usage),
+        normal_model="gpt-5.6-terra",
+        complex_model="gpt-5.6",
+        economy_model="gpt-5.6-luna",
+        official_domains=("ubisoft.com",),
+    )
+    client.client = cast(Any, SimpleNamespace(responses=responses))
+
+    result = await client.research_game_updates(
+        current_game_version="Y8S3 Red Horizon",
+        current_season_started_on="2026-08-27",
+        full_sweep=False,
+        actor_id=42,
+        correlation_id=uuid4(),
+        maximum_findings=20,
+    )
+
+    assert result.report.change_detected is False
+    assert responses.kwargs["timeout"] == 120.0
+    assert usage.records[0]["operation"] == "autonomous_game_research"
 
 
 @pytest.mark.asyncio
