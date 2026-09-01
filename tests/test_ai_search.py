@@ -295,6 +295,7 @@ async def test_autonomous_research_uses_a_short_bounded_official_pass(
     assert responses.kwargs["timeout"] == 60.0
     assert responses.kwargs["model"] == "gpt-5.6-terra"
     assert responses.kwargs["reasoning"] == {"effort": "low"}
+    assert responses.kwargs["text"] == {"format": {"type": "json_object"}}
     assert responses.kwargs["tools"] == [
         {"type": "web_search", "filters": {"allowed_domains": ["ubisoft.com"]}}
     ]
@@ -334,6 +335,7 @@ async def test_rotation_research_requires_bounded_curated_web_search(tmp_path: P
     assert responses.kwargs["timeout"] == 60.0
     assert responses.kwargs["model"] == "gpt-5.6-terra"
     assert responses.kwargs["tool_choice"] == "required"
+    assert responses.kwargs["text"] == {"format": {"type": "json_object"}}
     assert responses.kwargs["tools"] == [
         {
             "type": "web_search",

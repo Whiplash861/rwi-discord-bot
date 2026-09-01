@@ -829,4 +829,22 @@ RELEASES: tuple[Release, ...] = (
             ),
         ),
     ),
+    Release(
+        release_id="erin-update-28",
+        update_number=28,
+        version="V0.1.27",
+        released_on=date(2026, 9, 1),
+        notes=(
+            ReleaseNote(
+                ReleaseSection.FIXES,
+                "Fixed malformed model output that could interrupt ERIN's autonomous game-update "
+                "research pass even after a successful source search.",
+            ),
+            ReleaseNote(
+                ReleaseSection.MAINTENANCE,
+                "Autonomous game-update and live-rotation research now request API-enforced JSON "
+                "output before validating their typed reports.",
+            ),
+        ),
+    ),
 )
