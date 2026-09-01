@@ -22,6 +22,7 @@ from rwi_bot.services.privacy import ProfileRepository
 from rwi_bot.services.qa import QuestionAnsweringService
 from rwi_bot.services.reference_catalog import Division2ReferenceCatalog
 from rwi_bot.services.releases import ReleaseHistoryRepository
+from rwi_bot.services.rotations import RotationService, RotationStateStore
 from rwi_bot.services.seeding import apply_red_horizon_seed
 from rwi_bot.services.video_inspection import VideoInspectionService
 
@@ -48,6 +49,7 @@ class AppServices:
     qa: QuestionAnsweringService
     video_inspection: VideoInspectionService
     autonomous_research: AutonomousResearchService
+    rotations: RotationService
 
 
 async def build_services(settings: Settings) -> AppServices:
@@ -129,6 +131,17 @@ async def build_services(settings: Settings) -> AppServices:
         auto_promote_official=settings.autonomous_auto_promote_official,
     )
     await autonomous_research.initialize()
+    rotations = RotationService(
+        ai=ai,
+        state_store=RotationStateStore(settings.runtime_dir / "rotation-state.json"),
+        owner_user_id=settings.owner_user_id,
+        current_game_version=lambda: qa.current_game_version,
+        escalation_url=settings.rotation_escalation_url,
+        calendar_url=settings.rotation_calendar_url,
+        web_refresh_hours=settings.rotation_web_refresh_hours,
+        enabled=settings.rotation_updates_enabled,
+    )
+    await rotations.initialize()
     return AppServices(
         settings=settings,
         database=database,
@@ -150,4 +163,5 @@ async def build_services(settings: Settings) -> AppServices:
         qa=qa,
         video_inspection=video_inspection,
         autonomous_research=autonomous_research,
+        rotations=rotations,
     )

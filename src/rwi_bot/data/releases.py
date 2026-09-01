@@ -760,4 +760,37 @@ RELEASES: tuple[Release, ...] = (
             ),
         ),
     ),
+    Release(
+        release_id="erin-update-26",
+        update_number=26,
+        version="V0.1.25",
+        released_on=date(2026, 9, 1),
+        notes=(
+            ReleaseNote(
+                ReleaseSection.HIGH_IMPACT,
+                "Added a member-readable ROTATIONS category with five read-only live indexes "
+                "for daily loot, weekly missions, Descent, seasonal activity, and reset timing.",
+            ),
+            ReleaseNote(
+                ReleaseSection.NEW_FEATURES,
+                "ERIN now publishes current Escalation missions, targeted loot, and Prototype "
+                "requisitions from a dated structured feed alongside active season events.",
+            ),
+            ReleaseNote(
+                ReleaseSection.NEW_FEATURES,
+                "Added local-time daily, weekly, vendor, Raid, and three-day Descent reset "
+                "timers plus confidence-gated research for regional and weekly assignments.",
+            ),
+            ReleaseNote(
+                ReleaseSection.PRIVACY_SAFETY,
+                "Future, expired, weakly sourced, or uncorroborated rotation claims are withheld "
+                "instead of being presented as current game information.",
+            ),
+            ReleaseNote(
+                ReleaseSection.MAINTENANCE,
+                "Rotation posts update in place, survive transient feed failures, persist their "
+                "checkpoint, and can be inspected or refreshed through new staff commands.",
+            ),
+        ),
+    ),
 )

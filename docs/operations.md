@@ -50,6 +50,14 @@ official auto-promotion are separately configurable. Autonomous calls cannot spe
 member reserve. Use `/rwi research-status` to inspect the checkpoint and
 `/rwi research-now` to request a staff-authorized full sweep.
 
+`RWI_ROTATION_UPDATES_ENABLED` controls the Rotation publisher.
+`RWI_ROTATION_REFRESH_MINUTES` controls direct-feed refreshes and
+`RWI_ROTATION_WEB_REFRESH_HOURS` bounds the more expensive corroborating web pass.
+`RWI_ROTATION_ESCALATION_URL` and `RWI_ROTATION_CALENDAR_URL` must remain bounded HTTPS
+JSON endpoints. Staff can inspect state with `/rwi rotations-status` or immediately
+refresh all posts and force web research with `/rwi rotations-now`. Maintenance mode
+stops both scheduled and manual rotation research.
+
 ERIN also reconciles only the explicitly requested `#erin-patch-notes` channel on a
 healthy Discord connection. The channel is readable but not writable by Agent and Rogue
 Agent roles. This targeted operation does not reconcile other channels or the role
@@ -368,6 +376,28 @@ example: `Show me the damage math: base damage 100000, weapon damage 120%, TWD 2
 100%, CHD 150%, DTA 6%, DTOC 10%. The shot is a critical headshot against an armored
 target out of cover.` ERIN validates the 60% CHC cap and shows each bucket, condition,
 multiplier, and running result. Source links remain hidden until the member asks for them.
+
+## Game rotations
+
+On a healthy Discord connection, ERIN reconciles the member-readable, bot-writable
+`ROTATIONS` category and five read-only channels: `#daily-targeted-loot`,
+`#weekly-mission-rotations`, `#descent-rotation`, `#seasonal-rotations`, and
+`#reset-timers`. Each channel contains one pinned ERIN post that is edited only when its
+content changes.
+
+The structured Escalation feed must contain an entry dated exactly for the current UTC
+day; a future or stale entry is rejected. The calendar feed supplies dated seasonal
+windows and the cyclic Descent rollover. Exact regional targeted-loot assignments,
+Invasion and Legendary projects, the named Descent pool, Classified Assignment, and Dark
+Zone state come through a budget-isolated curated web pass. Research output must be dated,
+within its validity window, and backed by retained citations. Official claims require
+official citations; community claims require current corroboration or an approved live
+reference. Single unverified reports never publish.
+
+A missing source produces a plain unconfirmed entry instead of a guess. A failed refresh
+leaves existing Discord posts intact, persists a local diagnostic checkpoint, and retries
+on the configured interval. The public posts omit source lists in keeping with ERIN's
+normal response style; retained provenance remains available for operator inspection.
 
 ## Backup
 

@@ -160,6 +160,74 @@ class AdminCog(commands.Cog):
             ephemeral=True,
         )
 
+    @rwi.command(
+        name="rotations-status",
+        description="Show ERIN's live rotation publisher state",
+    )
+    async def rotations_status(self, interaction: discord.Interaction) -> None:
+        if not self._maintenance_operator(interaction):
+            await self._deny(interaction)
+            return
+        state = await self.bot.services.rotations.status()
+        last_refresh = (
+            discord.utils.format_dt(state.last_refresh_at, style="R")
+            if state.last_refresh_at
+            else "Never"
+        )
+        last_web = (
+            discord.utils.format_dt(state.last_web_research_at, style="R")
+            if state.last_web_research_at
+            else "Never"
+        )
+        await interaction.response.send_message(
+            f"**Rotation publisher:** {state.last_status}\n"
+            f"**Last refresh:** {last_refresh}\n"
+            f"**Last web research:** {last_web}\n"
+            f"**Consecutive partial refreshes:** {state.consecutive_failures}\n\n"
+            f"{state.last_summary}",
+            ephemeral=True,
+        )
+
+    @rwi.command(
+        name="rotations-now",
+        description="Refresh every rotation channel and force current web research",
+    )
+    async def rotations_now(self, interaction: discord.Interaction) -> None:
+        if not self._maintenance_operator(interaction):
+            await self._deny(interaction)
+            return
+        if self.bot.services.maintenance.halted:
+            await interaction.response.send_message(
+                "Rotation research is disabled while ERIN is in maintenance mode.",
+                ephemeral=True,
+            )
+            return
+        cog = self.bot.get_cog("RotationsCog")
+        if cog is None:
+            await interaction.response.send_message(
+                "The rotation publisher is unavailable.", ephemeral=True
+            )
+            return
+        await interaction.response.defer(ephemeral=True, thinking=True)
+        try:
+            outcome = await cog.refresh_now(force_web=True)  # type: ignore[attr-defined]
+        except Exception:
+            await interaction.followup.send(
+                "The rotation refresh failed safely. Existing channel posts were unchanged.",
+                ephemeral=True,
+            )
+            return
+        warning_text = (
+            "\n\n**Partial-source warnings:**\n- " + "\n- ".join(outcome.warnings)
+            if outcome.warnings
+            else ""
+        )
+        await interaction.followup.send(
+            f"Rotation refresh complete. Updated **{outcome.changed}** of "
+            f"**{outcome.total}** channel posts.\n\n{outcome.summary}{warning_text}",
+            ephemeral=True,
+        )
+
     @rwi.command(name="resume", description="Run health checks and leave maintenance mode")
     @app_commands.describe(force="Owner-only override when a critical health check fails")
     async def resume(self, interaction: discord.Interaction, force: bool = False) -> None:
@@ -201,6 +269,9 @@ class AdminCog(commands.Cog):
             autonomy = self.bot.get_cog("AutonomyCog")
             if autonomy is not None:
                 autonomy.schedule_start()  # type: ignore[attr-defined]
+            rotations = self.bot.get_cog("RotationsCog")
+            if rotations is not None:
+                rotations.schedule_start()  # type: ignore[attr-defined]
         await interaction.followup.send(f"{heading}\n\n" + "\n".join(lines), ephemeral=True)
 
     @rwi.command(
@@ -240,6 +311,10 @@ class AdminCog(commands.Cog):
         releases = self.bot.get_cog("ReleaseNotesCog")
         if releases is not None:
             releases.schedule_publish()  # type: ignore[attr-defined]
+        rotations = self.bot.get_cog("RotationsCog")
+        if rotations is not None:
+            await rotations.ensure_rotation_space()  # type: ignore[attr-defined]
+            rotations.schedule_start()  # type: ignore[attr-defined]
         summary = (
             f"Created {len(report.created_roles)} roles, "
             f"{len(report.created_categories)} categories, and "

@@ -1,0 +1,623 @@
+from __future__ import annotations
+
+import asyncio
+import hashlib
+import json
+from collections.abc import Awaitable, Callable
+from dataclasses import dataclass
+from datetime import UTC, date, datetime, timedelta
+from pathlib import Path
+from typing import Any
+from urllib.parse import urlparse
+from uuid import UUID, uuid4
+
+import httpx
+from pydantic import BaseModel, Field
+
+from rwi_bot.ai.client import OpenAIUnavailableError, RwiOpenAIClient
+from rwi_bot.domain.schemas import RotationResearchItem, RotationResearchReport, SourceCitation
+
+JsonFetcher = Callable[[str], Awaitable[object]]
+
+
+class RotationCacheState(BaseModel):
+    last_refresh_at: datetime | None = None
+    last_web_research_at: datetime | None = None
+    last_status: str = "never_run"
+    last_summary: str = "Rotation intelligence has not run yet."
+    consecutive_failures: int = 0
+    web_report: RotationResearchReport | None = None
+    web_citations: list[SourceCitation] = Field(default_factory=list)
+
+
+@dataclass(frozen=True, slots=True)
+class EscalationRotation:
+    week: date
+    day: date
+    missions: tuple[tuple[str, str], ...]
+    prototype_gear_cache: str | None
+    prototype_weapon_cache: str | None
+
+
+@dataclass(frozen=True, slots=True)
+class CalendarEvent:
+    name: str
+    title: str
+    category: str
+    occurs: str
+    duration_seconds: int
+    scheduled_start: datetime | None = None
+    scheduled_active_end: datetime | None = None
+    cycle_seed: datetime | None = None
+    cycle_duration: int | None = None
+
+
+@dataclass(frozen=True, slots=True)
+class RotationField:
+    name: str
+    value: str
+    inline: bool = False
+
+
+@dataclass(frozen=True, slots=True)
+class RotationPublication:
+    key: str
+    channel_name: str
+    title: str
+    description: str
+    fields: tuple[RotationField, ...]
+    marker: str
+
+    @property
+    def fingerprint(self) -> str:
+        payload = json.dumps(
+            {
+                "title": self.title,
+                "description": self.description,
+                "fields": [
+                    {"name": field.name, "value": field.value, "inline": field.inline}
+                    for field in self.fields
+                ],
+            },
+            sort_keys=True,
+            separators=(",", ":"),
+        )
+        return hashlib.sha256(payload.encode()).hexdigest()
+
+
+@dataclass(frozen=True, slots=True)
+class RotationSnapshot:
+    correlation_id: UUID
+    publications: tuple[RotationPublication, ...]
+    warnings: tuple[str, ...]
+    web_researched: bool
+    used_cached_web: bool
+
+
+class RotationStateStore:
+    def __init__(self, path: Path) -> None:
+        self.path = path
+
+    async def load(self) -> RotationCacheState:
+        try:
+            raw = await asyncio.to_thread(self.path.read_text, encoding="utf-8")
+            return RotationCacheState.model_validate_json(raw)
+        except (FileNotFoundError, ValueError):
+            return RotationCacheState()
+
+    async def save(self, state: RotationCacheState) -> None:
+        await asyncio.to_thread(self.path.parent.mkdir, parents=True, exist_ok=True)
+        temporary = self.path.with_suffix(".tmp")
+        payload = state.model_dump_json(indent=2)
+        await asyncio.to_thread(temporary.write_text, payload, encoding="utf-8")
+        await asyncio.to_thread(temporary.replace, self.path)
+
+
+class RotationService:
+    """Collect current rotations without treating an old or unverified value as current."""
+
+    def __init__(
+        self,
+        *,
+        ai: RwiOpenAIClient,
+        state_store: RotationStateStore,
+        owner_user_id: int,
+        current_game_version: Callable[[], str],
+        escalation_url: str,
+        calendar_url: str,
+        web_refresh_hours: int,
+        enabled: bool,
+        fetch_json: JsonFetcher | None = None,
+    ) -> None:
+        self.ai = ai
+        self.state_store = state_store
+        self.owner_user_id = owner_user_id
+        self.current_game_version = current_game_version
+        self.escalation_url = escalation_url
+        self.calendar_url = calendar_url
+        self.web_refresh_hours = web_refresh_hours
+        self.enabled = enabled
+        self.fetch_json = fetch_json or self._fetch_json
+        self._state: RotationCacheState | None = None
+        self._lock = asyncio.Lock()
+
+    async def initialize(self) -> RotationCacheState:
+        self._state = await self.state_store.load()
+        return self._state
+
+    async def status(self) -> RotationCacheState:
+        if self._state is None:
+            return await self.initialize()
+        return self._state
+
+    async def collect(
+        self,
+        *,
+        force_web: bool = False,
+        now: datetime | None = None,
+    ) -> RotationSnapshot:
+        if not self.enabled:
+            raise RuntimeError("Rotation publishing is disabled.")
+        async with self._lock:
+            current = (now or datetime.now(UTC)).astimezone(UTC)
+            state = await self.status()
+            correlation_id = uuid4()
+            warnings: list[str] = []
+            direct_results = await asyncio.gather(
+                self.fetch_json(self.escalation_url),
+                self.fetch_json(self.calendar_url),
+                return_exceptions=True,
+            )
+            escalation: EscalationRotation | None = None
+            calendar: tuple[CalendarEvent, ...] = ()
+            if isinstance(direct_results[0], BaseException):
+                warnings.append("The structured Escalation feed was unavailable.")
+            else:
+                try:
+                    escalation = _parse_escalation(direct_results[0], current.date())
+                except (TypeError, ValueError, KeyError):
+                    warnings.append("The structured Escalation feed was invalid or out of date.")
+            if isinstance(direct_results[1], BaseException):
+                warnings.append("The reset calendar feed was unavailable.")
+            else:
+                try:
+                    calendar = _parse_calendar(direct_results[1])
+                except (TypeError, ValueError, KeyError):
+                    warnings.append("The reset calendar feed returned an invalid response.")
+
+            web_researched = force_web or _web_research_due(
+                state.last_web_research_at,
+                current,
+                hours=self.web_refresh_hours,
+            )
+            used_cached_web = False
+            if web_researched:
+                try:
+                    result = await self.ai.research_current_rotations(
+                        current_game_version=self.current_game_version(),
+                        actor_id=self.owner_user_id,
+                        correlation_id=correlation_id,
+                    )
+                    if result.report.as_of != current.date():
+                        raise ValueError("rotation research was not dated for today")
+                    state.web_report = result.report
+                    state.web_citations = result.citations
+                    state.last_web_research_at = current
+                except (OpenAIUnavailableError, ValueError):
+                    warnings.append(
+                        "Current community rotation research failed; ERIN retained only "
+                        "still-valid cached findings."
+                    )
+                    used_cached_web = state.web_report is not None
+            elif state.web_report is not None:
+                used_cached_web = True
+
+            accepted_items = _accepted_web_items(
+                state.web_report,
+                tuple(state.web_citations),
+                today=current.date(),
+            )
+            publications = _build_publications(
+                current,
+                escalation=escalation,
+                calendar=calendar,
+                web_items=accepted_items,
+            )
+            state.last_refresh_at = current
+            state.last_status = "completed" if not warnings else "partial"
+            state.last_summary = (
+                f"Prepared {len(publications)} rotation posts with "
+                f"{len(accepted_items)} confidence-gated researched item(s)."
+            )
+            if warnings:
+                state.consecutive_failures += 1
+            else:
+                state.consecutive_failures = 0
+            await self.state_store.save(state)
+            self._state = state
+            return RotationSnapshot(
+                correlation_id=correlation_id,
+                publications=publications,
+                warnings=tuple(warnings),
+                web_researched=web_researched,
+                used_cached_web=used_cached_web,
+            )
+
+    @staticmethod
+    async def _fetch_json(url: str) -> object:
+        timeout = httpx.Timeout(15.0, connect=5.0)
+        headers = {"User-Agent": "ERIN-RWI-Rotation-Monitor/1.0"}
+        async with httpx.AsyncClient(
+            timeout=timeout,
+            follow_redirects=True,
+            headers=headers,
+        ) as client:
+            response = await client.get(url)
+            response.raise_for_status()
+            return response.json()
+
+
+def _parse_escalation(payload: object, today: date) -> EscalationRotation:
+    root = _mapping(payload)
+    rotations = root.get("Escalation")
+    if not isinstance(rotations, list) or not rotations:
+        raise ValueError("missing Escalation rotations")
+    for raw_rotation in rotations:
+        rotation = _mapping(raw_rotation)
+        week = date.fromisoformat(str(rotation["week"]))
+        mission_names = rotation.get("missions")
+        days = rotation.get("target_loot_by_day")
+        if not isinstance(mission_names, list) or not isinstance(days, list):
+            continue
+        for raw_day in days:
+            day_data = _mapping(raw_day)
+            day = date.fromisoformat(str(day_data["day"]))
+            loot = day_data.get("target_loot")
+            if not isinstance(loot, list) or len(loot) != len(mission_names):
+                continue
+            candidate = EscalationRotation(
+                week=week,
+                day=day,
+                missions=tuple(
+                    (str(mission).strip(), str(target).strip())
+                    for mission, target in zip(mission_names, loot, strict=True)
+                    if str(mission).strip() and str(target).strip()
+                ),
+                prototype_gear_cache=_optional_text(day_data.get("prototype_gear_cache")),
+                prototype_weapon_cache=_optional_text(day_data.get("prototype_weapon_cache")),
+            )
+            if day == today:
+                return candidate
+    raise ValueError("Escalation feed has no current day")
+
+
+def _parse_calendar(payload: object) -> tuple[CalendarEvent, ...]:
+    root = _mapping(payload)
+    calendar = _mapping(root.get("calendar"))
+    raw_events = calendar.get("events")
+    if not isinstance(raw_events, list):
+        raise ValueError("calendar events are missing")
+    events: list[CalendarEvent] = []
+    for raw_event in raw_events:
+        event = _mapping(raw_event)
+        name = str(event.get("name") or "").strip()
+        if not name:
+            continue
+        events.append(
+            CalendarEvent(
+                name=name,
+                title=str(event.get("title") or name).strip(),
+                category=str(event.get("category") or "Other").strip(),
+                occurs=str(event.get("occurs") or "Unknown").strip(),
+                duration_seconds=_integer(event.get("durationSeconds"), default=0),
+                scheduled_start=_optional_datetime(event.get("scheduledStart")),
+                scheduled_active_end=_optional_datetime(event.get("scheduledActiveEnd")),
+                cycle_seed=_optional_datetime(event.get("cycleSeed")),
+                cycle_duration=_optional_integer(event.get("cycleDuration")),
+            )
+        )
+    if not events:
+        raise ValueError("calendar contained no usable events")
+    return tuple(events)
+
+
+def _accepted_web_items(
+    report: RotationResearchReport | None,
+    citations: tuple[SourceCitation, ...],
+    *,
+    today: date,
+) -> tuple[RotationResearchItem, ...]:
+    if report is None or report.as_of > today:
+        return ()
+    citation_by_url = {_normalize_url(str(citation.url)): citation for citation in citations}
+    accepted: list[RotationResearchItem] = []
+    for item in report.items:
+        if item.kind.startswith("targeted_loot_") and report.as_of != today:
+            continue
+        if item.valid_from > today or (item.valid_until is not None and item.valid_until < today):
+            continue
+        matched = [
+            citation_by_url[_normalize_url(str(url))]
+            for url in item.source_urls
+            if _normalize_url(str(url)) in citation_by_url
+        ]
+        if len(matched) != len(item.source_urls) or item.evidence_class == "community_unverified":
+            continue
+        if item.evidence_class == "official":
+            if item.confidence < 0.85 or not all(citation.official for citation in matched):
+                continue
+        elif item.confidence < 0.80:
+            continue
+        elif len({_normalize_url(str(citation.url)) for citation in matched}) < 2 and not all(
+            citation.source_type in {"community_reference", "official_live_service"}
+            for citation in matched
+        ):
+            continue
+        accepted.append(item)
+    return tuple(accepted)
+
+
+def _build_publications(
+    now: datetime,
+    *,
+    escalation: EscalationRotation | None,
+    calendar: tuple[CalendarEvent, ...],
+    web_items: tuple[RotationResearchItem, ...],
+) -> tuple[RotationPublication, ...]:
+    daily_reset = _next_weekday_reset(now, weekday=None, hour=8)
+    weekly_reset = _next_weekday_reset(now, weekday=1, hour=8)
+    vendor_reset = _next_weekday_reset(now, weekday=5, hour=8)
+    descent_reset = _descent_reset(calendar, now)
+    by_kind: dict[str, RotationResearchItem] = {
+        item.kind: item for item in web_items if item.kind != "other_rotation"
+    }
+
+    daily_fields = (
+        *(
+            RotationField(label, _item_value(by_kind.get(kind)))
+            for kind, label in (
+                ("targeted_loot_dc", "Washington, D.C."),
+                ("targeted_loot_nyc", "New York"),
+                ("targeted_loot_brooklyn", "Brooklyn"),
+            )
+        ),
+        RotationField("Escalation Targeted Loot", _escalation_loot(escalation)),
+        RotationField("Escalation Requisition", _escalation_caches(escalation), inline=True),
+        RotationField("Next Daily Reset", _discord_time(daily_reset), inline=True),
+    )
+    weekly_fields = (
+        RotationField("Escalation Mission Rotation", _escalation_missions(escalation)),
+        RotationField("Invaded Mission Rotation", _item_value(by_kind.get("invaded_missions"))),
+        RotationField(
+            "Legendary Completion Project", _item_value(by_kind.get("legendary_project"))
+        ),
+        RotationField(
+            "Free Classified Assignment", _item_value(by_kind.get("classified_assignment"))
+        ),
+        RotationField("Next Weekly Reset", _discord_time(weekly_reset), inline=True),
+    )
+    descent_fields = (
+        RotationField("Current Talent Pool", _item_value(by_kind.get("descent_pool"))),
+        RotationField("Rotation Cadence", "Every **3 days**.", inline=True),
+        RotationField(
+            "Next Pool Change",
+            _discord_time(descent_reset) if descent_reset else "Calendar timing unavailable.",
+            inline=True,
+        ),
+    )
+    active, upcoming = _calendar_windows(calendar, now)
+    seasonal_fields: list[RotationField] = [
+        RotationField("Active Now", _event_list(active)),
+        RotationField("Coming Up", _event_list(upcoming)),
+        RotationField("Dark Zone Rotation", _item_value(by_kind.get("dark_zone_mode"))),
+    ]
+    for item in web_items:
+        if item.kind == "other_rotation":
+            seasonal_fields.append(RotationField(item.title, _item_value(item)))
+    timer_fields = (
+        RotationField("Daily Targeted Loot & Projects", _discord_time(daily_reset)),
+        RotationField("Weekly Invasion, Projects & Raids", _discord_time(weekly_reset)),
+        RotationField("Vendor Stock", _discord_time(vendor_reset)),
+        RotationField(
+            "Descent Talent Pool",
+            _discord_time(descent_reset) if descent_reset else "Calendar timing unavailable.",
+        ),
+    )
+    date_label = now.strftime("%B %d, %Y")
+    return (
+        RotationPublication(
+            key="daily-targeted-loot",
+            channel_name="daily-targeted-loot",
+            title=f"Daily Targeted Loot — {date_label}",
+            description=(
+                "Current regional and Escalation loot intelligence. ERIN leaves any regional "
+                "entry unconfirmed when a dated map cannot be corroborated."
+            ),
+            fields=daily_fields,
+            marker="ERIN_ROTATION:daily-targeted-loot",
+        ),
+        RotationPublication(
+            key="weekly-mission-rotations",
+            channel_name="weekly-mission-rotations",
+            title=f"Weekly Mission Rotations — {date_label}",
+            description="Current weekly activity assignments and completion projects.",
+            fields=weekly_fields,
+            marker="ERIN_ROTATION:weekly-mission-rotations",
+        ),
+        RotationPublication(
+            key="descent-rotation",
+            channel_name="descent-rotation",
+            title=f"Descent Talent Rotation — {date_label}",
+            description="Current named Descent pool and the next three-day rollover.",
+            fields=descent_fields,
+            marker="ERIN_ROTATION:descent-rotation",
+        ),
+        RotationPublication(
+            key="seasonal-rotations",
+            channel_name="seasonal-rotations",
+            title=f"Seasonal & Dark Zone Rotations — {date_label}",
+            description="Active and upcoming seasonal events plus current DZ intelligence.",
+            fields=tuple(seasonal_fields),
+            marker="ERIN_ROTATION:seasonal-rotations",
+        ),
+        RotationPublication(
+            key="reset-timers",
+            channel_name="reset-timers",
+            title="Division 2 Reset Timers",
+            description="Reset timestamps automatically render in each member's local time.",
+            fields=timer_fields,
+            marker="ERIN_ROTATION:reset-timers",
+        ),
+    )
+
+
+def _item_value(item: RotationResearchItem | None) -> str:
+    if item is None:
+        return (
+            "*No current value cleared ERIN's evidence gate. Check the in-game map or project "
+            "menu while she retries.*"
+        )
+    return _limit("\n".join(f"• {detail}" for detail in item.details), 1024)
+
+
+def _escalation_loot(rotation: EscalationRotation | None) -> str:
+    if rotation is None:
+        return "*The dated Escalation feed is temporarily unavailable.*"
+    return _limit(
+        "\n".join(f"• **{mission}:** {loot}" for mission, loot in rotation.missions),
+        1024,
+    )
+
+
+def _escalation_missions(rotation: EscalationRotation | None) -> str:
+    if rotation is None:
+        return "*The current Escalation mission playlist is temporarily unavailable.*"
+    return "\n".join(f"• {mission}" for mission, _ in rotation.missions)
+
+
+def _escalation_caches(rotation: EscalationRotation | None) -> str:
+    if rotation is None:
+        return "Unavailable"
+    gear = rotation.prototype_gear_cache or "Unconfirmed"
+    weapon = rotation.prototype_weapon_cache or "Unconfirmed"
+    return f"Gear: **{gear.title()}**\nWeapon: **{weapon.upper()}**"
+
+
+def _calendar_windows(
+    events: tuple[CalendarEvent, ...], now: datetime
+) -> tuple[tuple[CalendarEvent, ...], tuple[CalendarEvent, ...]]:
+    scheduled = [
+        event
+        for event in events
+        if event.scheduled_start is not None and event.scheduled_active_end is not None
+    ]
+    active = tuple(
+        sorted(
+            (
+                event
+                for event in scheduled
+                if event.scheduled_start is not None
+                and event.scheduled_active_end is not None
+                and event.scheduled_start <= now < event.scheduled_active_end
+            ),
+            key=lambda event: event.scheduled_active_end or now,
+        )[:8]
+    )
+    upcoming = tuple(
+        sorted(
+            (
+                event
+                for event in scheduled
+                if event.scheduled_start is not None and event.scheduled_start > now
+            ),
+            key=lambda event: event.scheduled_start or now,
+        )[:6]
+    )
+    return active, upcoming
+
+
+def _event_list(events: tuple[CalendarEvent, ...]) -> str:
+    if not events:
+        return "*No dated events are available from the calendar feed.*"
+    lines = []
+    for event in events:
+        boundary = event.scheduled_active_end or event.scheduled_start
+        suffix = f" — until {_discord_time(boundary)}" if boundary else ""
+        lines.append(f"• **{event.title}**{suffix}")
+    return _limit("\n".join(lines), 1024)
+
+
+def _descent_reset(events: tuple[CalendarEvent, ...], now: datetime) -> datetime | None:
+    event = next((item for item in events if item.name == "Descent Playlist Rotation"), None)
+    if event is None or event.cycle_seed is None or not event.cycle_duration:
+        return None
+    if now < event.cycle_seed:
+        return event.cycle_seed
+    elapsed = int((now - event.cycle_seed).total_seconds())
+    cycles = elapsed // event.cycle_duration + 1
+    return event.cycle_seed + timedelta(seconds=cycles * event.cycle_duration)
+
+
+def _next_weekday_reset(now: datetime, *, weekday: int | None, hour: int) -> datetime:
+    candidate = now.replace(hour=hour, minute=0, second=0, microsecond=0)
+    if weekday is None:
+        return candidate if candidate > now else candidate + timedelta(days=1)
+    days = (weekday - candidate.weekday()) % 7
+    candidate += timedelta(days=days)
+    return candidate if candidate > now else candidate + timedelta(days=7)
+
+
+def _discord_time(value: datetime) -> str:
+    timestamp = int(value.timestamp())
+    return f"<t:{timestamp}:F> (<t:{timestamp}:R>)"
+
+
+def _web_research_due(previous: datetime | None, now: datetime, *, hours: int) -> bool:
+    if previous is None:
+        return True
+    return now - previous.astimezone(UTC) >= timedelta(hours=hours)
+
+
+def _mapping(value: object) -> dict[str, Any]:
+    if not isinstance(value, dict):
+        raise TypeError("expected an object")
+    return {str(key): item for key, item in value.items()}
+
+
+def _optional_text(value: object) -> str | None:
+    text = str(value or "").strip()
+    return text or None
+
+
+def _integer(value: object, *, default: int) -> int:
+    if isinstance(value, bool) or not isinstance(value, (int, float, str)):
+        return default
+    try:
+        return int(value)
+    except ValueError:
+        return default
+
+
+def _optional_integer(value: object) -> int | None:
+    if value is None:
+        return None
+    parsed = _integer(value, default=0)
+    return parsed if parsed > 0 else None
+
+
+def _optional_datetime(value: object) -> datetime | None:
+    if not isinstance(value, str) or not value.strip():
+        return None
+    parsed = datetime.fromisoformat(value.replace("Z", "+00:00"))
+    return parsed.replace(tzinfo=UTC) if parsed.tzinfo is None else parsed.astimezone(UTC)
+
+
+def _normalize_url(url: str) -> str:
+    parsed = urlparse(url)
+    return f"{parsed.scheme.casefold()}://{parsed.netloc.casefold()}{parsed.path.rstrip('/')}"
+
+
+def _limit(value: str, maximum: int) -> str:
+    if len(value) <= maximum:
+        return value
+    return value[: maximum - 1].rstrip() + "…"

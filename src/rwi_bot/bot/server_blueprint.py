@@ -160,6 +160,48 @@ CATEGORY_CHANNELS: dict[str, tuple[ChannelSpec, ...]] = {
             bot_access=True,
         ),
     ),
+    names.ROTATIONS: (
+        ChannelSpec(
+            names.DAILY_TARGETED_LOOT,
+            ChannelKind.TEXT,
+            "Read-only daily DC, New York, Brooklyn, and Escalation targeted-loot updates.",
+            access_roles=(names.AGENT, names.ROGUE_AGENT),
+            bot_access=True,
+            read_only=True,
+        ),
+        ChannelSpec(
+            names.WEEKLY_MISSION_ROTATIONS,
+            ChannelKind.TEXT,
+            "Read-only Escalation, Invasion, Legendary project, and Classified rotations.",
+            access_roles=(names.AGENT, names.ROGUE_AGENT),
+            bot_access=True,
+            read_only=True,
+        ),
+        ChannelSpec(
+            names.DESCENT_ROTATION,
+            ChannelKind.TEXT,
+            "Read-only current Descent talent pool and three-day reset timing.",
+            access_roles=(names.AGENT, names.ROGUE_AGENT),
+            bot_access=True,
+            read_only=True,
+        ),
+        ChannelSpec(
+            names.SEASONAL_ROTATIONS,
+            ChannelKind.TEXT,
+            "Read-only active and upcoming seasonal, Manhunt, event, and Dark Zone rotations.",
+            access_roles=(names.AGENT, names.ROGUE_AGENT),
+            bot_access=True,
+            read_only=True,
+        ),
+        ChannelSpec(
+            names.RESET_TIMERS,
+            ChannelKind.TEXT,
+            "Read-only local-time reset index for daily, weekly, vendor, Raid, and Descent cycles.",
+            access_roles=(names.AGENT, names.ROGUE_AGENT),
+            bot_access=True,
+            read_only=True,
+        ),
+    ),
     names.ADMINISTRATION: (
         ChannelSpec(
             names.COUNCIL,
@@ -325,7 +367,26 @@ class ServerReconciler:
             raise RuntimeError("The bot member is not available in the target guild.")
         category = discord.utils.get(self.guild.categories, name=category_name)
         if category is None:
-            raise RuntimeError(f"The {category_name} category does not exist.")
+            fetched = await self.guild.fetch_channels()
+            category = next(
+                (
+                    channel
+                    for channel in fetched
+                    if isinstance(channel, discord.CategoryChannel)
+                    and channel.name == category_name
+                ),
+                None,
+            )
+        if category is None:
+            if category_name not in CATEGORY_CHANNELS:
+                raise RuntimeError(f"The {category_name} category does not exist.")
+            category = await self.guild.create_category(
+                category_name,
+                overwrites=self._new_category_overwrites(bot_member),
+                reason="Reconcile an explicitly requested RWI category",
+            )
+        else:
+            await self._ensure_category_overwrites(category, bot_member)
         roles: dict[str, discord.Role] = {}
         for role_name in spec.access_roles:
             role = discord.utils.get(self.guild.roles, name=role_name)
@@ -348,7 +409,7 @@ class ServerReconciler:
                 overwrites=overwrites,
                 topic=spec.topic or "",
                 nsfw=spec.nsfw,
-                reason="Reconcile the explicitly requested ERIN patch-notes channel",
+                reason="Reconcile an explicitly requested ERIN-managed channel",
             )
         return channel
 

@@ -47,6 +47,9 @@ class Settings(BaseSettings):
         "steamcommunity.com",
         "thedivisionforums.com",
         "prototrack.gg",
+        "when.shd.support",
+        "divisiontimers.com",
+        "thedivisiondispatch.com",
         "siriusarc7.github.io",
         "github.com",
         "raw.githubusercontent.com",
@@ -70,6 +73,12 @@ class Settings(BaseSettings):
     autonomous_full_sweep_hours: int = Field(default=24, ge=6, le=720)
     autonomous_max_findings_per_run: int = Field(default=20, ge=1, le=50)
     autonomous_auto_promote_official: bool = True
+
+    rotation_updates_enabled: bool = True
+    rotation_refresh_minutes: int = Field(default=60, ge=15, le=1440)
+    rotation_web_refresh_hours: int = Field(default=6, ge=1, le=48)
+    rotation_escalation_url: str = "https://hi-dep.github.io/division2/data/event/index.json"
+    rotation_calendar_url: str = "https://when.shd.support/api/v1/calendar/"
 
     log_level: str = "INFO"
     runtime_dir: Path = Path("/data/runtime")
@@ -102,6 +111,13 @@ class Settings(BaseSettings):
     def valid_official_search_urls(cls, value: tuple[str, ...]) -> tuple[str, ...]:
         if any(not item.startswith("https://") for item in value):
             raise ValueError("official search URLs must use HTTPS")
+        return value
+
+    @field_validator("rotation_escalation_url", "rotation_calendar_url")
+    @classmethod
+    def valid_rotation_urls(cls, value: str) -> str:
+        if not value.startswith("https://") or len(value) > 500:
+            raise ValueError("rotation feed URLs must be bounded HTTPS URLs")
         return value
 
     @field_validator("openai_hard_budget_usd", "member_reserve_usd")

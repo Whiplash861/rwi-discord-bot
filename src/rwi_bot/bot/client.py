@@ -52,6 +52,7 @@ class RwiBot(commands.Bot):
         from rwi_bot.cogs.operations import OperationAlertRoleView, OperationsCog
         from rwi_bot.cogs.privacy import PrivacyCog
         from rwi_bot.cogs.releases import ReleaseNotesCog
+        from rwi_bot.cogs.rotations import RotationsCog
 
         self.add_view(
             PlatformRoleView(
@@ -72,6 +73,7 @@ class RwiBot(commands.Bot):
         await self.add_cog(ConversationCog(self))
         await self.add_cog(PrivacyCog(self))
         await self.add_cog(ReleaseNotesCog(self))
+        await self.add_cog(RotationsCog(self))
         await operations.restore_persistent_views()
 
         if self.services.settings.sync_commands:
@@ -140,6 +142,10 @@ class RwiBot(commands.Bot):
         autonomy = self.get_cog("AutonomyCog")
         if autonomy is not None:
             autonomy.schedule_start()  # type: ignore[attr-defined]
+        rotations = self.get_cog("RotationsCog")
+        if rotations is not None:
+            await rotations.ensure_rotation_space()  # type: ignore[attr-defined]
+            rotations.schedule_start()  # type: ignore[attr-defined]
 
     async def ensure_global_identity(self) -> None:
         user = self.user
@@ -267,6 +273,7 @@ class RwiBot(commands.Bot):
             or record.event_type == "release.published"
             or record.event_type == "autonomy.research_started"
             or record.event_type == "autonomy.no_change"
+            or record.event_type == "rotation.published"
         ):
             return
         guild = self.get_guild(self.services.settings.discord_guild_id)

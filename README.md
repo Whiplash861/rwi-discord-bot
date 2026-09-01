@@ -97,6 +97,14 @@ Verified season transitions update the answer freshness boundary and invalidate 
 answer caches. Staff can inspect this state with `/rwi research-status` or request a full
 sweep with `/rwi research-now`; maintenance mode stops all autonomous work.
 
+ERIN maintains a read-only `ROTATIONS` category with current targeted loot,
+Escalation requisitions and missions, weekly activities, Descent talent-pool timing,
+seasonal events, Dark Zone intelligence, and reset timers. Structured Escalation and
+calendar feeds update the reliable core; exact regional maps, weekly assignments, and
+talent-pool names publish only when current dated web evidence clears a strict confidence
+gate. The five posts are edited in place rather than repeated, and Discord timestamps
+render in each member's local time.
+
 Members can ask ERIN in a DM, `#ask-rwi`, or another server channel to schedule Broken
 Rain, Paradise Lost, Dark Hours, or Iron Horse. ERIN collects the organizer's role and
 any missing date, time, or timezone, then publishes an RSVP roster in the read-only
@@ -124,6 +132,8 @@ This repository is under active private-alpha development.
 - Raw DMs, secrets, and unnecessary personal information are excluded from audit logs.
 - Members can opt out of shared answer learning and privately export or reset profile data.
 - Release announcements are idempotent: reconnecting the same build never reposts it.
+- Rotation posts retain their last safe value when a refresh fails and never label stale
+  or weakly sourced data as current.
 
 ## Local quick start
 

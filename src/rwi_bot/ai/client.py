@@ -17,7 +17,12 @@ from tenacity import retry, retry_if_exception_type, stop_after_attempt, wait_ex
 
 from rwi_bot.ai.prompts import RWI_ANSWER_INSTRUCTIONS
 from rwi_bot.db.repositories import UsageRepository
-from rwi_bot.domain.schemas import ConfidenceLabel, GameResearchReport, SourceCitation
+from rwi_bot.domain.schemas import (
+    ConfidenceLabel,
+    GameResearchReport,
+    RotationResearchReport,
+    SourceCitation,
+)
 from rwi_bot.services.budget import (
     BudgetDeniedError,
     BudgetGuard,
@@ -55,6 +60,14 @@ class OpenAIAnswer:
 @dataclass(slots=True)
 class OpenAIResearchResult:
     report: GameResearchReport
+    citations: list[SourceCitation]
+    response_id: str
+    usage: UsageAmounts
+
+
+@dataclass(slots=True)
+class OpenAIRotationResult:
+    report: RotationResearchReport
     citations: list[SourceCitation]
     response_id: str
     usage: UsageAmounts
@@ -247,9 +260,7 @@ class RwiOpenAIClient:
                 )
             )
         try:
-            async with self.budget.reserve(
-                SpendingClass.AUTONOMOUS_RESEARCH, Decimal("0.60")
-            ):
+            async with self.budget.reserve(SpendingClass.AUTONOMOUS_RESEARCH, Decimal("0.60")):
                 raw_results = await asyncio.gather(
                     *(
                         self._research_game_update_pass(
@@ -389,6 +400,109 @@ class RwiOpenAIClient:
             response_id=str(getattr(response, "id", "unknown")),
             usage=usage,
         )
+
+    async def research_current_rotations(
+        self,
+        *,
+        current_game_version: str,
+        actor_id: int | None,
+        correlation_id: UUID,
+        maximum_items: int = 16,
+    ) -> OpenAIRotationResult:
+        """Find dated rotation details that are not available from ERIN's direct feeds."""
+        if self.maintenance.halted:
+            raise OpenAIUnavailableError("RWI is in maintenance mode.")
+        permit = await self.breaker.acquire()
+        if permit is None:
+            raise OpenAIUnavailableError("The OpenAI circuit breaker is open.")
+        model = self.normal_model
+        today = datetime.now(UTC).date().isoformat()
+        prompt = (
+            f"Today is {today}. ERIN's current Division 2 baseline is "
+            f"{current_game_version!r}. Search current dated sources for the rotations active "
+            "today. Look specifically for Washington DC, New York, and Brooklyn targeted loot; "
+            "this week's invaded missions and stronghold; this week's Legendary mission "
+            "completion project; the current named Descent talent pool; the free weekly "
+            "Classified Assignment; the active Dark Zone mode or weekly DZ rotation; and any "
+            "other material current rotation. Do not infer a deterministic order from old "
+            "history. Omit anything whose current value cannot be established. Every item must "
+            "have a validity date and URLs actually opened during this search. Community claims "
+            "need corroboration; label single-source reports community_unverified. Return no "
+            f"more than {maximum_items} items. Output only JSON matching: "
+            '{"as_of":"YYYY-MM-DD","summary":"...","items":[{'
+            '"kind":"targeted_loot_dc|targeted_loot_nyc|targeted_loot_brooklyn|'
+            "invaded_missions|legendary_project|descent_pool|classified_assignment|"
+            'dark_zone_mode|other_rotation","title":"...","details":["..."],'
+            '"valid_from":"YYYY-MM-DD","valid_until":"YYYY-MM-DD or null",'
+            '"confidence":0.0,"evidence_class":"official|corroborated_community|'
+            'community_unverified","source_urls":["https://..."]}],'
+            '"unavailable":["..."]}'
+        )
+        web_tool: dict[str, Any] = {"type": "web_search"}
+        allowed_domains = self._search_domains(WebSearchScope.CURATED)
+        if allowed_domains:
+            web_tool["filters"] = {"allowed_domains": list(allowed_domains)}
+        kwargs: dict[str, Any] = {
+            "model": model,
+            "instructions": (
+                "You are ERIN's guarded live-rotation researcher. Search before answering. "
+                "Prefer official and machine-readable current sources, preserve uncertainty, "
+                "and emit valid JSON without Markdown or unsupported filler."
+            ),
+            "input": prompt,
+            "tools": [web_tool],
+            "tool_choice": "required",
+            "include": ["web_search_call.action.sources"],
+            "max_output_tokens": 2800,
+            "reasoning": {"effort": "low"},
+            "store": False,
+            "timeout": 60.0,
+        }
+        try:
+            async with self._semaphore:
+                async with self.budget.reserve(SpendingClass.AUTONOMOUS_RESEARCH, Decimal("0.40")):
+                    response = await self._create_response(kwargs)
+            text, citations, search_calls = _extract_output(
+                response,
+                official_domains=self.official_domains,
+                official_urls=self.official_urls,
+                community_domains=self.community_domains,
+            )
+            usage = _extract_usage(response, search_calls)
+            report = RotationResearchReport.model_validate_json(_json_payload(text))
+            await self.usage_repository.append(
+                operation="rotation_research",
+                model=model,
+                input_tokens=usage.input_tokens,
+                cached_input_tokens=usage.cached_input_tokens,
+                cache_write_tokens=usage.cache_write_tokens,
+                output_tokens=usage.output_tokens,
+                tool_calls=usage.web_search_calls,
+                estimated_cost=estimate_cost(model, usage),
+                user_id=actor_id,
+                correlation_id=correlation_id,
+            )
+            await self.breaker.success()
+            return OpenAIRotationResult(
+                report=report,
+                citations=citations,
+                response_id=str(getattr(response, "id", "unknown")),
+                usage=usage,
+            )
+        except BudgetDeniedError as exc:
+            raise OpenAIUnavailableError(
+                "The rotation research budget is currently reserved for member answers."
+            ) from exc
+        except Exception as exc:
+            await self.breaker.failure()
+            self.log.warning(
+                "rotation_research_failed",
+                correlation_id=str(correlation_id),
+                error_type=type(exc).__name__,
+            )
+            raise OpenAIUnavailableError("Current rotation research failed.") from exc
+        finally:
+            await self.breaker.abandon(permit)
 
     async def _answer_with_permit(
         self,

@@ -137,3 +137,12 @@ def test_scheduled_operations_channel_is_read_only_and_matchmaking_role_is_menti
     assert channel.read_only is True
     assert channel.bot_access is True
     assert role.mentionable is True
+
+
+def test_all_rotation_channels_are_read_only_and_visible_to_members() -> None:
+    channels = CATEGORY_CHANNELS[names.ROTATIONS]
+
+    assert tuple(channel.name for channel in channels) == names.ROTATION_CHANNELS
+    assert all(channel.kind is ChannelKind.TEXT for channel in channels)
+    assert all(channel.read_only and channel.bot_access for channel in channels)
+    assert all(channel.access_roles == (names.AGENT, names.ROGUE_AGENT) for channel in channels)

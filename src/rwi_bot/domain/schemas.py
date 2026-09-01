@@ -138,3 +138,31 @@ class GameResearchReport(BaseModel):
     official_evidence_urls: list[HttpUrl] = Field(default_factory=list)
     findings: list[GameResearchFinding] = Field(default_factory=list)
     unresolved_questions: list[str] = Field(default_factory=list)
+
+
+class RotationResearchItem(BaseModel):
+    kind: Literal[
+        "targeted_loot_dc",
+        "targeted_loot_nyc",
+        "targeted_loot_brooklyn",
+        "invaded_missions",
+        "legendary_project",
+        "descent_pool",
+        "classified_assignment",
+        "dark_zone_mode",
+        "other_rotation",
+    ]
+    title: str = Field(min_length=1, max_length=200)
+    details: list[str] = Field(min_length=1, max_length=24)
+    valid_from: date
+    valid_until: date | None = None
+    confidence: float = Field(ge=0.0, le=1.0)
+    evidence_class: Literal["official", "corroborated_community", "community_unverified"]
+    source_urls: list[HttpUrl] = Field(min_length=1, max_length=8)
+
+
+class RotationResearchReport(BaseModel):
+    as_of: date
+    summary: str = Field(min_length=1, max_length=1500)
+    items: list[RotationResearchItem] = Field(default_factory=list, max_length=30)
+    unavailable: list[str] = Field(default_factory=list, max_length=20)

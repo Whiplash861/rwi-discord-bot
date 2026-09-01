@@ -4,7 +4,7 @@ build-backend = "hatchling.build"
 
 [project]
 name = "rwi-discord-bot"
-version = "0.1.24"
+version = "0.1.25"
 description = "The Redwing Initiative Discord knowledge and build-advice bot"
 readme = "README.md"
 requires-python = ">=3.12,<3.14"
@@ -12,6 +12,7 @@ dependencies = [
   "alembic>=1.16,<2",
   "asyncpg>=0.30,<1",
   "discord.py>=2.5,<3",
+  "httpx>=0.28,<1",
   "openai>=2,<3",
   "orjson>=3.10,<4",
   "pgvector>=0.4,<1",

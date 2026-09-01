@@ -303,6 +303,28 @@ views for every active announcement and reminder. A background dispatcher sends 
 attendance check to non-withdrawn RSVPs during the final hour and marks it sent
 transactionally to prevent reconnect duplicates.
 
+## Rotation intelligence
+
+The Rotation service separates deterministic timing, direct structured feeds, and
+confidence-gated web research. Escalation mission, targeted-loot, and requisition data is
+accepted only for an exact current-day feed entry. A structured calendar provides dated
+season windows and the seed plus duration for cyclic Descent resets. Daily, Tuesday
+weekly, and Saturday vendor reset timestamps are calculated locally in UTC and rendered
+with Discord-local timestamp tags.
+
+Rotation values without a dependable direct feed are researched on a slower bounded
+cadence using the curated source set. Each structured result carries a validity window,
+confidence class, and the URLs actually retained by search. Current regional targeted
+loot cannot survive a day boundary; weekly values may remain only through their declared
+validity window. Weak, future, expired, uncited, or single-source community claims are
+dropped before presentation.
+
+One atomic runtime checkpoint retains the last web report, citations, refresh status, and
+failure count. Discord remains presentation: each read-only Rotation channel has a stable
+footer marker, and the publisher edits that one pinned embed only when its content differs.
+Provider or feed failure cannot erase the previous Discord presentation. Maintenance mode
+stops the loop, while successful resume restarts it.
+
 ## Damage calculation order
 
 Explicit single-projectile calculations use structured decimal inputs and never delegate

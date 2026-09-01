@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from datetime import UTC, datetime
 from decimal import Decimal
 from pathlib import Path
 from types import SimpleNamespace
@@ -113,6 +114,29 @@ class PartiallyFailingResearchResponses:
             usage=SimpleNamespace(
                 input_tokens=100,
                 output_tokens=100,
+                input_tokens_details=SimpleNamespace(cached_tokens=0, cache_write_tokens=0),
+            ),
+        )
+
+
+class CapturingRotationResponse:
+    def __init__(self) -> None:
+        self.kwargs: dict[str, object] = {}
+
+    async def create(self, **kwargs: object) -> SimpleNamespace:
+        self.kwargs = kwargs
+        today = datetime.now(UTC).date().isoformat()
+        return SimpleNamespace(
+            id="rotation-response",
+            status="completed",
+            output_text=(
+                f'{{"as_of":"{today}","summary":"No exact values found.",'
+                '"items":[],"unavailable":["regional maps"]}'
+            ),
+            output=[],
+            usage=SimpleNamespace(
+                input_tokens=100,
+                output_tokens=80,
                 input_tokens_details=SimpleNamespace(cached_tokens=0, cache_write_tokens=0),
             ),
         )
@@ -275,6 +299,48 @@ async def test_autonomous_research_uses_a_short_bounded_official_pass(
         {"type": "web_search", "filters": {"allowed_domains": ["ubisoft.com"]}}
     ]
     assert usage.records[0]["operation"] == "autonomous_game_research_official"
+
+
+@pytest.mark.asyncio
+async def test_rotation_research_requires_bounded_curated_web_search(tmp_path: Path) -> None:
+    maintenance = MaintenanceManager(tmp_path)
+    await maintenance.load()
+    usage = RecordingUsage()
+    responses = CapturingRotationResponse()
+    client = RwiOpenAIClient(
+        api_key="test-placeholder",
+        maintenance=maintenance,
+        budget=BudgetGuard(
+            cast(Any, usage),
+            hard_limit=Decimal("25"),
+            member_reserve=Decimal("5"),
+        ),
+        usage_repository=cast(Any, usage),
+        normal_model="gpt-5.6-terra",
+        complex_model="gpt-5.6",
+        economy_model="gpt-5.6-luna",
+        official_domains=("ubisoft.com",),
+        community_domains=("prototrack.gg", "when.shd.support"),
+    )
+    client.client = cast(Any, SimpleNamespace(responses=responses))
+
+    result = await client.research_current_rotations(
+        current_game_version="Y8S3 Red Horizon",
+        actor_id=42,
+        correlation_id=uuid4(),
+    )
+
+    assert result.report.items == []
+    assert responses.kwargs["timeout"] == 60.0
+    assert responses.kwargs["model"] == "gpt-5.6-terra"
+    assert responses.kwargs["tool_choice"] == "required"
+    assert responses.kwargs["tools"] == [
+        {
+            "type": "web_search",
+            "filters": {"allowed_domains": ["ubisoft.com", "prototrack.gg", "when.shd.support"]},
+        }
+    ]
+    assert usage.records[0]["operation"] == "rotation_research"
 
 
 @pytest.mark.asyncio
