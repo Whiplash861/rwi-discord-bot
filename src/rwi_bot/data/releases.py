@@ -966,4 +966,22 @@ RELEASES: tuple[Release, ...] = (
             ),
         ),
     ),
+    Release(
+        release_id="erin-update-34",
+        update_number=34,
+        version="V0.1.33",
+        released_on=date(2026, 9, 1),
+        notes=(
+            ReleaseNote(
+                ReleaseSection.FIXES,
+                "Validated current Reddit posts now persist between staggered feed checks and "
+                "ERIN's later research pass, preventing useful daily evidence from being lost.",
+            ),
+            ReleaseNote(
+                ReleaseSection.PRIVACY_SAFETY,
+                "Cached Reddit evidence is revalidated against its reporter, subreddit, title, "
+                "and active daily or weekly reset window before every reuse.",
+            ),
+        ),
+    ),
 )

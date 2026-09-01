@@ -30,6 +30,15 @@ JsonFetcher = Callable[[str], Awaitable[object]]
 TextFetcher = Callable[[str], Awaitable[str]]
 
 
+class RedditMegathread(BaseModel):
+    title: str
+    url: str
+    author: str
+    subreddit: str
+    updated_at: datetime
+    content: str
+
+
 class RotationCacheState(BaseModel):
     last_refresh_at: datetime | None = None
     last_web_research_at: datetime | None = None
@@ -38,6 +47,7 @@ class RotationCacheState(BaseModel):
     consecutive_failures: int = 0
     web_report: RotationResearchReport | None = None
     web_citations: list[SourceCitation] = Field(default_factory=list)
+    reddit_posts: list[RedditMegathread] = Field(default_factory=list)
 
 
 @dataclass(frozen=True, slots=True)
@@ -67,16 +77,6 @@ class VendorFeed:
     updated_at: datetime
     source_url: str
     items: tuple[VendorStockEntry, ...]
-
-
-@dataclass(frozen=True, slots=True)
-class RedditMegathread:
-    title: str
-    url: str
-    author: str
-    subreddit: str
-    updated_at: datetime
-    content: str
 
 
 @dataclass(frozen=True, slots=True)
@@ -265,7 +265,13 @@ class RotationService:
 
             trusted_posts: tuple[RedditMegathread, ...] = ()
             try:
-                trusted_posts = _trusted_reddit_posts(tuple(reddit_feeds), now=current)
+                fetched_posts = _trusted_reddit_posts(tuple(reddit_feeds), now=current)
+                trusted_posts = _merge_reddit_posts(
+                    tuple(state.reddit_posts),
+                    fetched_posts,
+                    now=current,
+                )
+                state.reddit_posts = list(trusted_posts)
             except (ET.ParseError, TypeError, ValueError):
                 warnings.append("A trusted Reddit megathread feed returned invalid data.")
             reddit_items = _reddit_rotation_items(trusted_posts, now=current)
@@ -319,6 +325,7 @@ class RotationService:
                     reddit_items,
                     today=current.date(),
                 )
+            if reddit_citations:
                 state.web_citations = list(
                     _merge_citations(tuple(state.web_citations), reddit_citations)
                 )
@@ -551,33 +558,66 @@ def _trusted_reddit_posts(
     *,
     now: datetime,
 ) -> tuple[RedditMegathread, ...]:
-    weekly_reset = _latest_weekday_reset(now, weekday=1, hour=8).date()
     trusted: list[RedditMegathread] = []
     for feed_kind, payload in feeds:
         posts = _parse_reddit_atom(payload)
         for post in posts:
-            author = post.author.casefold().removeprefix("/u/").removeprefix("u/")
-            subreddit = post.subreddit.casefold()
-            title = post.title.casefold()
-            if feed_kind == "weekly":
-                if author != "rubenalamina" or subreddit != "thedivision":
-                    continue
-                if "week of" not in title or "weekly invaded missions" not in title:
-                    continue
-                if _weekly_megathread_date(post.title) != weekly_reset:
-                    continue
-            elif feed_kind == "daily":
-                if author != "lunaticwolfyy" or subreddit != "division2":
-                    continue
-                if "daily escalation missions" not in title:
-                    continue
-                if post.updated_at.date() != now.date():
-                    continue
-            else:
-                continue
-            trusted.append(post)
+            if _reddit_post_is_trusted(post, feed_kind=feed_kind, now=now):
+                trusted.append(post)
     unique = {_normalize_url(post.url): post for post in trusted}
     return tuple(sorted(unique.values(), key=lambda post: post.updated_at, reverse=True))
+
+
+def _merge_reddit_posts(
+    cached: tuple[RedditMegathread, ...],
+    fetched: tuple[RedditMegathread, ...],
+    *,
+    now: datetime,
+) -> tuple[RedditMegathread, ...]:
+    current: dict[str, RedditMegathread] = {}
+    for post in (*cached, *fetched):
+        feed_kind = _reddit_post_feed_kind(post)
+        if feed_kind is None or not _reddit_post_is_trusted(post, feed_kind=feed_kind, now=now):
+            continue
+        current[_normalize_url(post.url)] = post
+    return tuple(sorted(current.values(), key=lambda post: post.updated_at, reverse=True))
+
+
+def _reddit_post_feed_kind(post: RedditMegathread) -> str | None:
+    author = post.author.casefold().removeprefix("/u/").removeprefix("u/")
+    if author == "rubenalamina":
+        return "weekly"
+    if author == "lunaticwolfyy":
+        return "daily"
+    return None
+
+
+def _reddit_post_is_trusted(
+    post: RedditMegathread,
+    *,
+    feed_kind: str,
+    now: datetime,
+) -> bool:
+    author = post.author.casefold().removeprefix("/u/").removeprefix("u/")
+    subreddit = post.subreddit.casefold()
+    title = post.title.casefold()
+    if feed_kind == "weekly":
+        weekly_reset = _latest_weekday_reset(now, weekday=1, hour=8).date()
+        return (
+            author == "rubenalamina"
+            and subreddit == "thedivision"
+            and "week of" in title
+            and "weekly invaded missions" in title
+            and _weekly_megathread_date(post.title) == weekly_reset
+        )
+    if feed_kind == "daily":
+        return (
+            author == "lunaticwolfyy"
+            and subreddit == "division2"
+            and "daily escalation missions" in title
+            and post.updated_at.date() == now.date()
+        )
+    return False
 
 
 def _parse_reddit_atom(payload: str) -> tuple[RedditMegathread, ...]:

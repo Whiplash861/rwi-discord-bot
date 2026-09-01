@@ -669,3 +669,36 @@ async def test_exact_current_daily_report_is_promoted_without_trusting_all_reddi
     assert "Black Tusk" in rendered
     assert state.web_citations[0].source_type == "community_reference"
     assert state.web_citations[0].official is False
+
+
+@pytest.mark.asyncio
+async def test_valid_daily_post_persists_until_later_research_cycle(tmp_path: Path) -> None:
+    daily_feed = reddit_feed(
+        title="Division 2 Daily Escalation Missions & Their Targeted Loot - 01/09/2026",
+        author="/u/lunaticwolfyy",
+        subreddit="Division2",
+        url="https://www.reddit.com/r/Division2/comments/current/daily_rotation/",
+        content="<p>Current Dark Zone observations.</p>",
+    )
+    ai = SimpleNamespace(
+        research_current_rotations=AsyncMock(
+            return_value=SimpleNamespace(
+                report=RotationResearchReport(
+                    as_of=date(2026, 9, 1), summary="No complete result.", items=[]
+                ),
+                citations=[],
+            )
+        )
+    )
+    service = build_service(tmp_path, ai=ai, daily_reddit=daily_feed)
+    state = await service.initialize()
+    state.last_web_research_at = NOW
+
+    await service.collect(now=NOW.replace(hour=13))
+    later = await service.collect(now=NOW.replace(hour=18))
+
+    assert ai.research_current_rotations.await_count == 1
+    call = ai.research_current_rotations.await_args.kwargs
+    assert "Author: /u/lunaticwolfyy" in call["megathread_context"]
+    assert "Current Dark Zone observations" in call["megathread_context"]
+    assert later.web_researched is True
