@@ -659,7 +659,7 @@ async def test_exact_current_daily_report_is_promoted_without_trusting_all_reddi
     )
     service = build_service(tmp_path, ai=ai, daily_reddit=daily_feed)
 
-    snapshot = await service.collect(now=NOW)
+    snapshot = await service.collect(now=NOW.replace(hour=13))
     state = await service.status()
 
     dark_zone = next(item for item in snapshot.publications if item.key == "dark-zone-rotations")

@@ -948,4 +948,22 @@ RELEASES: tuple[Release, ...] = (
             ),
         ),
     ),
+    Release(
+        release_id="erin-update-33",
+        update_number=33,
+        version="V0.1.32",
+        released_on=date(2026, 9, 1),
+        notes=(
+            ReleaseNote(
+                ReleaseSection.FIXES,
+                "Staggered weekly and daily Reddit feed checks across refresh cycles so Reddit's "
+                "anonymous RSS quota cannot permanently block the second rotation source.",
+            ),
+            ReleaseNote(
+                ReleaseSection.IMPROVEMENTS,
+                "Tuesday checks prioritize the weekly Invaded Mission megathread while daily "
+                "Dark Zone reports continue on the alternating refresh cycle.",
+            ),
+        ),
+    ),
 )

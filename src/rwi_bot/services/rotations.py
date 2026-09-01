@@ -193,7 +193,6 @@ class RotationService:
         self.enabled = enabled
         self.fetch_json = fetch_json or self._fetch_json
         self.fetch_text = fetch_text or self._fetch_text
-        self._reddit_request_spacing = 1.0 if fetch_text is None else 0.0
         self._state: RotationCacheState | None = None
         self._lock = asyncio.Lock()
 
@@ -223,7 +222,7 @@ class RotationService:
                 self.fetch_json(self.escalation_url),
                 self.fetch_json(self.calendar_url),
                 self._load_vendor_feed(),
-                self._load_reddit_feeds(),
+                self._load_reddit_feeds(now=current),
                 return_exceptions=True,
             )
             escalation: EscalationRotation | None = None
@@ -404,7 +403,7 @@ class RotationService:
             source_url=page_url,
         )
 
-    async def _load_reddit_feeds(self) -> RedditFeedBatch:
+    async def _load_reddit_feeds(self, *, now: datetime) -> RedditFeedBatch:
         feeds: list[tuple[str, str]] = []
         unavailable: list[str] = []
         configured = tuple(
@@ -415,9 +414,10 @@ class RotationService:
             )
             if url is not None
         )
-        for index, (label, url) in enumerate(configured):
-            if index and self._reddit_request_spacing:
-                await asyncio.sleep(self._reddit_request_spacing)
+        if len(configured) > 1:
+            preferred_label = "weekly" if now.weekday() == 1 and now.hour % 2 == 0 else "daily"
+            configured = tuple(item for item in configured if item[0] == preferred_label)
+        for label, url in configured:
             try:
                 payload = await self.fetch_text(url)
             except Exception:  # Feed loss is isolated; other rotation inputs remain usable.
