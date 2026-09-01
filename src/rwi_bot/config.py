@@ -88,6 +88,15 @@ class Settings(BaseSettings):
     rotation_vendor_gear_url: str = "https://rubenalamina.mx/division/gear.json"
     rotation_vendor_weapons_url: str = "https://rubenalamina.mx/division/weapons.json"
     rotation_vendor_mods_url: str = "https://rubenalamina.mx/division/mods.json"
+    rotation_reddit_weekly_feed_url: str = (
+        "https://www.reddit.com/r/thedivision/search.rss?"
+        "q=%22Weekly%20Invaded%20Missions%22&restrict_sr=on&sort=new&t=month"
+    )
+    rotation_reddit_daily_feed_url: str = (
+        "https://www.reddit.com/r/Division2/search.rss?"
+        "q=author%3Alunaticwolfyy%20%22Daily%20Escalation%20Missions%22&"
+        "restrict_sr=on&sort=new&t=week"
+    )
 
     log_level: str = "INFO"
     runtime_dir: Path = Path("/data/runtime")
@@ -129,6 +138,8 @@ class Settings(BaseSettings):
         "rotation_vendor_gear_url",
         "rotation_vendor_weapons_url",
         "rotation_vendor_mods_url",
+        "rotation_reddit_weekly_feed_url",
+        "rotation_reddit_daily_feed_url",
     )
     @classmethod
     def valid_rotation_urls(cls, value: str) -> str:

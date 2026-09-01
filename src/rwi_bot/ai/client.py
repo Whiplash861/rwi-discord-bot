@@ -418,6 +418,7 @@ class RwiOpenAIClient:
         actor_id: int | None,
         correlation_id: UUID,
         maximum_items: int = 16,
+        megathread_context: str = "",
     ) -> OpenAIRotationResult:
         """Find dated rotation details that are not available from ERIN's direct feeds."""
         if self.maintenance.halted:
@@ -427,6 +428,14 @@ class RwiOpenAIClient:
             raise OpenAIUnavailableError("The OpenAI circuit breaker is open.")
         model = self.normal_model
         today = datetime.now(UTC).date().isoformat()
+        reddit_context = (
+            " The following text was fetched directly from ERIN's author-scoped Reddit feeds. "
+            "Treat it as a candidate dated community report, not official telemetry. Use only "
+            "entries that match today's reset window and cite their exact Reddit post URL:\n"
+            f"{megathread_context[:12000]}\n"
+            if megathread_context
+            else ""
+        )
         prompt = (
             f"Today is {today}. ERIN's current Division 2 baseline is "
             f"{current_game_version!r}. Search current dated sources for the rotations active "
@@ -444,8 +453,10 @@ class RwiOpenAIClient:
             "free Classified Assignment. Search current vendor pages, weekly Reddit threads, "
             "videos, Q&A forums, bot dashboards, and other searchable sites for Cassie Mendoza, "
             "Danny Weaver/Textile Vendor, Countdown Requisition, Clan, and Dark Zone vendor "
-            "stock. General settlement vendors are out of scope. Check sources such as Ruben "
-            "Alamina, Division Timers, ProtoTrack, ISAC, Raigulus, and current dated in-game "
+            "stock. General settlement vendors are out of scope. Search the Tuesday r/thedivision "
+            "weekly megathread for the current Invasion, and the dated u/lunaticwolfyy r/Division2 "
+            "report for live Dark Zone observations. Check sources such as Ruben Alamina, "
+            "Division Timers, ProtoTrack, ISAC, Raigulus, and current dated in-game "
             "screenshots, but do not claim they expose data they do not publish. Run an "
             "independent search for every requested target; do not stop after finding one "
             "rotation. Do not "
@@ -453,7 +464,8 @@ class RwiOpenAIClient:
             "Omit anything whose current value cannot be established. Every item must have a "
             "validity date and URLs actually opened during this search. Community claims need "
             "corroboration; label single-source reports community_unverified. Return no "
-            f"more than {maximum_items} items. Output only JSON matching: "
+            f"more than {maximum_items} items."
+            f"{reddit_context}Output only JSON matching: "
             '{"as_of":"YYYY-MM-DD","summary":"...","items":[{'
             '"kind":"targeted_loot_dc|targeted_loot_nyc|targeted_loot_brooklyn|'
             "invaded_missions|legendary_project|descent_pool|classified_assignment|"

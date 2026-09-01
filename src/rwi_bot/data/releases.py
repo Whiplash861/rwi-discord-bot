@@ -919,4 +919,33 @@ RELEASES: tuple[Release, ...] = (
             ),
         ),
     ),
+    Release(
+        release_id="erin-update-32",
+        update_number=32,
+        version="V0.1.31",
+        released_on=date(2026, 9, 1),
+        notes=(
+            ReleaseNote(
+                ReleaseSection.HIGH_IMPACT,
+                "ERIN now ingests the dated Tuesday Division 2 Reddit megathread as a live "
+                "community-reference feed for weekly Invaded Missions.",
+            ),
+            ReleaseNote(
+                ReleaseSection.NEW_FEATURES,
+                "Trusted daily Division 2 Reddit reports are supplied directly to Dark Zone "
+                "research so current observations can be structured when no game-state API exists.",
+            ),
+            ReleaseNote(
+                ReleaseSection.PRIVACY_SAFETY,
+                "Reddit trust is scoped to approved reporters, expected subreddits, exact post "
+                "URLs, and the active reset window; unrelated posts remain unverified community "
+                "content.",
+            ),
+            ReleaseNote(
+                ReleaseSection.FIXES,
+                "Stale, wrong-author, malformed, or incomplete megathreads are rejected instead "
+                "of being displayed as current rotation data.",
+            ),
+        ),
+    ),
 )

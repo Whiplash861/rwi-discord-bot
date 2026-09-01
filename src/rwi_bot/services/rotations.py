@@ -5,6 +5,7 @@ import hashlib
 import html
 import json
 import re
+import xml.etree.ElementTree as ET
 from collections.abc import Awaitable, Callable
 from dataclasses import dataclass
 from datetime import UTC, date, datetime, timedelta
@@ -66,6 +67,22 @@ class VendorFeed:
     updated_at: datetime
     source_url: str
     items: tuple[VendorStockEntry, ...]
+
+
+@dataclass(frozen=True, slots=True)
+class RedditMegathread:
+    title: str
+    url: str
+    author: str
+    subreddit: str
+    updated_at: datetime
+    content: str
+
+
+@dataclass(frozen=True, slots=True)
+class RedditFeedBatch:
+    feeds: tuple[tuple[str, str], ...]
+    unavailable: tuple[str, ...]
 
 
 @dataclass(frozen=True, slots=True)
@@ -153,6 +170,8 @@ class RotationService:
         vendor_gear_url: str | None = None,
         vendor_weapons_url: str | None = None,
         vendor_mods_url: str | None = None,
+        reddit_weekly_feed_url: str | None = None,
+        reddit_daily_feed_url: str | None = None,
         web_refresh_hours: int,
         enabled: bool,
         fetch_json: JsonFetcher | None = None,
@@ -168,10 +187,13 @@ class RotationService:
         self.vendor_gear_url = vendor_gear_url
         self.vendor_weapons_url = vendor_weapons_url
         self.vendor_mods_url = vendor_mods_url
+        self.reddit_weekly_feed_url = reddit_weekly_feed_url
+        self.reddit_daily_feed_url = reddit_daily_feed_url
         self.web_refresh_hours = web_refresh_hours
         self.enabled = enabled
         self.fetch_json = fetch_json or self._fetch_json
         self.fetch_text = fetch_text or self._fetch_text
+        self._reddit_request_spacing = 1.0 if fetch_text is None else 0.0
         self._state: RotationCacheState | None = None
         self._lock = asyncio.Lock()
 
@@ -201,11 +223,13 @@ class RotationService:
                 self.fetch_json(self.escalation_url),
                 self.fetch_json(self.calendar_url),
                 self._load_vendor_feed(),
+                self._load_reddit_feeds(),
                 return_exceptions=True,
             )
             escalation: EscalationRotation | None = None
             calendar: tuple[CalendarEvent, ...] = ()
             vendor_feed: VendorFeed | None = None
+            reddit_feeds: list[tuple[str, str]] = []
             if isinstance(direct_results[0], BaseException):
                 warnings.append("The structured Escalation feed was unavailable.")
             else:
@@ -230,6 +254,24 @@ class RotationService:
                         "The weekly vendor feed has not updated since the current reset."
                     )
                     vendor_feed = None
+            reddit_result = direct_results[3]
+            if isinstance(reddit_result, BaseException):
+                warnings.append("The trusted Reddit rotation feeds were unavailable.")
+            elif isinstance(reddit_result, RedditFeedBatch):
+                reddit_feeds.extend(reddit_result.feeds)
+                warnings.extend(
+                    f"The trusted Reddit {label} feed was unavailable."
+                    for label in reddit_result.unavailable
+                )
+
+            trusted_posts: tuple[RedditMegathread, ...] = ()
+            try:
+                trusted_posts = _trusted_reddit_posts(tuple(reddit_feeds), now=current)
+            except (ET.ParseError, TypeError, ValueError):
+                warnings.append("A trusted Reddit megathread feed returned invalid data.")
+            reddit_items = _reddit_rotation_items(trusted_posts, now=current)
+            reddit_citations = _reddit_citations(trusted_posts)
+            reddit_context = _reddit_megathread_context(trusted_posts)
 
             web_researched = force_web or _web_research_due(
                 state.last_web_research_at,
@@ -244,11 +286,24 @@ class RotationService:
                         current_game_version=self.current_game_version(),
                         actor_id=self.owner_user_id,
                         correlation_id=correlation_id,
+                        megathread_context=reddit_context,
                     )
                     if result.report.as_of != current.date():
                         raise ValueError("rotation research was not dated for today")
-                    state.web_report = result.report
-                    state.web_citations = result.citations
+                    state.web_report = _merge_rotation_report(
+                        result.report,
+                        reddit_items,
+                        today=current.date(),
+                    )
+                    state.web_citations = list(
+                        _merge_citations(
+                            _promote_trusted_reddit_citations(
+                                tuple(result.citations),
+                                trusted_posts,
+                            ),
+                            reddit_citations,
+                        )
+                    )
                     state.last_web_research_at = current
                 except (OpenAIUnavailableError, ValueError):
                     warnings.append(
@@ -258,6 +313,16 @@ class RotationService:
                     used_cached_web = state.web_report is not None
             elif state.web_report is not None:
                 used_cached_web = True
+
+            if reddit_items:
+                state.web_report = _merge_rotation_report(
+                    state.web_report,
+                    reddit_items,
+                    today=current.date(),
+                )
+                state.web_citations = list(
+                    _merge_citations(tuple(state.web_citations), reddit_citations)
+                )
 
             accepted_items = _accepted_web_items(
                 state.web_report,
@@ -338,6 +403,29 @@ class RotationService:
             (gear, weapons, mods),
             source_url=page_url,
         )
+
+    async def _load_reddit_feeds(self) -> RedditFeedBatch:
+        feeds: list[tuple[str, str]] = []
+        unavailable: list[str] = []
+        configured = tuple(
+            (label, url)
+            for label, url in (
+                ("weekly", self.reddit_weekly_feed_url),
+                ("daily", self.reddit_daily_feed_url),
+            )
+            if url is not None
+        )
+        for index, (label, url) in enumerate(configured):
+            if index and self._reddit_request_spacing:
+                await asyncio.sleep(self._reddit_request_spacing)
+            try:
+                payload = await self.fetch_text(url)
+            except Exception:  # Feed loss is isolated; other rotation inputs remain usable.
+                unavailable.append(label)
+                continue
+            if payload.strip():
+                feeds.append((label, payload))
+        return RedditFeedBatch(feeds=tuple(feeds), unavailable=tuple(unavailable))
 
 
 def _parse_escalation(payload: object, today: date) -> EscalationRotation:
@@ -456,6 +544,256 @@ def _parse_vendor_feed(
     if not items:
         raise ValueError("vendor inventory contained no relevant stock")
     return VendorFeed(updated_at=updated_at, source_url=source_url, items=tuple(items))
+
+
+def _trusted_reddit_posts(
+    feeds: tuple[tuple[str, str], ...],
+    *,
+    now: datetime,
+) -> tuple[RedditMegathread, ...]:
+    weekly_reset = _latest_weekday_reset(now, weekday=1, hour=8).date()
+    trusted: list[RedditMegathread] = []
+    for feed_kind, payload in feeds:
+        posts = _parse_reddit_atom(payload)
+        for post in posts:
+            author = post.author.casefold().removeprefix("/u/").removeprefix("u/")
+            subreddit = post.subreddit.casefold()
+            title = post.title.casefold()
+            if feed_kind == "weekly":
+                if author != "rubenalamina" or subreddit != "thedivision":
+                    continue
+                if "week of" not in title or "weekly invaded missions" not in title:
+                    continue
+                if _weekly_megathread_date(post.title) != weekly_reset:
+                    continue
+            elif feed_kind == "daily":
+                if author != "lunaticwolfyy" or subreddit != "division2":
+                    continue
+                if "daily escalation missions" not in title:
+                    continue
+                if post.updated_at.date() != now.date():
+                    continue
+            else:
+                continue
+            trusted.append(post)
+    unique = {_normalize_url(post.url): post for post in trusted}
+    return tuple(sorted(unique.values(), key=lambda post: post.updated_at, reverse=True))
+
+
+def _parse_reddit_atom(payload: str) -> tuple[RedditMegathread, ...]:
+    if len(payload) > 2_000_000 or re.search(r"<!DOCTYPE|<!ENTITY", payload, re.IGNORECASE):
+        raise ValueError("Reddit feed XML exceeded its safety bounds")
+    root = ET.fromstring(payload)  # noqa: S314 - bounded and DTD/entity declarations rejected
+    namespace = "{http://www.w3.org/2005/Atom}"
+    posts: list[RedditMegathread] = []
+    for entry in root.findall(f"{namespace}entry"):
+        title = (entry.findtext(f"{namespace}title") or "").strip()
+        author = (entry.findtext(f"{namespace}author/{namespace}name") or "").strip()
+        updated_text = (entry.findtext(f"{namespace}updated") or "").strip()
+        content_markup = entry.findtext(f"{namespace}content") or ""
+        link = next(
+            (
+                str(candidate.get("href") or "").strip()
+                for candidate in entry.findall(f"{namespace}link")
+                if candidate.get("rel", "alternate") == "alternate"
+            ),
+            "",
+        )
+        parsed = urlparse(link)
+        subreddit_match = re.match(r"^/r/([^/]+)/comments/[^/]+", parsed.path, re.IGNORECASE)
+        if (
+            not title
+            or not author
+            or not link
+            or subreddit_match is None
+            or not _hostname_matches_domain((parsed.hostname or "").casefold(), "reddit.com")
+        ):
+            continue
+        updated_at = _optional_datetime(updated_text)
+        if updated_at is None:
+            continue
+        posts.append(
+            RedditMegathread(
+                title=" ".join(html.unescape(title).split())[:300],
+                url=link,
+                author=author,
+                subreddit=subreddit_match.group(1),
+                updated_at=updated_at,
+                content=_reddit_plain_text(content_markup),
+            )
+        )
+    return tuple(posts)
+
+
+def _reddit_plain_text(markup: str) -> str:
+    text = html.unescape(markup)
+    text = re.sub(r"<br\s*/?>", "\n", text, flags=re.IGNORECASE)
+    text = re.sub(r"<(?:li|p|div|h[1-6])\b[^>]*>", "\n", text, flags=re.IGNORECASE)
+    text = re.sub(r"</(?:li|p|div|h[1-6])>", "\n", text, flags=re.IGNORECASE)
+    text = re.sub(r"<[^>]+>", "", text)
+    return "\n".join(line.strip() for line in text.splitlines() if line.strip())[:20000]
+
+
+def _weekly_megathread_date(title: str) -> date | None:
+    match = re.search(
+        r"\bweek\s+of\s+(\d{1,2})[./-](\d{1,2})[./-](\d{4})\b",
+        title,
+        flags=re.IGNORECASE,
+    )
+    if match is None:
+        return None
+    try:
+        return date(int(match.group(3)), int(match.group(2)), int(match.group(1)))
+    except ValueError:
+        return None
+
+
+def _reddit_rotation_items(
+    posts: tuple[RedditMegathread, ...],
+    *,
+    now: datetime,
+) -> tuple[RotationResearchItem, ...]:
+    items: list[RotationResearchItem] = []
+    for post in posts:
+        if post.author.casefold().removeprefix("/u/").removeprefix("u/") != "rubenalamina":
+            continue
+        missions = _weekly_invaded_missions(post.content)
+        valid_from = _weekly_megathread_date(post.title)
+        if missions is None or valid_from is None:
+            continue
+        items.append(
+            RotationResearchItem.model_validate(
+                {
+                    "kind": "invaded_missions",
+                    "title": "Weekly Invaded Missions",
+                    "details": [*missions, "Tidal Basin"],
+                    "invaded": {
+                        "main_missions": list(missions[:3]),
+                        "stronghold": missions[3],
+                        "final_mission": "Tidal Basin",
+                    },
+                    "valid_from": valid_from,
+                    "valid_until": valid_from + timedelta(days=6),
+                    "confidence": 0.94,
+                    "evidence_class": "corroborated_community",
+                    "source_urls": [post.url],
+                }
+            )
+        )
+    return tuple(item for item in items if item.valid_from <= now.date())
+
+
+def _weekly_invaded_missions(content: str) -> tuple[str, str, str, str] | None:
+    lines = content.splitlines()
+    start = next(
+        (index for index, line in enumerate(lines) if "weekly invaded missions" in line.casefold()),
+        None,
+    )
+    if start is None:
+        return None
+    missions: list[str] = []
+    for raw_line in lines[start + 1 :]:
+        line = re.sub(r"^[\s\u2022*\-\u2013\u2014]+", "", raw_line).strip()
+        line = re.sub(r"[*_`]+", "", line).strip()
+        if not line:
+            continue
+        folded = line.casefold().rstrip(":")
+        if folded.startswith("weekly ") or folded.startswith("global event"):
+            break
+        if len(line) > 120 or ":" in line:
+            break
+        missions.append(line)
+        if len(missions) > 4:
+            return None
+    if len(missions) != 4:
+        return None
+    return missions[0], missions[1], missions[2], missions[3]
+
+
+def _reddit_citations(
+    posts: tuple[RedditMegathread, ...],
+) -> tuple[SourceCitation, ...]:
+    return tuple(
+        SourceCitation(
+            title=post.title,
+            url=post.url,
+            source_type="community_reference",
+            verified_at=post.updated_at,
+            official=False,
+        )
+        for post in posts
+    )
+
+
+def _reddit_megathread_context(posts: tuple[RedditMegathread, ...]) -> str:
+    sections = [
+        "\n".join(
+            (
+                f"Title: {post.title}",
+                f"Author: {post.author}",
+                f"Subreddit: r/{post.subreddit}",
+                f"Updated: {post.updated_at.isoformat()}",
+                f"URL: {post.url}",
+                f"Post text:\n{post.content[:6000]}",
+            )
+        )
+        for post in posts
+    ]
+    return "\n\n---\n\n".join(sections)[:12000]
+
+
+def _promote_trusted_reddit_citations(
+    citations: tuple[SourceCitation, ...],
+    posts: tuple[RedditMegathread, ...],
+) -> tuple[SourceCitation, ...]:
+    trusted = {_normalize_url(post.url): post for post in posts}
+    promoted: list[SourceCitation] = []
+    for citation in citations:
+        post = trusted.get(_normalize_url(str(citation.url)))
+        if post is None:
+            promoted.append(citation)
+            continue
+        promoted.append(
+            citation.model_copy(
+                update={
+                    "source_type": "community_reference",
+                    "verified_at": post.updated_at,
+                    "official": False,
+                }
+            )
+        )
+    return tuple(promoted)
+
+
+def _merge_citations(
+    *groups: tuple[SourceCitation, ...],
+) -> tuple[SourceCitation, ...]:
+    merged: dict[str, SourceCitation] = {}
+    for group in groups:
+        for citation in group:
+            merged[_normalize_url(str(citation.url))] = citation
+    return tuple(merged.values())
+
+
+def _merge_rotation_report(
+    report: RotationResearchReport | None,
+    direct_items: tuple[RotationResearchItem, ...],
+    *,
+    today: date,
+) -> RotationResearchReport:
+    existing = report.items if report is not None and report.as_of == today else []
+    by_kind = {item.kind: item for item in existing}
+    for item in direct_items:
+        by_kind[item.kind] = item
+    summary = report.summary if report is not None and report.as_of == today else ""
+    if direct_items:
+        summary = f"{summary} Trusted Reddit megathread data was ingested.".strip()
+    return RotationResearchReport(
+        as_of=today,
+        summary=summary or "Current trusted Reddit megathreads were checked.",
+        items=list(by_kind.values()),
+        unavailable=(report.unavailable if report is not None and report.as_of == today else []),
+    )
 
 
 def _vendor_item_details(item: dict[str, Any], category: str) -> str | None:
@@ -1116,7 +1454,15 @@ def _optional_datetime(value: object) -> datetime | None:
 
 def _normalize_url(url: str) -> str:
     parsed = urlparse(url)
-    return f"{parsed.scheme.casefold()}://{parsed.netloc.casefold()}{parsed.path.rstrip('/')}"
+    hostname = (parsed.hostname or "").casefold()
+    if _hostname_matches_domain(hostname, "reddit.com"):
+        hostname = "reddit.com"
+    return f"{parsed.scheme.casefold()}://{hostname}{parsed.path.rstrip('/')}"
+
+
+def _hostname_matches_domain(hostname: str, domain: str) -> bool:
+    clean_domain = domain.casefold().strip().lstrip(".")
+    return hostname == clean_domain or hostname.endswith(f".{clean_domain}")
 
 
 def _limit(value: str, maximum: int) -> str:

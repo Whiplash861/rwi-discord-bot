@@ -142,6 +142,8 @@ async def build_services(settings: Settings) -> AppServices:
         vendor_gear_url=settings.rotation_vendor_gear_url,
         vendor_weapons_url=settings.rotation_vendor_weapons_url,
         vendor_mods_url=settings.rotation_vendor_mods_url,
+        reddit_weekly_feed_url=settings.rotation_reddit_weekly_feed_url,
+        reddit_daily_feed_url=settings.rotation_reddit_daily_feed_url,
         web_refresh_hours=settings.rotation_web_refresh_hours,
         enabled=settings.rotation_updates_enabled,
     )

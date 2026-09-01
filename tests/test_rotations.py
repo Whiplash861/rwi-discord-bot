@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import html
 from datetime import UTC, date, datetime
 from pathlib import Path
 from types import SimpleNamespace
@@ -23,6 +24,32 @@ VENDOR_PAGE_URL = "https://example.invalid/vendors/"
 VENDOR_GEAR_URL = "https://example.invalid/gear.json"
 VENDOR_WEAPONS_URL = "https://example.invalid/weapons.json"
 VENDOR_MODS_URL = "https://example.invalid/mods.json"
+REDDIT_WEEKLY_URL = "https://example.invalid/reddit-weekly.rss"
+REDDIT_DAILY_URL = "https://example.invalid/reddit-daily.rss"
+
+
+def reddit_feed(
+    *,
+    title: str | None = None,
+    author: str = "/u/rubenalamina",
+    subreddit: str = "thedivision",
+    updated: str = "2026-09-01T10:00:00+00:00",
+    url: str = "https://www.reddit.com/r/thedivision/comments/current/weekly_rotation/",
+    content: str = "",
+) -> str:
+    entry = ""
+    if title is not None:
+        entry = (
+            "<entry>"
+            f"<author><name>{html.escape(author)}</name></author>"
+            f'<category term="{html.escape(subreddit)}"/>'
+            f'<content type="html">{html.escape(content)}</content>'
+            f'<link rel="alternate" href="{html.escape(url)}"/>'
+            f"<title>{html.escape(title)}</title>"
+            f"<updated>{updated}</updated>"
+            "</entry>"
+        )
+    return f'<feed xmlns="http://www.w3.org/2005/Atom">{entry}</feed>'
 
 
 def escalation_payload(day: str = "2026-09-01") -> dict[str, object]:
@@ -111,6 +138,8 @@ def build_service(
     ai: object,
     stale_escalation: bool = False,
     vendor_modified: str = "2026-09-01T09:21:15+00:00",
+    weekly_reddit: str | None = None,
+    daily_reddit: str | None = None,
 ) -> RotationService:
     async def fetch_json(url: str) -> object:
         if url == ESCALATION_URL:
@@ -156,8 +185,13 @@ def build_service(
         raise AssertionError(f"unexpected URL: {url}")
 
     async def fetch_text(url: str) -> str:
-        assert url == VENDOR_PAGE_URL
-        return f'<meta property="article:modified_time" content="{vendor_modified}">'
+        if url == VENDOR_PAGE_URL:
+            return f'<meta property="article:modified_time" content="{vendor_modified}">'
+        if url == REDDIT_WEEKLY_URL:
+            return weekly_reddit or reddit_feed()
+        if url == REDDIT_DAILY_URL:
+            return daily_reddit or reddit_feed()
+        raise AssertionError(f"unexpected URL: {url}")
 
     return RotationService(
         ai=cast(Any, ai),
@@ -170,6 +204,8 @@ def build_service(
         vendor_gear_url=VENDOR_GEAR_URL,
         vendor_weapons_url=VENDOR_WEAPONS_URL,
         vendor_mods_url=VENDOR_MODS_URL,
+        reddit_weekly_feed_url=REDDIT_WEEKLY_URL,
+        reddit_daily_feed_url=REDDIT_DAILY_URL,
         web_refresh_hours=6,
         enabled=True,
         fetch_json=fetch_json,
@@ -473,3 +509,163 @@ async def test_partial_invasion_descent_and_dark_zone_reports_are_not_published(
     assert "Awaiting a complete dated set" in weekly.fields[1].value
     assert "current named pool has not been established" in descent.fields[0].value
     assert "still searching dated in-game reports" in dark_zone.fields[0].value
+
+
+@pytest.mark.asyncio
+async def test_current_author_scoped_tuesday_megathread_supplies_invasion(
+    tmp_path: Path,
+) -> None:
+    weekly_feed = reddit_feed(
+        title=("Week of 01/09/2026 - Manhunt Targets - Weekly Invaded Missions - Weekly Legendary"),
+        content=(
+            "<p><strong>Weekly Invaded Missions:</strong></p><ul>"
+            "<li>Bank Headquarters</li><li>Potomac Event Center</li>"
+            "<li>Federal Emergency Bunker</li><li>Manning National Zoo</li>"
+            "</ul><p><strong>Weekly Legendary:</strong></p><ul>"
+            "<li>Roosevelt Island</li></ul>"
+        ),
+    )
+    ai = SimpleNamespace(
+        research_current_rotations=AsyncMock(
+            return_value=SimpleNamespace(
+                report=RotationResearchReport(
+                    as_of=date(2026, 9, 1),
+                    summary="No complete web result.",
+                    items=[],
+                ),
+                citations=[],
+            )
+        )
+    )
+    service = build_service(tmp_path, ai=ai, weekly_reddit=weekly_feed)
+
+    snapshot = await service.collect(now=NOW)
+
+    weekly = next(item for item in snapshot.publications if item.key == "weekly-mission-rotations")
+    rendered = weekly.fields[1].value
+    assert "Bank Headquarters" in rendered
+    assert "Potomac Event Center" in rendered
+    assert "Federal Emergency Bunker" in rendered
+    assert "Manning National Zoo" in rendered
+    assert "Tidal Basin" in rendered
+    call = ai.research_current_rotations.await_args.kwargs
+    assert "Author: /u/rubenalamina" in call["megathread_context"]
+    assert "Weekly Invaded Missions" in call["megathread_context"]
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize(
+    ("title", "author"),
+    (
+        (
+            "Week of 25/08/2026 - Weekly Invaded Missions - Weekly Legendary",
+            "/u/rubenalamina",
+        ),
+        (
+            "Week of 01/09/2026 - Weekly Invaded Missions - Weekly Legendary",
+            "/u/not_the_trusted_reporter",
+        ),
+    ),
+)
+async def test_stale_or_wrong_author_weekly_reddit_posts_are_rejected(
+    tmp_path: Path,
+    title: str,
+    author: str,
+) -> None:
+    feed = reddit_feed(
+        title=title,
+        author=author,
+        content=(
+            "<p>Weekly Invaded Missions:</p><ul><li>Mission One</li>"
+            "<li>Mission Two</li><li>Mission Three</li><li>Stronghold One</li></ul>"
+        ),
+    )
+    ai = SimpleNamespace(
+        research_current_rotations=AsyncMock(
+            return_value=SimpleNamespace(
+                report=RotationResearchReport(
+                    as_of=date(2026, 9, 1), summary="No current result.", items=[]
+                ),
+                citations=[],
+            )
+        )
+    )
+    service = build_service(tmp_path, ai=ai, weekly_reddit=feed)
+
+    snapshot = await service.collect(now=NOW)
+
+    weekly = next(item for item in snapshot.publications if item.key == "weekly-mission-rotations")
+    assert "Awaiting a complete dated set" in weekly.fields[1].value
+    assert ai.research_current_rotations.await_args.kwargs["megathread_context"] == ""
+
+
+@pytest.mark.asyncio
+async def test_exact_current_daily_report_is_promoted_without_trusting_all_reddit(
+    tmp_path: Path,
+) -> None:
+    post_url = "https://www.reddit.com/r/Division2/comments/current/daily_rotation/"
+    daily_feed = reddit_feed(
+        title="Division 2 Daily Escalation Missions & Their Targeted Loot - 01/09/2026",
+        author="/u/lunaticwolfyy",
+        subreddit="Division2",
+        url=post_url,
+        content="<p>DZ East, DZ South, and DZ West observations.</p>",
+    )
+    report = RotationResearchReport(
+        as_of=date(2026, 9, 1),
+        summary="Current dated Dark Zone report.",
+        items=[
+            researched_item(
+                "dark_zone_mode",
+                "Current Dark Zones",
+                [],
+                post_url,
+                dark_zones=[
+                    {
+                        "zone": "Dark Zone East",
+                        "mode": "Toxic",
+                        "faction": "Hyenas",
+                        "targeted_loot": "Assault Rifles",
+                    },
+                    {
+                        "zone": "Dark Zone South",
+                        "mode": "Normalized",
+                        "faction": "True Sons",
+                        "targeted_loot": "Gear System Mods",
+                    },
+                    {
+                        "zone": "Dark Zone West",
+                        "mode": "Blackout",
+                        "faction": "Black Tusk",
+                        "targeted_loot": "Gloves",
+                    },
+                ],
+            )
+        ],
+    )
+    ai = SimpleNamespace(
+        research_current_rotations=AsyncMock(
+            return_value=SimpleNamespace(
+                report=report,
+                citations=[
+                    SourceCitation(
+                        title="Current daily report",
+                        url=post_url,
+                        source_type="community_forum",
+                    )
+                ],
+            )
+        )
+    )
+    service = build_service(tmp_path, ai=ai, daily_reddit=daily_feed)
+
+    snapshot = await service.collect(now=NOW)
+    state = await service.status()
+
+    dark_zone = next(item for item in snapshot.publications if item.key == "dark-zone-rotations")
+    rendered = "\n".join(field.value for field in dark_zone.fields)
+    assert "Hyenas" in rendered
+    assert "True Sons" in rendered
+    assert "Black Tusk" in rendered
+    assert state.web_citations[0].source_type == "community_reference"
+    assert state.web_citations[0].official is False

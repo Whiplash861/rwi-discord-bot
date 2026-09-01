@@ -367,6 +367,7 @@ async def test_rotation_research_uses_open_web_search_with_evidence_gates(tmp_pa
     assert responses.kwargs["tool_choice"] == "required"
     assert "text" not in responses.kwargs
     assert responses.kwargs["tools"] == [{"type": "web_search"}]
+    assert "Tuesday r/thedivision weekly megathread" in responses.kwargs["input"]
     assert usage.records[0]["operation"] == "rotation_research"
 
 

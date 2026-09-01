@@ -92,3 +92,17 @@ def test_settings_parse_comma_separated_domains_from_dotenv(tmp_path: Path) -> N
         "https://example.com/live",
     )
     assert settings.community_search_domains == ("wikipedia.org", "reddit.com")
+
+
+def test_settings_expose_author_scoped_reddit_rotation_feeds() -> None:
+    settings = valid_settings()
+
+    assert "r/thedivision/search.rss" in settings.rotation_reddit_weekly_feed_url
+    assert "Weekly%20Invaded%20Missions" in settings.rotation_reddit_weekly_feed_url
+    assert "r/Division2/search.rss" in settings.rotation_reddit_daily_feed_url
+    assert "author%3Alunaticwolfyy" in settings.rotation_reddit_daily_feed_url
+
+
+def test_settings_reject_insecure_reddit_rotation_feed() -> None:
+    with pytest.raises(ValidationError, match="bounded HTTPS"):
+        valid_settings(rotation_reddit_weekly_feed_url="http://reddit.example.invalid/feed")
