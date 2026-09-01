@@ -142,6 +142,36 @@ class CapturingRotationResponse:
         )
 
 
+class MalformedThenRepairedResearchResponses:
+    def __init__(self) -> None:
+        self.calls: list[dict[str, object]] = []
+
+    async def create(self, **kwargs: object) -> SimpleNamespace:
+        self.calls.append(kwargs)
+        if len(self.calls) == 1:
+            output_text = '{"change_detected":false,"summary":"cut off"'
+            response_id = "malformed-search"
+        else:
+            output_text = (
+                '{"change_detected":false,"current_game_version":"Y8S3 Red Horizon",'
+                '"season_name":"Red Horizon","season_started_on":"2026-08-27",'
+                '"summary":"No change found.","official_evidence_urls":[],'
+                '"findings":[],"unresolved_questions":[]}'
+            )
+            response_id = "repaired-json"
+        return SimpleNamespace(
+            id=response_id,
+            status="completed",
+            output_text=output_text,
+            output=[],
+            usage=SimpleNamespace(
+                input_tokens=100,
+                output_tokens=100,
+                input_tokens_details=SimpleNamespace(cached_tokens=0, cache_write_tokens=0),
+            ),
+        )
+
+
 def test_curated_search_combines_official_live_and_community_domains() -> None:
     client = cast(RwiOpenAIClient, object.__new__(RwiOpenAIClient))
     client.official_domains = ("ubisoft.com",)
@@ -295,7 +325,7 @@ async def test_autonomous_research_uses_a_short_bounded_official_pass(
     assert responses.kwargs["timeout"] == 60.0
     assert responses.kwargs["model"] == "gpt-5.6-terra"
     assert responses.kwargs["reasoning"] == {"effort": "low"}
-    assert responses.kwargs["text"] == {"format": {"type": "json_object"}}
+    assert "text" not in responses.kwargs
     assert responses.kwargs["tools"] == [
         {"type": "web_search", "filters": {"allowed_domains": ["ubisoft.com"]}}
     ]
@@ -335,7 +365,7 @@ async def test_rotation_research_requires_bounded_curated_web_search(tmp_path: P
     assert responses.kwargs["timeout"] == 60.0
     assert responses.kwargs["model"] == "gpt-5.6-terra"
     assert responses.kwargs["tool_choice"] == "required"
-    assert responses.kwargs["text"] == {"format": {"type": "json_object"}}
+    assert "text" not in responses.kwargs
     assert responses.kwargs["tools"] == [
         {
             "type": "web_search",
@@ -343,6 +373,51 @@ async def test_rotation_research_requires_bounded_curated_web_search(tmp_path: P
         }
     ]
     assert usage.records[0]["operation"] == "rotation_research"
+
+
+@pytest.mark.asyncio
+async def test_malformed_web_research_is_repaired_without_a_second_web_search(
+    tmp_path: Path,
+) -> None:
+    maintenance = MaintenanceManager(tmp_path)
+    await maintenance.load()
+    usage = RecordingUsage()
+    responses = MalformedThenRepairedResearchResponses()
+    client = RwiOpenAIClient(
+        api_key="test-placeholder",
+        maintenance=maintenance,
+        budget=BudgetGuard(
+            cast(Any, usage),
+            hard_limit=Decimal("25"),
+            member_reserve=Decimal("5"),
+        ),
+        usage_repository=cast(Any, usage),
+        normal_model="gpt-5.6-terra",
+        complex_model="gpt-5.6",
+        economy_model="gpt-5.6-luna",
+        official_domains=("ubisoft.com",),
+    )
+    client.client = cast(Any, SimpleNamespace(responses=responses))
+
+    result = await client.research_game_updates(
+        current_game_version="Y8S3 Red Horizon",
+        current_season_started_on="2026-08-27",
+        full_sweep=False,
+        actor_id=42,
+        correlation_id=uuid4(),
+        maximum_findings=20,
+    )
+
+    assert result.report.change_detected is False
+    assert len(responses.calls) == 2
+    assert responses.calls[0]["tools"] == [
+        {"type": "web_search", "filters": {"allowed_domains": ["ubisoft.com"]}}
+    ]
+    assert "tools" not in responses.calls[1]
+    assert responses.calls[1]["text"] == {"format": {"type": "json_object"}}
+    assert result.response_id == "malformed-search|repaired-json"
+    assert usage.records[0]["operation"] == "autonomous_game_research_official_json_repair"
+    assert usage.records[1]["operation"] == "autonomous_game_research_official"
 
 
 @pytest.mark.asyncio

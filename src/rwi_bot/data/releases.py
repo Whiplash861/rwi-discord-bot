@@ -842,8 +842,26 @@ RELEASES: tuple[Release, ...] = (
             ),
             ReleaseNote(
                 ReleaseSection.MAINTENANCE,
-                "Autonomous game-update and live-rotation research now request API-enforced JSON "
-                "output before validating their typed reports.",
+                "Added strict typed-report validation so malformed research output is never "
+                "accepted as rotation or game-update knowledge.",
+            ),
+        ),
+    ),
+    Release(
+        release_id="erin-update-29",
+        update_number=29,
+        version="V0.1.28",
+        released_on=date(2026, 9, 1),
+        notes=(
+            ReleaseNote(
+                ReleaseSection.FIXES,
+                "Resolved the provider conflict between live web search and JSON mode that "
+                "briefly interrupted ERIN's autonomous research after Update 28.",
+            ),
+            ReleaseNote(
+                ReleaseSection.MAINTENANCE,
+                "Web research now keeps full search access, validates its result locally, and "
+                "uses a separate tool-free JSON normalization pass only when syntax is malformed.",
             ),
         ),
     ),
