@@ -1,3 +1,3 @@
 """The Redwing Initiative Discord bot."""
 
-__version__ = "0.1.21"
+__version__ = "0.1.24"

@@ -737,4 +737,27 @@ RELEASES: tuple[Release, ...] = (
             ),
         ),
     ),
+    Release(
+        release_id="erin-update-25",
+        update_number=25,
+        version="V0.1.24",
+        released_on=date(2026, 8, 31),
+        notes=(
+            ReleaseNote(
+                ReleaseSection.FIXES,
+                "Split autonomous update research into independent official and community "
+                "passes after a second live provider timeout.",
+            ),
+            ReleaseNote(
+                ReleaseSection.HIGH_IMPACT,
+                "Successful official results now survive a slow community source pass, while "
+                "the missed source group is recorded for the next retry.",
+            ),
+            ReleaseNote(
+                ReleaseSection.MAINTENANCE,
+                "Each source group now uses a faster fit-for-purpose model, a bounded search "
+                "deadline, isolated domain filters, and separately recorded usage.",
+            ),
+        ),
+    ),
 )

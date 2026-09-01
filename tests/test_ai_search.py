@@ -92,6 +92,32 @@ class CapturingResearchResponse:
         )
 
 
+class PartiallyFailingResearchResponses:
+    def __init__(self) -> None:
+        self.calls: list[dict[str, object]] = []
+
+    async def create(self, **kwargs: object) -> SimpleNamespace:
+        self.calls.append(kwargs)
+        if kwargs["model"] == "gpt-5.6-luna":
+            raise RuntimeError("community search provider stalled")
+        return SimpleNamespace(
+            id="official-research-response",
+            status="completed",
+            output_text=(
+                '{"change_detected":false,"current_game_version":"Y8S3 Red Horizon",'
+                '"season_name":"Red Horizon","season_started_on":"2026-08-27",'
+                '"summary":"Official baseline remains current.","official_evidence_urls":[],'
+                '"findings":[],"unresolved_questions":[]}'
+            ),
+            output=[],
+            usage=SimpleNamespace(
+                input_tokens=100,
+                output_tokens=100,
+                input_tokens_details=SimpleNamespace(cached_tokens=0, cache_write_tokens=0),
+            ),
+        )
+
+
 def test_curated_search_combines_official_live_and_community_domains() -> None:
     client = cast(RwiOpenAIClient, object.__new__(RwiOpenAIClient))
     client.official_domains = ("ubisoft.com",)
@@ -101,6 +127,10 @@ def test_curated_search_combines_official_live_and_community_domains() -> None:
     assert client._search_domains(WebSearchScope.CURATED) == (
         "ubisoft.com",
         "trello.com",
+        "wikipedia.org",
+        "reddit.com",
+    )
+    assert client._search_domains(WebSearchScope.COMMUNITY) == (
         "wikipedia.org",
         "reddit.com",
     )
@@ -205,7 +235,7 @@ async def test_token_cutoff_is_regenerated_concisely_before_return(tmp_path: Pat
 
 
 @pytest.mark.asyncio
-async def test_autonomous_research_has_a_longer_bounded_provider_deadline(
+async def test_autonomous_research_uses_a_short_bounded_official_pass(
     tmp_path: Path,
 ) -> None:
     maintenance = MaintenanceManager(tmp_path)
@@ -238,8 +268,59 @@ async def test_autonomous_research_has_a_longer_bounded_provider_deadline(
     )
 
     assert result.report.change_detected is False
-    assert responses.kwargs["timeout"] == 120.0
-    assert usage.records[0]["operation"] == "autonomous_game_research"
+    assert responses.kwargs["timeout"] == 60.0
+    assert responses.kwargs["model"] == "gpt-5.6-terra"
+    assert responses.kwargs["reasoning"] == {"effort": "low"}
+    assert responses.kwargs["tools"] == [
+        {"type": "web_search", "filters": {"allowed_domains": ["ubisoft.com"]}}
+    ]
+    assert usage.records[0]["operation"] == "autonomous_game_research_official"
+
+
+@pytest.mark.asyncio
+async def test_full_research_sweep_preserves_official_result_when_community_pass_fails(
+    tmp_path: Path,
+) -> None:
+    maintenance = MaintenanceManager(tmp_path)
+    await maintenance.load()
+    usage = RecordingUsage()
+    responses = PartiallyFailingResearchResponses()
+    client = RwiOpenAIClient(
+        api_key="test-placeholder",
+        maintenance=maintenance,
+        budget=BudgetGuard(
+            cast(Any, usage),
+            hard_limit=Decimal("25"),
+            member_reserve=Decimal("5"),
+        ),
+        usage_repository=cast(Any, usage),
+        normal_model="gpt-5.6-terra",
+        complex_model="gpt-5.6",
+        economy_model="gpt-5.6-luna",
+        official_domains=("ubisoft.com",),
+        community_domains=("reddit.com", "youtube.com"),
+    )
+    client.client = cast(Any, SimpleNamespace(responses=responses))
+
+    result = await client.research_game_updates(
+        current_game_version="Y8S3 Red Horizon",
+        current_season_started_on="2026-08-27",
+        full_sweep=True,
+        actor_id=42,
+        correlation_id=uuid4(),
+        maximum_findings=20,
+    )
+
+    assert len(responses.calls) == 2
+    assert result.report.current_game_version == "Y8S3 Red Horizon"
+    assert result.report.change_detected is False
+    assert any(
+        "community source pass failed" in question
+        for question in result.report.unresolved_questions
+    )
+    assert [record["operation"] for record in usage.records] == [
+        "autonomous_game_research_official"
+    ]
 
 
 @pytest.mark.asyncio
