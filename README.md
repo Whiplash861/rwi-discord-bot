@@ -102,8 +102,11 @@ Escalation requisitions and missions, weekly activities, Descent talent-pool tim
 seasonal events, Dark Zone intelligence, and reset timers. Structured Escalation and
 calendar feeds update the reliable core; exact regional maps, weekly assignments, and
 talent-pool names publish only when current dated web evidence clears a strict confidence
-gate. The five posts are edited in place rather than repeated, and Discord timestamps
-render in each member's local time.
+gate. Regional loot can publish as dated map images or a categorized location list with
+separate mission, area, Classified Assignment, Raid, and off-map sections. Invasion,
+Descent, and Dark Zone reports must be complete before they publish. The five posts are
+edited in place rather than repeated, and Discord timestamps render in each member's
+local time.
 
 Members can ask ERIN in a DM, `#ask-rwi`, or another server channel to schedule Broken
 Rain, Paradise Lost, Dark Hours, or Iron Horse. ERIN collects the organizer's role and

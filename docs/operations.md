@@ -394,10 +394,20 @@ within its validity window, and backed by retained citations. Official claims re
 official citations; community claims require current corroboration or an approved live
 reference. Single unverified reports never publish.
 
-A missing source produces a plain unconfirmed entry instead of a guess. A failed refresh
-leaves existing Discord posts intact, persists a local diagnostic checkpoint, and retries
-on the configured interval. The public posts omit source lists in keeping with ERIN's
-normal response style; retained provenance remains available for operator inspection.
+Regional targeted loot publishes as current map images when available. Its text fallback
+is grouped behind visual dividers in this order: Main or Invaded Missions, Areas,
+Classified Assignments, Raids, then other locations such as the Pentagon and Coney Island.
+The Washington report is not accepted as complete unless it covers the Pentagon, both
+Coney Island missions, Dark Hours, and Iron Horse. Invasion requires three Main Missions,
+one Stronghold, and Tidal Basin in that order; Dark Zone reporting requires East, South,
+and West; Descent requires the current pool name.
+
+Incomplete regional sections are omitted instead of producing repeated empty fields. A
+failed refresh leaves existing Discord posts intact, persists a local diagnostic
+checkpoint, and retries on the configured interval. Research runs immediately after the
+08:00 UTC daily reset and after a Descent rollover even when the normal web interval has
+not elapsed. The public posts omit source lists in keeping with ERIN's normal response
+style; retained provenance remains available for operator inspection.
 
 ## Backup
 

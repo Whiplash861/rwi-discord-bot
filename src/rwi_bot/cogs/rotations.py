@@ -147,13 +147,13 @@ class RotationsCog(commands.Cog):
         channel: discord.TextChannel,
         publication: RotationPublication,
     ) -> bool:
-        embed = rotation_embed(publication)
+        embeds = rotation_embeds(publication)
         existing = await self._find_existing(channel, publication.marker)
-        if existing is not None and _message_matches(existing, embed):
+        if existing is not None and _message_matches(existing, embeds):
             return False
         if existing is None:
             message = await channel.send(
-                embed=embed,
+                embeds=embeds,
                 allowed_mentions=discord.AllowedMentions.none(),
             )
             try:
@@ -161,7 +161,7 @@ class RotationsCog(commands.Cog):
             except (discord.Forbidden, discord.HTTPException):
                 pass
             return True
-        await existing.edit(embed=embed, allowed_mentions=discord.AllowedMentions.none())
+        await existing.edit(embeds=embeds, allowed_mentions=discord.AllowedMentions.none())
         return True
 
     async def _find_existing(
@@ -196,7 +196,19 @@ def rotation_embed(publication: RotationPublication) -> discord.Embed:
     return embed
 
 
-def _message_matches(message: discord.Message, expected: discord.Embed) -> bool:
-    if len(message.embeds) != 1:
+def rotation_embeds(publication: RotationPublication) -> list[discord.Embed]:
+    embeds = [rotation_embed(publication)]
+    for image in publication.images[:9]:
+        map_embed = discord.Embed(
+            title=image.label,
+            colour=discord.Colour.orange(),
+        )
+        map_embed.set_image(url=image.url)
+        embeds.append(map_embed)
+    return embeds
+
+
+def _message_matches(message: discord.Message, expected: list[discord.Embed]) -> bool:
+    if len(message.embeds) != len(expected):
         return False
-    return message.embeds[0].to_dict() == expected.to_dict()
+    return [embed.to_dict() for embed in message.embeds] == [embed.to_dict() for embed in expected]

@@ -793,4 +793,40 @@ RELEASES: tuple[Release, ...] = (
             ),
         ),
     ),
+    Release(
+        release_id="erin-update-27",
+        update_number=27,
+        version="V0.1.26",
+        released_on=date(2026, 9, 1),
+        notes=(
+            ReleaseNote(
+                ReleaseSection.HIGH_IMPACT,
+                "Rebuilt daily targeted-loot reporting around current map images or complete "
+                "typed location assignments, including the Pentagon, Coney Island, Dark Hours, "
+                "and Iron Horse.",
+            ),
+            ReleaseNote(
+                ReleaseSection.NEW_FEATURES,
+                "Added regional and loot-category dividers with stable spatial then "
+                "alphabetical ordering for missions, areas, Classified Assignments, Raids, and "
+                "other locations.",
+            ),
+            ReleaseNote(
+                ReleaseSection.FIXES,
+                "Invaded rotations now require and display three Main Missions, the Invaded "
+                "Stronghold, and Tidal Basin in progression order instead of accepting a partial "
+                "weekly list.",
+            ),
+            ReleaseNote(
+                ReleaseSection.FIXES,
+                "Descent reports now require the current named pool and can include its full "
+                "talent breakdown; Dark Zone reports require East, South, and West assignments.",
+            ),
+            ReleaseNote(
+                ReleaseSection.IMPROVEMENTS,
+                "Removed repeated evidence-gate placeholders and taught rotation research to run "
+                "again immediately after daily and Descent resets.",
+            ),
+        ),
+    ),
 )

@@ -420,19 +420,36 @@ class RwiOpenAIClient:
         prompt = (
             f"Today is {today}. ERIN's current Division 2 baseline is "
             f"{current_game_version!r}. Search current dated sources for the rotations active "
-            "today. Look specifically for Washington DC, New York, and Brooklyn targeted loot; "
-            "this week's invaded missions and stronghold; this week's Legendary mission "
-            "completion project; the current named Descent talent pool; the free weekly "
-            "Classified Assignment; the active Dark Zone mode or weekly DZ rotation; and any "
-            "other material current rotation. Do not infer a deterministic order from old "
-            "history. Omit anything whose current value cannot be established. Every item must "
-            "have a validity date and URLs actually opened during this search. Community claims "
-            "need corroboration; label single-source reports community_unverified. Return no "
+            "today. For Washington DC, New York, and Brooklyn targeted loot, prefer dated "
+            "in-game map screenshots. A text fallback must be a complete location-to-loot list "
+            "classified as main_or_invaded_mission, area, classified_assignment, raid, or "
+            "other_location; cover the Pentagon, Coney Island, Dark Hours, and Iron Horse when "
+            "the current maps expose them. Use map_order for spatial order and alphabetical "
+            "order within a tie. For the weekly Invasion, require exactly three Main Missions, "
+            "the Invaded Stronghold, then Tidal Basin. For Descent, require the current named "
+            "pool and include its talent lists when the live source displays them. For Dark "
+            "Zone rotation, require current assignments for East, South, and West, including "
+            "targeted loot when visible. Also look for the current Legendary completion project, "
+            "free Classified Assignment, and any other material rotation. Check current Division "
+            "community bot/source pages such as ProtoTrack and ISAC, but do not claim they expose "
+            "data that they do not publish. Do not infer a deterministic order from old history. "
+            "Omit anything whose current value cannot be established. Every item must have a "
+            "validity date and URLs actually opened during this search. Community claims need "
+            "corroboration; label single-source reports community_unverified. Return no "
             f"more than {maximum_items} items. Output only JSON matching: "
             '{"as_of":"YYYY-MM-DD","summary":"...","items":[{'
             '"kind":"targeted_loot_dc|targeted_loot_nyc|targeted_loot_brooklyn|'
             "invaded_missions|legendary_project|descent_pool|classified_assignment|"
             'dark_zone_mode|other_rotation","title":"...","details":["..."],'
+            '"targeted_loot":[{"category":"main_or_invaded_mission|area|'
+            'classified_assignment|raid|other_location","location":"...",'
+            '"loot":"...","map_order":0}],"map_images":[{"label":"...",'
+            '"url":"https://..."}],"invaded":{"main_missions":["...","...",'
+            '"..."],"stronghold":"...","final_mission":"Tidal Basin"},'
+            '"descent":{"name":"...","offensive_talents":["..."],'
+            '"defensive_talents":["..."],"utility_talents":["..."],'
+            '"exotic_talents":["..."]},"dark_zones":[{"zone":"Dark Zone East|'
+            'Dark Zone South|Dark Zone West","mode":"...","targeted_loot":"... or null"}],'
             '"valid_from":"YYYY-MM-DD","valid_until":"YYYY-MM-DD or null",'
             '"confidence":0.0,"evidence_class":"official|corroborated_community|'
             'community_unverified","source_urls":["https://..."]}],'
@@ -453,14 +470,14 @@ class RwiOpenAIClient:
             "tools": [web_tool],
             "tool_choice": "required",
             "include": ["web_search_call.action.sources"],
-            "max_output_tokens": 2800,
+            "max_output_tokens": 6000,
             "reasoning": {"effort": "low"},
             "store": False,
             "timeout": 60.0,
         }
         try:
             async with self._semaphore:
-                async with self.budget.reserve(SpendingClass.AUTONOMOUS_RESEARCH, Decimal("0.40")):
+                async with self.budget.reserve(SpendingClass.AUTONOMOUS_RESEARCH, Decimal("0.60")):
                     response = await self._create_response(kwargs)
             text, citations, search_calls = _extract_output(
                 response,

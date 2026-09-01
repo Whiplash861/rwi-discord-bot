@@ -317,13 +317,16 @@ cadence using the curated source set. Each structured result carries a validity 
 confidence class, and the URLs actually retained by search. Current regional targeted
 loot cannot survive a day boundary; weekly values may remain only through their declared
 validity window. Weak, future, expired, uncited, or single-source community claims are
-dropped before presentation.
+dropped before presentation. Current map-image URLs are carried as separate Discord
+embeds. Text map data uses typed location categories and stable spatial/alphabetical
+sorting. Typed completeness gates reject partial Invasion, Descent, Dark Zone, and D.C.
+off-map coverage before presentation.
 
 One atomic runtime checkpoint retains the last web report, citations, refresh status, and
 failure count. Discord remains presentation: each read-only Rotation channel has a stable
-footer marker, and the publisher edits that one pinned embed only when its content differs.
-Provider or feed failure cannot erase the previous Discord presentation. Maintenance mode
-stops the loop, while successful resume restarts it.
+footer marker, and the publisher edits that one pinned multi-embed message only when its
+content differs. Provider or feed failure cannot erase the previous Discord presentation.
+Maintenance mode stops the loop, while successful resume restarts it.
 
 ## Damage calculation order
 

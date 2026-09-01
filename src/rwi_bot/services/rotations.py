@@ -15,7 +15,12 @@ import httpx
 from pydantic import BaseModel, Field
 
 from rwi_bot.ai.client import OpenAIUnavailableError, RwiOpenAIClient
-from rwi_bot.domain.schemas import RotationResearchItem, RotationResearchReport, SourceCitation
+from rwi_bot.domain.schemas import (
+    RotationResearchItem,
+    RotationResearchReport,
+    SourceCitation,
+    TargetedLootAssignment,
+)
 
 JsonFetcher = Callable[[str], Awaitable[object]]
 
@@ -60,6 +65,12 @@ class RotationField:
 
 
 @dataclass(frozen=True, slots=True)
+class RotationImage:
+    label: str
+    url: str
+
+
+@dataclass(frozen=True, slots=True)
 class RotationPublication:
     key: str
     channel_name: str
@@ -67,6 +78,7 @@ class RotationPublication:
     description: str
     fields: tuple[RotationField, ...]
     marker: str
+    images: tuple[RotationImage, ...] = ()
 
     @property
     def fingerprint(self) -> str:
@@ -78,6 +90,7 @@ class RotationPublication:
                     {"name": field.name, "value": field.value, "inline": field.inline}
                     for field in self.fields
                 ],
+                "images": [{"label": image.label, "url": image.url} for image in self.images],
             },
             sort_keys=True,
             separators=(",", ":"),
@@ -189,6 +202,7 @@ class RotationService:
                 state.last_web_research_at,
                 current,
                 hours=self.web_refresh_hours,
+                calendar=calendar,
             )
             used_cached_web = False
             if web_researched:
@@ -353,8 +367,38 @@ def _accepted_web_items(
             for citation in matched
         ):
             continue
+        if item.kind.startswith("targeted_loot_") and not _targeted_loot_complete(item):
+            continue
+        if item.kind == "invaded_missions" and item.invaded is None:
+            continue
+        if item.kind == "descent_pool" and item.descent is None:
+            continue
+        if item.kind == "dark_zone_mode" and {
+            assignment.zone for assignment in item.dark_zones
+        } != {"Dark Zone East", "Dark Zone South", "Dark Zone West"}:
+            continue
         accepted.append(item)
     return tuple(accepted)
+
+
+def _targeted_loot_complete(item: RotationResearchItem) -> bool:
+    if item.map_images:
+        return True
+    if not item.targeted_loot:
+        return False
+    if item.kind != "targeted_loot_dc":
+        return True
+    locations = {entry.location.casefold() for entry in item.targeted_loot}
+    required_locations = (
+        "the pentagon",
+        "coney island amusement park",
+        "coney island ballpark",
+        "dark hours",
+        "iron horse",
+    )
+    return all(
+        any(required in location for location in locations) for required in required_locations
+    )
 
 
 def _build_publications(
@@ -372,22 +416,32 @@ def _build_publications(
         item.kind: item for item in web_items if item.kind != "other_rotation"
     }
 
-    daily_fields = (
-        *(
-            RotationField(label, _item_value(by_kind.get(kind)))
-            for kind, label in (
-                ("targeted_loot_dc", "Washington, D.C."),
-                ("targeted_loot_nyc", "New York"),
-                ("targeted_loot_brooklyn", "Brooklyn"),
-            )
-        ),
-        RotationField("Escalation Targeted Loot", _escalation_loot(escalation)),
-        RotationField("Escalation Requisition", _escalation_caches(escalation), inline=True),
-        RotationField("Next Daily Reset", _discord_time(daily_reset), inline=True),
+    daily_fields: list[RotationField] = []
+    daily_images: list[RotationImage] = []
+    for kind, label in (
+        ("targeted_loot_dc", "Washington, D.C."),
+        ("targeted_loot_nyc", "New York"),
+        ("targeted_loot_brooklyn", "Brooklyn"),
+    ):
+        item = by_kind.get(kind)
+        if item is None:
+            continue
+        daily_fields.extend(_targeted_loot_fields(label, item))
+        daily_images.extend(
+            RotationImage(label=image.label, url=str(image.url)) for image in item.map_images
+        )
+    daily_fields.extend(
+        (
+            RotationField("━━ ESCALATION TARGETED LOOT ━━", "\u200b"),
+            RotationField("Mission Assignments", _escalation_loot(escalation)),
+            RotationField("Requisition Caches", _escalation_caches(escalation), inline=True),
+            RotationField("Next Daily Reset", _discord_time(daily_reset), inline=True),
+        )
     )
+    invaded_item = by_kind.get("invaded_missions")
     weekly_fields = (
         RotationField("Escalation Mission Rotation", _escalation_missions(escalation)),
-        RotationField("Invaded Mission Rotation", _item_value(by_kind.get("invaded_missions"))),
+        RotationField("Invaded Mission Rotation", _invaded_rotation(invaded_item)),
         RotationField(
             "Legendary Completion Project", _item_value(by_kind.get("legendary_project"))
         ),
@@ -396,8 +450,10 @@ def _build_publications(
         ),
         RotationField("Next Weekly Reset", _discord_time(weekly_reset), inline=True),
     )
+    descent_item = by_kind.get("descent_pool")
     descent_fields = (
-        RotationField("Current Talent Pool", _item_value(by_kind.get("descent_pool"))),
+        RotationField("Current Talent Pool", _descent_pool(descent_item)),
+        *_descent_talent_fields(descent_item),
         RotationField("Rotation Cadence", "Every **3 days**.", inline=True),
         RotationField(
             "Next Pool Change",
@@ -409,7 +465,7 @@ def _build_publications(
     seasonal_fields: list[RotationField] = [
         RotationField("Active Now", _event_list(active)),
         RotationField("Coming Up", _event_list(upcoming)),
-        RotationField("Dark Zone Rotation", _item_value(by_kind.get("dark_zone_mode"))),
+        RotationField("Dark Zone Rotation", _dark_zone_rotation(by_kind.get("dark_zone_mode"))),
     ]
     for item in web_items:
         if item.kind == "other_rotation":
@@ -430,10 +486,11 @@ def _build_publications(
             channel_name="daily-targeted-loot",
             title=f"Daily Targeted Loot — {date_label}",
             description=(
-                "Current regional and Escalation loot intelligence. ERIN leaves any regional "
-                "entry unconfirmed when a dated map cannot be corroborated."
+                "Current map-backed regional assignments and the dated Escalation feed. "
+                "Regional sections appear only when a complete current map is available."
             ),
-            fields=daily_fields,
+            fields=tuple(daily_fields),
+            images=tuple(daily_images[:4]),
             marker="ERIN_ROTATION:daily-targeted-loot",
         ),
         RotationPublication(
@@ -473,11 +530,88 @@ def _build_publications(
 
 def _item_value(item: RotationResearchItem | None) -> str:
     if item is None:
-        return (
-            "*No current value cleared ERIN's evidence gate. Check the in-game map or project "
-            "menu while she retries.*"
-        )
+        return "*A complete dated assignment is not available yet.*"
     return _limit("\n".join(f"• {detail}" for detail in item.details), 1024)
+
+
+def _targeted_loot_fields(
+    region_label: str,
+    item: RotationResearchItem,
+) -> tuple[RotationField, ...]:
+    fields: list[RotationField] = [RotationField(f"━━ {region_label.upper()} ━━", "\u200b")]
+    category_labels = (
+        ("main_or_invaded_mission", "Main / Invaded Missions"),
+        ("area", "Areas"),
+        ("classified_assignment", "Classified Assignments"),
+        ("raid", "Raids"),
+        ("other_location", "Other Locations"),
+    )
+    for category, label in category_labels:
+        assignments = sorted(
+            (entry for entry in item.targeted_loot if entry.category == category),
+            key=_targeted_loot_sort_key,
+        )
+        if not assignments:
+            continue
+        value = "\n".join(f"• **{entry.location}:** {entry.loot}" for entry in assignments)
+        fields.append(RotationField(label, _limit(value, 1024)))
+    if item.map_images and len(fields) == 1:
+        fields.append(RotationField("Current Map", "See the dated map image below."))
+    return tuple(fields)
+
+
+def _targeted_loot_sort_key(entry: TargetedLootAssignment) -> tuple[int, str]:
+    return entry.map_order, entry.location.casefold()
+
+
+def _invaded_rotation(item: RotationResearchItem | None) -> str:
+    if item is None or item.invaded is None:
+        return "*Awaiting a complete dated set: 3 missions, 1 stronghold, then Tidal Basin.*"
+    invaded = item.invaded
+    lines = [
+        *(
+            f"**{index}. Main Mission:** {mission}"
+            for index, mission in enumerate(invaded.main_missions, 1)
+        ),
+        f"**4. Stronghold:** {invaded.stronghold}",
+        f"**5. Finale:** {invaded.final_mission}",
+    ]
+    return "\n".join(lines)
+
+
+def _descent_pool(item: RotationResearchItem | None) -> str:
+    if item is None or item.descent is None:
+        return "*The current named pool has not been established from a dated source.*"
+    return f"**{item.descent.name}**"
+
+
+def _descent_talent_fields(item: RotationResearchItem | None) -> tuple[RotationField, ...]:
+    if item is None or item.descent is None:
+        return ()
+    groups = (
+        ("Offensive Talents", item.descent.offensive_talents),
+        ("Defensive Talents", item.descent.defensive_talents),
+        ("Utility Talents", item.descent.utility_talents),
+        ("Exotic Talents", item.descent.exotic_talents),
+    )
+    return tuple(
+        RotationField(label, _limit(" • ".join(talents), 1024))
+        for label, talents in groups
+        if talents
+    )
+
+
+def _dark_zone_rotation(item: RotationResearchItem | None) -> str:
+    if item is None or len(item.dark_zones) != 3:
+        return "*A complete current East / South / West assignment is not available yet.*"
+    order = {"Dark Zone East": 0, "Dark Zone South": 1, "Dark Zone West": 2}
+    lines = []
+    for assignment in sorted(item.dark_zones, key=lambda entry: order[entry.zone]):
+        loot = (
+            f" — Targeted Loot: **{assignment.targeted_loot}**" if assignment.targeted_loot else ""
+        )
+        lines.append(f"• **{assignment.zone}:** {assignment.mode}{loot}")
+    return _limit("\n".join(lines), 1024)
 
 
 def _escalation_loot(rotation: EscalationRotation | None) -> str:
@@ -572,10 +706,32 @@ def _discord_time(value: datetime) -> str:
     return f"<t:{timestamp}:F> (<t:{timestamp}:R>)"
 
 
-def _web_research_due(previous: datetime | None, now: datetime, *, hours: int) -> bool:
+def _web_research_due(
+    previous: datetime | None,
+    now: datetime,
+    *,
+    hours: int,
+    calendar: tuple[CalendarEvent, ...],
+) -> bool:
     if previous is None:
         return True
-    return now - previous.astimezone(UTC) >= timedelta(hours=hours)
+    previous_utc = previous.astimezone(UTC)
+    daily_reset = now.replace(hour=8, minute=0, second=0, microsecond=0)
+    if daily_reset > now:
+        daily_reset -= timedelta(days=1)
+    if previous_utc < daily_reset <= now:
+        return True
+    descent = next((event for event in calendar if event.name == "Descent Playlist Rotation"), None)
+    if descent is not None and descent.cycle_seed is not None and descent.cycle_duration:
+        if now >= descent.cycle_seed:
+            elapsed = int((now - descent.cycle_seed).total_seconds())
+            cycles = elapsed // descent.cycle_duration
+            latest_descent_reset = descent.cycle_seed + timedelta(
+                seconds=cycles * descent.cycle_duration
+            )
+            if previous_utc < latest_descent_reset <= now:
+                return True
+    return now - previous_utc >= timedelta(hours=hours)
 
 
 def _mapping(value: object) -> dict[str, Any]:

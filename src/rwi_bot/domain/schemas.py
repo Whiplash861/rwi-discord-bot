@@ -140,6 +140,44 @@ class GameResearchReport(BaseModel):
     unresolved_questions: list[str] = Field(default_factory=list)
 
 
+class TargetedLootAssignment(BaseModel):
+    category: Literal[
+        "main_or_invaded_mission",
+        "area",
+        "classified_assignment",
+        "raid",
+        "other_location",
+    ]
+    location: str = Field(min_length=1, max_length=120)
+    loot: str = Field(min_length=1, max_length=120)
+    map_order: int = Field(default=999, ge=0, le=999)
+
+
+class RotationMapImage(BaseModel):
+    label: str = Field(min_length=1, max_length=80)
+    url: HttpUrl
+
+
+class InvadedMissionRotation(BaseModel):
+    main_missions: list[str] = Field(min_length=3, max_length=3)
+    stronghold: str = Field(min_length=1, max_length=120)
+    final_mission: Literal["Tidal Basin"] = "Tidal Basin"
+
+
+class DescentTalentPoolRotation(BaseModel):
+    name: str = Field(min_length=1, max_length=80)
+    offensive_talents: list[str] = Field(default_factory=list, max_length=20)
+    defensive_talents: list[str] = Field(default_factory=list, max_length=20)
+    utility_talents: list[str] = Field(default_factory=list, max_length=20)
+    exotic_talents: list[str] = Field(default_factory=list, max_length=12)
+
+
+class DarkZoneRotationAssignment(BaseModel):
+    zone: Literal["Dark Zone East", "Dark Zone South", "Dark Zone West"]
+    mode: str = Field(min_length=1, max_length=80)
+    targeted_loot: str | None = Field(default=None, max_length=120)
+
+
 class RotationResearchItem(BaseModel):
     kind: Literal[
         "targeted_loot_dc",
@@ -153,7 +191,12 @@ class RotationResearchItem(BaseModel):
         "other_rotation",
     ]
     title: str = Field(min_length=1, max_length=200)
-    details: list[str] = Field(min_length=1, max_length=24)
+    details: list[str] = Field(default_factory=list, max_length=24)
+    targeted_loot: list[TargetedLootAssignment] = Field(default_factory=list, max_length=80)
+    map_images: list[RotationMapImage] = Field(default_factory=list, max_length=4)
+    invaded: InvadedMissionRotation | None = None
+    descent: DescentTalentPoolRotation | None = None
+    dark_zones: list[DarkZoneRotationAssignment] = Field(default_factory=list, max_length=3)
     valid_from: date
     valid_until: date | None = None
     confidence: float = Field(ge=0.0, le=1.0)

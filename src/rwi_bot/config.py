@@ -56,6 +56,10 @@ class Settings(BaseSettings):
         "rubenalamina.mx",
         "youtube.com",
         "youtu.be",
+        "x.com",
+        "pbs.twimg.com",
+        "shdmanual.com",
+        "discordbotlist.com",
     )
     current_game_version: str = "Y8S3 Red Horizon"
     current_game_version_started_on: date = date(2026, 8, 27)

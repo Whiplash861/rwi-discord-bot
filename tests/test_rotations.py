@@ -8,6 +8,7 @@ from unittest.mock import AsyncMock
 
 import pytest
 
+from rwi_bot.cogs.rotations import rotation_embeds
 from rwi_bot.domain.schemas import (
     RotationResearchItem,
     RotationResearchReport,
@@ -83,6 +84,7 @@ def researched_item(
     *,
     evidence_class: str = "corroborated_community",
     confidence: float = 0.91,
+    **content: object,
 ) -> RotationResearchItem:
     return RotationResearchItem.model_validate(
         {
@@ -94,6 +96,7 @@ def researched_item(
             "confidence": confidence,
             "evidence_class": evidence_class,
             "source_urls": [url],
+            **content,
         }
     )
 
@@ -138,14 +141,43 @@ async def test_collect_builds_all_rotation_posts_from_dated_feeds_and_gated_web(
             researched_item(
                 "targeted_loot_dc",
                 "Washington targeted loot",
-                ["Downtown East: Assault Rifles"],
+                [],
                 dc_url,
+                targeted_loot=[
+                    {
+                        "category": "area",
+                        "location": "Downtown East",
+                        "loot": "Assault Rifles",
+                        "map_order": 10,
+                    },
+                    {
+                        "category": "raid",
+                        "location": "Dark Hours",
+                        "loot": "Gear System Mods",
+                        "map_order": 20,
+                    },
+                ],
+                map_images=[
+                    {
+                        "label": "Washington, D.C. Targeted Loot Map",
+                        "url": "https://images.example.invalid/dc.png",
+                    }
+                ],
             ),
             researched_item(
                 "invaded_missions",
                 "Weekly invasion",
-                ["Capitol Building", "Jefferson Trade Center"],
+                [],
                 invasion_url,
+                invaded={
+                    "main_missions": [
+                        "Jefferson Trade Center",
+                        "Lincoln Memorial",
+                        "Space Administration HQ",
+                    ],
+                    "stronghold": "Capitol Building",
+                    "final_mission": "Tidal Basin",
+                },
             ),
             researched_item(
                 "legendary_project",
@@ -189,12 +221,17 @@ async def test_collect_builds_all_rotation_posts_from_dated_feeds_and_gated_web(
     weekly_text = "\n".join(field.value for field in by_key["weekly-mission-rotations"].fields)
     descent_text = "\n".join(field.value for field in by_key["descent-rotation"].fields)
     seasonal_text = "\n".join(field.value for field in by_key["seasonal-rotations"].fields)
-    assert "Downtown East: Assault Rifles" in daily_text
+    assert "Downtown East:** Assault Rifles" in daily_text
     assert "The Tombs" in daily_text
     assert "Skill MOD" in daily_text
     assert "Capitol Building" in weekly_text
+    assert "Tidal Basin" in weekly_text
     assert "District Union Arena" not in weekly_text
-    assert "No current value cleared" in weekly_text
+    assert "complete dated assignment" in weekly_text
+    assert len(by_key["daily-targeted-loot"].images) == 1
+    embeds = rotation_embeds(by_key["daily-targeted-loot"])
+    assert len(embeds) == 2
+    assert embeds[1].image.url == "https://images.example.invalid/dc.png"
     assert "<t:1788393600:F>" in descent_text  # 2026-09-03 00:00 UTC
     assert "SHD Exposed" in seasonal_text
     assert snapshot.warnings == ()
@@ -212,8 +249,15 @@ async def test_collect_reuses_still_valid_web_cache_between_research_windows(
             researched_item(
                 "targeted_loot_brooklyn",
                 "Brooklyn targeted loot",
-                ["DUMBO: Marksman Rifles"],
+                [],
                 url,
+                targeted_loot=[
+                    {
+                        "category": "area",
+                        "location": "DUMBO",
+                        "loot": "Marksman Rifles",
+                    }
+                ],
             )
         ],
     )
@@ -239,9 +283,30 @@ async def test_collect_reuses_still_valid_web_cache_between_research_windows(
     assert ai.research_current_rotations.await_count == 1
     assert second.web_researched is False
     assert second.used_cached_web is True
-    assert "DUMBO: Marksman Rifles" in "\n".join(
+    assert "DUMBO:** Marksman Rifles" in "\n".join(
         field.value for field in second.publications[0].fields
     )
+
+
+@pytest.mark.asyncio
+async def test_collect_researches_again_immediately_after_daily_reset(tmp_path: Path) -> None:
+    report = RotationResearchReport(
+        as_of=date(2026, 9, 1),
+        summary="No complete live assignments.",
+        items=[],
+    )
+    ai = SimpleNamespace(
+        research_current_rotations=AsyncMock(
+            return_value=SimpleNamespace(report=report, citations=[])
+        )
+    )
+    service = build_service(tmp_path, ai=ai)
+
+    await service.collect(now=NOW.replace(hour=7))
+    second = await service.collect(now=NOW.replace(hour=9))
+
+    assert ai.research_current_rotations.await_count == 2
+    assert second.web_researched is True
 
 
 @pytest.mark.asyncio
@@ -265,4 +330,60 @@ async def test_future_escalation_data_is_not_published_as_today(
     snapshot = await service.collect(now=NOW)
 
     assert "structured Escalation feed was invalid or out of date" in snapshot.warnings[0]
-    assert "temporarily unavailable" in snapshot.publications[0].fields[3].value
+    assert "temporarily unavailable" in snapshot.publications[0].fields[1].value
+
+
+@pytest.mark.asyncio
+async def test_partial_invasion_descent_and_dark_zone_reports_are_not_published(
+    tmp_path: Path,
+) -> None:
+    source_url = "https://example.invalid/current-rotations"
+    report = RotationResearchReport(
+        as_of=date(2026, 9, 1),
+        summary="Incomplete reports.",
+        items=[
+            researched_item(
+                "invaded_missions",
+                "Incomplete invasion",
+                ["Jefferson Trade Center"],
+                source_url,
+            ),
+            researched_item(
+                "descent_pool",
+                "Pool cadence only",
+                ["Changes every three days"],
+                source_url,
+            ),
+            researched_item(
+                "dark_zone_mode",
+                "One zone only",
+                [],
+                source_url,
+                dark_zones=[{"zone": "Dark Zone East", "mode": "Blackout"}],
+            ),
+        ],
+    )
+    ai = SimpleNamespace(
+        research_current_rotations=AsyncMock(
+            return_value=SimpleNamespace(
+                report=report,
+                citations=[
+                    SourceCitation(
+                        title="Current rotations",
+                        url=source_url,
+                        source_type="community_reference",
+                    )
+                ],
+            )
+        )
+    )
+    service = build_service(tmp_path, ai=ai)
+
+    snapshot = await service.collect(now=NOW)
+
+    weekly = next(item for item in snapshot.publications if item.key == "weekly-mission-rotations")
+    descent = next(item for item in snapshot.publications if item.key == "descent-rotation")
+    seasonal = next(item for item in snapshot.publications if item.key == "seasonal-rotations")
+    assert "Awaiting a complete dated set" in weekly.fields[1].value
+    assert "current named pool has not been established" in descent.fields[0].value
+    assert "complete current East / South / West" in seasonal.fields[2].value
