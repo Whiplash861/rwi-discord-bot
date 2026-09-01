@@ -224,8 +224,11 @@ class RotationService:
                 warnings.append("The structured weekly vendor feed was unavailable or invalid.")
             elif isinstance(direct_results[2], VendorFeed):
                 vendor_feed = direct_results[2]
-                if vendor_feed.updated_at < current - timedelta(days=8):
-                    warnings.append("The weekly vendor feed was older than eight days.")
+                current_vendor_window = _latest_weekday_reset(current, weekday=1, hour=8)
+                if vendor_feed.updated_at < current_vendor_window:
+                    warnings.append(
+                        "The weekly vendor feed has not updated since the current reset."
+                    )
                     vendor_feed = None
 
             web_researched = force_web or _web_research_due(
@@ -589,7 +592,7 @@ def _build_publications(
 ) -> tuple[RotationPublication, ...]:
     daily_reset = _next_weekday_reset(now, weekday=None, hour=8)
     weekly_reset = _next_weekday_reset(now, weekday=1, hour=8)
-    vendor_reset = _next_weekday_reset(now, weekday=5, hour=8)
+    vendor_reset = _next_weekday_reset(now, weekday=1, hour=8)
     descent_reset = _descent_reset(calendar, now)
     by_kind: dict[str, RotationResearchItem] = {
         item.kind: item for item in web_items if item.kind != "other_rotation"
@@ -651,12 +654,20 @@ def _build_publications(
             seasonal_fields.append(RotationField(item.title, _item_value(item)))
     dark_zone_fields = list(_dark_zone_fields(by_kind.get("dark_zone_mode")))
     dark_zone_fields.append(RotationField("━━ DARK ZONE VENDORS ━━", "\u200b"))
+    dark_zone_vendor_field_count = len(dark_zone_fields)
     for vendor in (
         "Dark Zone East Vendor",
         "Dark Zone South Vendor",
         "Dark Zone West Vendor",
     ):
         dark_zone_fields.extend(_vendor_fields(vendor, vendor_stock))
+    if len(dark_zone_fields) == dark_zone_vendor_field_count:
+        dark_zone_fields.append(
+            RotationField(
+                "Current Vendor Stock",
+                "The current weekly DZ inventories have not been published yet.",
+            )
+        )
     vendor_fields: list[RotationField] = []
     if vendor_feed is not None:
         vendor_fields.append(
@@ -1029,6 +1040,11 @@ def _next_weekday_reset(now: datetime, *, weekday: int | None, hour: int) -> dat
     days = (weekday - candidate.weekday()) % 7
     candidate += timedelta(days=days)
     return candidate if candidate > now else candidate + timedelta(days=7)
+
+
+def _latest_weekday_reset(now: datetime, *, weekday: int, hour: int) -> datetime:
+    next_reset = _next_weekday_reset(now, weekday=weekday, hour=hour)
+    return next_reset - timedelta(days=7)
 
 
 def _discord_time(value: datetime) -> str:

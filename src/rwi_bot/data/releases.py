@@ -900,4 +900,23 @@ RELEASES: tuple[Release, ...] = (
             ),
         ),
     ),
+    Release(
+        release_id="erin-update-31",
+        update_number=31,
+        version="V0.1.30",
+        released_on=date(2026, 9, 1),
+        notes=(
+            ReleaseNote(
+                ReleaseSection.FIXES,
+                "Vendor inventory is now rejected immediately after a weekly reset until its "
+                "source publishes stock for the new window; last week's items can no longer be "
+                "presented as current.",
+            ),
+            ReleaseNote(
+                ReleaseSection.FIXES,
+                "Corrected ERIN's vendor reset timer to the Tuesday weekly boundary used by the "
+                "live vendor and rotation services.",
+            ),
+        ),
+    ),
 )

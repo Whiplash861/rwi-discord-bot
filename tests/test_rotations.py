@@ -110,6 +110,7 @@ def build_service(
     *,
     ai: object,
     stale_escalation: bool = False,
+    vendor_modified: str = "2026-09-01T09:21:15+00:00",
 ) -> RotationService:
     async def fetch_json(url: str) -> object:
         if url == ESCALATION_URL:
@@ -156,7 +157,7 @@ def build_service(
 
     async def fetch_text(url: str) -> str:
         assert url == VENDOR_PAGE_URL
-        return '<meta property="article:modified_time" content="2026-08-26T06:21:15+00:00">'
+        return f'<meta property="article:modified_time" content="{vendor_modified}">'
 
     return RotationService(
         ai=cast(Any, ai),
@@ -385,6 +386,37 @@ async def test_future_escalation_data_is_not_published_as_today(
 
     assert "structured Escalation feed was invalid or out of date" in snapshot.warnings[0]
     assert "temporarily unavailable" in snapshot.publications[0].fields[1].value
+
+
+@pytest.mark.asyncio
+async def test_vendor_stock_older_than_current_weekly_reset_is_withheld(tmp_path: Path) -> None:
+    ai = SimpleNamespace(
+        research_current_rotations=AsyncMock(
+            return_value=SimpleNamespace(
+                report=RotationResearchReport(
+                    as_of=date(2026, 9, 1),
+                    summary="No current vendor report.",
+                    items=[],
+                ),
+                citations=[],
+            )
+        )
+    )
+    service = build_service(
+        tmp_path,
+        ai=ai,
+        vendor_modified="2026-08-26T06:21:15+00:00",
+    )
+
+    snapshot = await service.collect(now=NOW)
+
+    vendors = next(item for item in snapshot.publications if item.key == "vendors")
+    rendered = "\n".join(field.value for field in vendors.fields)
+    assert "The Setup" not in rendered
+    assert "The Grudge" not in rendered
+    assert any(
+        "has not updated since the current reset" in warning for warning in snapshot.warnings
+    )
 
 
 @pytest.mark.asyncio
