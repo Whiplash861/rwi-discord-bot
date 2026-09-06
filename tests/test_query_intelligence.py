@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from types import SimpleNamespace
 
+from rwi_bot.services.build_intent import identify_build_request
 from rwi_bot.services.encounter_intent import predict_encounter_request
 from rwi_bot.services.language import interpret_locally
 from rwi_bot.services.query_intelligence import (
@@ -121,3 +122,27 @@ def test_latest_guide_revision_supersedes_older_same_subject() -> None:
     )
 
     assert prefer_latest_guide_hits([older, newer, complementary]) == [newer, complementary]
+
+
+def test_build_scope_expands_meta_retrieval_queries() -> None:
+    interpreted = interpret_locally("What is the best DPS build?")
+    build_scope = identify_build_request(
+        interpreted=interpreted,
+        encounter=None,
+        reference_hits=[],
+        current_game_version="Y8S3 Red Horizon",
+    )
+
+    plan = build_query_plan(
+        interpreted=interpreted,
+        encounter=None,
+        reference_hits=[],
+        build_scope=build_scope,
+    )
+
+    assert any(
+        "current weapon DPS build decision matrix" in query for query in plan.retrieval_queries
+    )
+    assert any(
+        "practical current weapon DPS baseline" in value for value in plan.response_directives
+    )

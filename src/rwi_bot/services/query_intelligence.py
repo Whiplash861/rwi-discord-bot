@@ -5,6 +5,7 @@ from dataclasses import dataclass
 from typing import Any, Protocol
 
 from rwi_bot.domain.schemas import IntentKind, InterpretedQuestion
+from rwi_bot.services.build_intent import BuildRequestScope
 from rwi_bot.services.encounter_intent import EncounterPrediction
 from rwi_bot.services.language import normalize_text
 from rwi_bot.services.reference_catalog import ReferenceHit, is_specific_reference_hit
@@ -32,11 +33,14 @@ def build_query_plan(
     interpreted: InterpretedQuestion,
     encounter: EncounterPrediction | None,
     reference_hits: Iterable[ReferenceHit],
+    build_scope: BuildRequestScope | None = None,
 ) -> QueryPlan:
     primary_query = (
         encounter.search_query if encounter is not None else interpreted.normalized_question
     )
     queries = [primary_query, interpreted.normalized_question]
+    if build_scope is not None:
+        queries.extend(build_scope.retrieval_queries)
     targets: list[str] = []
     directives: list[str] = []
     target_kind: str | None = None
@@ -99,6 +103,8 @@ def build_query_plan(
             "Check loadout legality and activation conditions before recommending the build. "
             "Explain the combat loop, substitutions, profile fit, and tiered pros and cons."
         )
+    if build_scope is not None:
+        directives.extend(build_scope.response_directives)
     if any(term in normalized.split() for term in ("all", "every", "complete")):
         directives.append(
             "The member explicitly requested complete scope; cover every requested component "

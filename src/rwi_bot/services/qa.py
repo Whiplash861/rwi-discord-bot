@@ -19,7 +19,12 @@ from rwi_bot.domain.schemas import (
 )
 from rwi_bot.services.audit import AuditService
 from rwi_bot.services.budget import SpendingClass
-from rwi_bot.services.community import CommunityLoadoutHit, CommunityLoadoutRepository
+from rwi_bot.services.build_intent import build_scope_prompt, identify_build_request
+from rwi_bot.services.community import (
+    CommunityLoadoutHit,
+    CommunityLoadoutRepository,
+    community_loadout_context,
+)
 from rwi_bot.services.community_learning import (
     CommunityClaimRepository,
     community_claim_context,
@@ -145,16 +150,24 @@ class QuestionAnsweringService:
             if self.reference_catalog is not None
             else []
         )
+        build_scope = identify_build_request(
+            interpreted=interpreted,
+            encounter=encounter_prediction,
+            reference_hits=reference_hits,
+            current_game_version=self.current_game_version,
+        )
         query_plan = build_query_plan(
             interpreted=interpreted,
             encounter=encounter_prediction,
             reference_hits=reference_hits,
+            build_scope=build_scope,
         )
         retrieval_query = query_plan.primary_query
         request_scope_parts = [
             value
             for value in (
                 query_plan_scope_prompt(query_plan),
+                build_scope_prompt(build_scope) if build_scope is not None else None,
                 skill_scope_prompt(skill_family_request) if skill_family_request else None,
                 encounter_scope_prompt(encounter_prediction)
                 if encounter_prediction is not None
@@ -167,6 +180,7 @@ class QuestionAnsweringService:
             if value
         ]
         request_scope = "\n".join(request_scope_parts) or None
+        community_hits: list[CommunityLoadoutHit] = []
         if interpreted.intent is IntentKind.BUILD_ADVICE and self.community_loadouts is not None:
             try:
                 community_hits = await self.community_loadouts.search(
@@ -193,24 +207,6 @@ class QuestionAnsweringService:
                                 ],
                             },
                         )
-                    )
-                    return AnswerResult(
-                        text=render_community_loadouts(
-                            community_hits, game_version=self.current_game_version
-                        ),
-                        citations=[
-                            SourceCitation(
-                                title=hit.loadout.title,
-                                url=hit.loadout.source_url,
-                                source_type="community_loadout",
-                                verified_at=hit.loadout.updated_at,
-                                official=False,
-                            )
-                            for hit in community_hits
-                        ],
-                        assumptions=request.assumptions,
-                        confidence=ConfidenceLabel.MEDIUM,
-                        learning_opt_out=learning_opt_out,
                     )
         if reference_hits:
             await self.audit.record(
@@ -249,6 +245,8 @@ class QuestionAnsweringService:
             ),
             "canonical_targets": list(query_plan.canonical_targets),
             "query_target_kind": query_plan.target_kind,
+            "build_request_kind": build_scope.kind if build_scope is not None else None,
+            "build_objective": build_scope.objective if build_scope is not None else None,
         }
         signature = question_signature(
             interpreted.normalized_question,
@@ -283,9 +281,12 @@ class QuestionAnsweringService:
                             },
                         )
                     )
-        cached = (
-            None if community_claim_hits else await self.cache.get_valid(signature, request.tier)
+        bypass_cache = bool(
+            community_claim_hits
+            or community_hits
+            or (build_scope is not None and build_scope.requires_live_meta_search)
         )
+        cached = None if bypass_cache else await self.cache.get_valid(signature, request.tier)
         if cached is not None and getattr(cached, "prompt_version", None) != SYSTEM_PROMPT_VERSION:
             cached = None
         if cached is not None:
@@ -317,9 +318,12 @@ class QuestionAnsweringService:
             self.knowledge,
             query_plan.retrieval_queries,
             limit=(
-                16
-                if encounter_prediction is not None
-                and encounter_prediction.request_kind == "activity_guide"
+                18
+                if (build_scope is not None and build_scope.kind in {"broad", "activity"})
+                or (
+                    encounter_prediction is not None
+                    and encounter_prediction.request_kind == "activity_guide"
+                )
                 else 8
             ),
             game_version=self.current_game_version,
@@ -347,9 +351,26 @@ class QuestionAnsweringService:
             )
         usable_hits = relevant_hits_for_plan(hits, query_plan) if local_retrieval_supported else []
         context, revision_ids, knowledge_citations = knowledge_context(usable_hits)
+        verified_context = context
         reviewed_context = community_claim_context(community_claim_hits)
         if reviewed_context:
             context = f"{context}\n\n{reviewed_context}" if context else reviewed_context
+        loadout_context = community_loadout_context(
+            community_hits, game_version=self.current_game_version
+        )
+        if loadout_context:
+            context = f"{context}\n\n{loadout_context}" if context else loadout_context
+        community_citations = [
+            SourceCitation(
+                title=hit.loadout.title,
+                url=hit.loadout.source_url,
+                source_type="community_loadout",
+                verified_at=hit.loadout.updated_at,
+                official=False,
+            )
+            for hit in community_hits
+        ]
+        local_citations = _merge_citations(knowledge_citations, community_citations)
         complexity = (
             "complex"
             if encounter_prediction is not None
@@ -369,15 +390,20 @@ class QuestionAnsweringService:
         )
 
         used_web = False
+        live_meta_search = bool(
+            self.web_search_enabled
+            and build_scope is not None
+            and build_scope.requires_live_meta_search
+        )
         try:
-            if usable_hits or community_claim_hits:
+            if (usable_hits or community_claim_hits or community_hits) and not live_meta_search:
                 generated = await self.ai.answer(
                     input_text=input_text,
                     user_id=request.user_id,
                     correlation_id=correlation_id,
                     complexity=complexity,
                 )
-                citations = _merge_citations(knowledge_citations, generated.citations)
+                citations = _merge_citations(local_citations, generated.citations)
                 confidence = _declared_confidence(generated)
                 used_web = False
             else:
@@ -386,19 +412,29 @@ class QuestionAnsweringService:
                 confidence = ConfidenceLabel.UNKNOWN
                 used_web = False
 
-            if self.web_search_enabled and confidence in {
-                ConfidenceLabel.LOW,
-                ConfidenceLabel.UNKNOWN,
-            }:
+            if self.web_search_enabled and (
+                live_meta_search or confidence in {ConfidenceLabel.LOW, ConfidenceLabel.UNKNOWN}
+            ):
                 self.log.info(
                     "answer_web_escalation",
                     correlation_id=str(correlation_id),
                     local_knowledge_hits=len(usable_hits),
                     rejected_local_hits=len(hits) - len(usable_hits),
                     community_claim_hits=len(community_claim_hits),
+                    community_loadout_hits=len(community_hits),
+                    live_meta_search=live_meta_search,
                 )
                 web_input_text = input_text
-                if usable_hits or community_claim_hits:
+                if usable_hits or community_claim_hits or community_hits:
+                    reusable_context = "\n\n".join(
+                        value for value in (verified_context, loadout_context) if value
+                    )
+                    external_check = (
+                        "EXTERNAL CHECK REQUIRED: Independently verify time-sensitive meta "
+                        "and community-usage claims from current external evidence. Preserve "
+                        "the useful locally verified mechanics above, but do not turn a "
+                        "single community example into a popularity ranking."
+                    )
                     web_input_text = compose_answer_input(
                         question=request.question,
                         member_name=request.member_name,
@@ -407,8 +443,9 @@ class QuestionAnsweringService:
                         current_game_version=self.current_game_version,
                         freshness_boundary=self.current_game_version_started_on.isoformat(),
                         knowledge_context=(
-                            "Local retrieval did not completely support this question. "
-                            "Independently verify the answer from current external evidence."
+                            f"{reusable_context}\n\n{external_check}"
+                            if reusable_context
+                            else external_check
                         ),
                         conversation_summary=request.conversation_summary,
                         request_scope=request_scope,
@@ -422,10 +459,11 @@ class QuestionAnsweringService:
                     search_scope=WebSearchScope.CURATED,
                     spending_class=SpendingClass.MEMBER_ANSWER,
                 )
-                citations = generated.citations
+                web_citations = generated.citations
+                citations = _merge_citations(local_citations, web_citations)
                 confidence = _minimum_confidence(
                     _declared_confidence(generated),
-                    _web_evidence_confidence(citations),
+                    _web_evidence_confidence(web_citations),
                 )
                 if confidence in {ConfidenceLabel.LOW, ConfidenceLabel.UNKNOWN}:
                     generated = await self.ai.answer(
@@ -437,10 +475,11 @@ class QuestionAnsweringService:
                         search_scope=WebSearchScope.OPEN,
                         spending_class=SpendingClass.MEMBER_ANSWER,
                     )
-                    citations = generated.citations
+                    web_citations = generated.citations
+                    citations = _merge_citations(local_citations, web_citations)
                     confidence = _minimum_confidence(
                         _declared_confidence(generated),
-                        _web_evidence_confidence(citations),
+                        _web_evidence_confidence(web_citations),
                     )
                 used_web = True
             elif generated is None:
@@ -569,7 +608,7 @@ class QuestionAnsweringService:
             )
 
         cache_entry_id = None
-        if not learning_opt_out and not community_claim_hits:
+        if not learning_opt_out and not bypass_cache:
             cache_entry_id = await self.cache.create_candidate(
                 signature=signature,
                 normalized_intent=(

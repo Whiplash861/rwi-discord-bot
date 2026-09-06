@@ -52,6 +52,7 @@ class Settings(BaseSettings):
         "thedivisiondispatch.com",
         "siriusarc7.github.io",
         "raigulus.github.io",
+        "keengamer.com",
         "github.com",
         "raw.githubusercontent.com",
         "rubenalamina.mx",

@@ -143,7 +143,7 @@ def interpret_locally(question: str) -> InterpretedQuestion:
         token in normalized for token in ("what changed", "patch", "title update", "known issue")
     ):
         intent = IntentKind.PATCH_HISTORY
-    elif any(
+    elif intent is not IntentKind.BUILD_ADVICE and any(
         token in normalized
         for token in (
             "mission",

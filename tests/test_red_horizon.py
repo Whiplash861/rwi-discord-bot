@@ -56,7 +56,7 @@ def test_red_horizon_seed_catalog_is_unique_and_current() -> None:
     }
 
     expected = (
-        62
+        63
         + len(RED_HORIZON_SKILL_TABLES)
         + len(RAID_AND_DZ_RECORDS)
         + len(COMPLETE_ENCOUNTER_RECORDS)
@@ -85,6 +85,17 @@ def test_red_horizon_launch_values_use_release_values() -> None:
     assert iron_will.content["pvp_cooldown_seconds"] == 3  # type: ignore[attr-defined]
     assert ember_engine.content["four_piece_burn_chance"] == 0.40  # type: ignore[attr-defined]
     assert ember_engine.content["chest_burn_chance"] == 0.60  # type: ignore[attr-defined]
+
+
+def test_current_pve_dps_matrix_is_conditional_and_source_backed() -> None:
+    matrix = seed("Red Horizon PvE DPS build decision matrix")
+
+    archetypes = matrix.content["current_archetypes"]  # type: ignore[attr-defined]
+    assert "Striker weapon DPS" in archetypes
+    assert "Tipping Scales LMG DPS" in archetypes
+    assert "Negotiator's Dilemma crit DPS" in archetypes
+    assert "universal ranking" in matrix.content["scope"]  # type: ignore[attr-defined]
+    assert len(matrix.sources) == 5  # type: ignore[attr-defined]
 
 
 def test_red_horizon_brand_catalog_uses_final_ubisoft_values() -> None:
@@ -181,7 +192,7 @@ async def test_seed_preview_and_apply_are_create_only_and_idempotent() -> None:
     result = await apply_red_horizon_seed(repository, actor_id=42)  # type: ignore[arg-type]
     second = await apply_red_horizon_seed(repository, actor_id=42)  # type: ignore[arg-type]
 
-    expected = 148 + len(RAID_AND_DZ_RECORDS) + len(COMPLETE_ENCOUNTER_RECORDS)
+    expected = 149 + len(RAID_AND_DZ_RECORDS) + len(COMPLETE_ENCOUNTER_RECORDS)
     assert preview.total == expected
     assert preview.existing == 2
     assert preview.missing == expected - 2

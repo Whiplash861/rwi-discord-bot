@@ -48,6 +48,42 @@ OFFICIAL_SKILL_BREAKDOWN_SOURCE = SourceEvidence(
     supports_claim=True,
     note="Final Y8S3 Skill table linked from the Red Horizon launch article.",
 )
+CURRENT_BUILD_TEST_SOURCE = SourceEvidence(
+    url="https://raigulus.github.io/division-2/builds/",
+    title="Division 2 Builds Tested: Tier 10, PvE & PvP",
+    source_type=SourceType.COMMUNITY,
+    trust_score=Decimal("0.760"),
+    publisher="Raigulus",
+    supports_claim=True,
+    note=(
+        "Video-backed 2026 activity tests used as current community-use evidence, not as a "
+        "universal tier list or proof of unshown mechanics. Re-audited September 5, 2026."
+    ),
+)
+CURRENT_BUILD_DISCUSSION_SOURCE = SourceEvidence(
+    url="https://www.reddit.com/r/Division2/comments/1w0xs5c/new_season_builds/",
+    title="Red Horizon community build discussion",
+    source_type=SourceType.COMMUNITY,
+    trust_score=Decimal("0.660"),
+    publisher="r/Division2",
+    supports_claim=True,
+    note=(
+        "August 28, 2026 discussion used only to identify recurring current-season build "
+        "archetypes and community sentiment. Individual claims still require corroboration."
+    ),
+)
+CURRENT_DPS_DISCUSSION_SOURCE = SourceEvidence(
+    url="https://www.reddit.com/r/thedivision/comments/1w7s1n8/looking_to_put_together_a_unique_dps_build/",
+    title="Current alternatives to the standard DPS build",
+    source_type=SourceType.COMMUNITY,
+    trust_score=Decimal("0.660"),
+    publisher="r/thedivision",
+    supports_claim=True,
+    note=(
+        "September 5, 2026 discussion used to corroborate current community interest in "
+        "Striker, Tipping Scales, Negotiator's Dilemma, and Aces & Eights archetypes."
+    ),
+)
 
 
 @dataclass(frozen=True, slots=True)
@@ -330,6 +366,69 @@ RED_HORIZON_GEAR_SET_UPDATES: dict[str, dict[str, Any]] = {
 
 
 RED_HORIZON_SEEDS: tuple[KnowledgeSeed, ...] = (
+    KnowledgeSeed(
+        subject="Red Horizon PvE DPS build decision matrix",
+        entity_type="build_meta",
+        claim_key="current_role_archetypes_and_selection_v1",
+        content={
+            "scope": (
+                "Current Red Horizon PvE weapon-DPS starting points. This is a decision "
+                "matrix, not a universal ranking or guaranteed damage table."
+            ),
+            "selection_criteria": [
+                "activity and difficulty",
+                "solo versus coordinated group",
+                "theoretical ceiling versus achievable stack or talent uptime",
+                "single-target versus multi-target pressure",
+                "range, accuracy, survivability, team utility, and player comfort",
+                "owned items and legitimate acquisition access",
+            ],
+            "current_archetypes": {
+                "Striker weapon DPS": (
+                    "Common sustained single-target/default baseline when repeated hits and "
+                    "stack uptime are realistic."
+                ),
+                "Tipping Scales LMG DPS": (
+                    "Current continuous-fire alternative for players who prefer LMG pressure "
+                    "and can preserve firing uptime."
+                ),
+                "Negotiator's Dilemma crit DPS": (
+                    "Multi-target alternative when the player can mark and damage several "
+                    "valid enemies instead of tunneling one target."
+                ),
+                "Aces & Eights rifle or MMR DPS": (
+                    "Precision alternative for deliberate rifle/MMR play and consistent "
+                    "headshot or card-cycle execution."
+                ),
+                "high-end weapon DPS": (
+                    "Low-ramp alternative whose value depends on current brand bonuses, "
+                    "weapon talent uptime, range, and the risk of its chest/backpack talents."
+                ),
+            },
+            "recommendation_method": [
+                "Choose one practical baseline under the member's stated content and profile.",
+                "Offer alternatives only when they optimize a different real constraint.",
+                "Describe the combat loop and activation conditions before quoting a ceiling.",
+                "Label recurring community choices as community signals, not objective rank.",
+                "Label a novel combination as theorycraft and tell the member what to test.",
+                "Never carry Prototype Augment assumptions into normalized Raids or Incursions.",
+            ],
+        },
+        context={
+            "season": "Red Horizon",
+            "mode": "pve",
+            "evidence_kind": "official_rules_plus_current_community_signals",
+            "community_observed_through": "2026-09-05",
+        },
+        confidence=0.86,
+        sources=(
+            OFFICIAL_SOURCE,
+            OFFICIAL_BRAND_BREAKDOWN_SOURCE,
+            CURRENT_BUILD_TEST_SOURCE,
+            CURRENT_BUILD_DISCUSSION_SOURCE,
+            CURRENT_DPS_DISCUSSION_SOURCE,
+        ),
+    ),
     KnowledgeSeed(
         subject="Red Horizon Under Pressure",
         entity_type="seasonal_modifier",

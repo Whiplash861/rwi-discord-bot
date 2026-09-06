@@ -984,4 +984,34 @@ RELEASES: tuple[Release, ...] = (
             ),
         ),
     ),
+    Release(
+        release_id="erin-update-35",
+        update_number=35,
+        version="V0.1.34",
+        released_on=date(2026, 9, 5),
+        notes=(
+            ReleaseNote(
+                ReleaseSection.HIGH_IMPACT,
+                "Broad requests such as 'best DPS build' now produce a conditional current-meta "
+                "recommendation with a practical baseline, distinct alternatives, and a legal "
+                "high-yield theorycraft to test instead of stopping at 'it depends'.",
+            ),
+            ReleaseNote(
+                ReleaseSection.NEW_FEATURES,
+                "Content-specific requests now map builds to team roles, encounter mechanics, "
+                "skills, and swap points, including progression and optimized Broken Rain plans.",
+            ),
+            ReleaseNote(
+                ReleaseSection.IMPROVEMENTS,
+                "ERIN now combines verified game rules, the member's saved profile, current web "
+                "signals, and matching RWI community loadouts before drafting build advice.",
+            ),
+            ReleaseNote(
+                ReleaseSection.FIXES,
+                "Community loadout matches no longer short-circuit build reasoning, and build "
+                "requests mentioning missions or difficulty are no longer misrouted as generic "
+                "mission guides.",
+            ),
+        ),
+    ),
 )
