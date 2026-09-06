@@ -12,13 +12,14 @@ from uuid import UUID
 
 import structlog
 from openai import AsyncOpenAI
-from pydantic import HttpUrl
+from pydantic import HttpUrl, ValidationError
 from tenacity import retry, retry_if_exception_type, stop_after_attempt, wait_exponential_jitter
 
 from rwi_bot.ai.prompts import RWI_ANSWER_INSTRUCTIONS
 from rwi_bot.db.repositories import UsageRepository
 from rwi_bot.domain.schemas import (
     ConfidenceLabel,
+    GameResearchFinding,
     GameResearchReport,
     RotationResearchReport,
     SourceCitation,
@@ -387,7 +388,14 @@ class RwiOpenAIClient:
             correlation_id=correlation_id,
             operation=f"autonomous_game_research_{source_group}",
         )
-        report = GameResearchReport.model_validate_json(payload)
+        report, quarantined_findings = _validated_game_research_report(payload)
+        if quarantined_findings:
+            self.log.warning(
+                "research_findings_quarantined",
+                correlation_id=str(correlation_id),
+                source_group=source_group,
+                count=quarantined_findings,
+            )
         await self.usage_repository.append(
             operation=f"autonomous_game_research_{source_group}",
             model=model,
@@ -879,6 +887,41 @@ def _extract_output(
                 title = str(getattr(annotation, "title", "Source") or "Source")
                 add_citation(url, title)
     return text, citations, search_calls
+
+
+def _validated_game_research_report(payload: str) -> tuple[GameResearchReport, int]:
+    """Quarantine malformed findings without weakening validation of report-level state."""
+
+    raw = json.loads(payload)
+    if not isinstance(raw, dict):
+        raise ValueError("Game research output must be a JSON object.")
+    findings = raw.get("findings")
+    if not isinstance(findings, list):
+        return GameResearchReport.model_validate(raw), 0
+
+    valid_findings: list[GameResearchFinding] = []
+    quarantined = 0
+    for finding in findings:
+        try:
+            valid_findings.append(GameResearchFinding.model_validate(finding))
+        except ValidationError:
+            quarantined += 1
+    if not quarantined:
+        return GameResearchReport.model_validate(raw), 0
+
+    normalized = dict(raw)
+    normalized["findings"] = valid_findings
+    unresolved = normalized.get("unresolved_questions")
+    if not isinstance(unresolved, list):
+        unresolved = []
+    normalized["unresolved_questions"] = [
+        *unresolved,
+        (
+            f"ERIN quarantined {quarantined} malformed research finding(s) whose required "
+            "evidence fields were missing or invalid; they will be retried."
+        ),
+    ]
+    return GameResearchReport.model_validate(normalized), quarantined
 
 
 def _merge_research_passes(

@@ -1014,4 +1014,17 @@ RELEASES: tuple[Release, ...] = (
             ),
         ),
     ),
+    Release(
+        release_id="erin-update-36",
+        update_number=36,
+        version="V0.1.35",
+        released_on=date(2026, 9, 5),
+        notes=(
+            ReleaseNote(
+                ReleaseSection.MAINTENANCE,
+                "A malformed item in an autonomous game-research response is now quarantined "
+                "and retried later instead of aborting the entire scheduled update check.",
+            ),
+        ),
+    ),
 )

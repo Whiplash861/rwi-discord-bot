@@ -16,6 +16,7 @@ from rwi_bot.ai.client import (
     _completion_state,
     _extract_evidence_confidence,
     _extract_output,
+    _validated_game_research_report,
     classify_external_source,
 )
 from rwi_bot.domain.schemas import AnswerRequest, ConfidenceLabel, SourceCitation
@@ -210,6 +211,27 @@ def test_completion_state_detects_provider_and_fallback_token_cutoffs() -> None:
         output_tokens=2200,
         output_token_limit=2200,
     ) == (True, None)
+
+
+def test_game_research_quarantines_finding_with_missing_evidence_fields() -> None:
+    payload = (
+        '{"change_detected":true,"current_game_version":"Y8S3 Red Horizon",'
+        '"season_name":"Red Horizon","season_started_on":"2026-08-27",'
+        '"summary":"One valid result and one malformed result.",'
+        '"official_evidence_urls":[],"findings":['
+        '{"subject":"Valid","entity_type":"system","claim_key":"valid",'
+        '"summary":"Valid finding.","content":{},"context":{},"confidence":0.9,'
+        '"evidence_class":"official","source_urls":[],"material_change":false},'
+        '{"subject":"Missing fields","entity_type":"activity","claim_key":"invalid",'
+        '"summary":"Incomplete finding.","content":{},"context":{},'
+        '"source_urls":[],"material_change":false}],"unresolved_questions":[]}'
+    )
+
+    report, quarantined = _validated_game_research_report(payload)
+
+    assert quarantined == 1
+    assert [finding.subject for finding in report.findings] == ["Valid"]
+    assert "quarantined 1 malformed" in report.unresolved_questions[-1]
 
 
 def test_evidence_marker_is_removed_and_missing_marker_fails_closed() -> None:
