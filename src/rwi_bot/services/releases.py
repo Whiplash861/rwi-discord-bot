@@ -38,6 +38,7 @@ RELEASE_SECTION_ORDER = (
 class ReleaseNote:
     section: ReleaseSection
     text: str
+    community_visible: bool = True
 
     def __post_init__(self) -> None:
         clean = " ".join(self.text.split())
@@ -164,7 +165,11 @@ class ReleaseHistoryRepository:
 def render_release_description(release: Release) -> str:
     lines = [release.version, "", release.released_on.strftime("%B %d, %Y"), "", "__Patch Notes__"]
     for section in RELEASE_SECTION_ORDER:
-        notes = [note.text for note in release.notes if note.section == section]
+        notes = [
+            note.text
+            for note in release.notes
+            if note.section == section and note.community_visible
+        ]
         if not notes:
             continue
         lines.extend(("", f"**{section.value}**", *(f"- {note}" for note in notes)))
@@ -231,59 +236,74 @@ def automatic_release(
     }
     notes: list[ReleaseNote] = []
 
-    if _matches(changed, ("privacy", "moderation", "maintenance", "budget", "ai/client")):
-        notes.append(
-            ReleaseNote(
-                ReleaseSection.PRIVACY_SAFETY,
-                "Privacy, moderation, maintenance, or cost-control safeguards changed.",
-            )
-        )
+    # Public notes describe affected player-facing features, not administrative internals.
+    areas = (
+        (
+            ("privacy",),
+            ReleaseSection.PRIVACY_SAFETY,
+            "Member privacy, saved-profile export or learning controls changed.",
+        ),
+        (
+            ("services/qa", "ai/prompts", "ai/client"),
+            ReleaseSection.IMPROVEMENTS,
+            "Question interpretation, evidence handling or answer generation changed.",
+        ),
+        (
+            ("member_profiles", "onboarding"),
+            ReleaseSection.IMPROVEMENTS,
+            "Introductions, saved player preferences or personalized advice changed.",
+        ),
+        (
+            ("community.py", "community_learning"),
+            ReleaseSection.IMPROVEMENTS,
+            "Community build references or gameplay contribution handling changed.",
+        ),
+        (
+            ("video_inspection",),
+            ReleaseSection.IMPROVEMENTS,
+            "Screenshot or gameplay-video inspection changed.",
+        ),
+        (
+            ("rotations",),
+            ReleaseSection.IMPROVEMENTS,
+            "Rotation collection, reset handling or rotation channel displays changed.",
+        ),
+        (
+            ("announcements", "cogs/autonomy"),
+            ReleaseSection.IMPROVEMENTS,
+            "Important developer update announcements changed.",
+        ),
+        (
+            ("operations",),
+            ReleaseSection.IMPROVEMENTS,
+            "Raid and Incursion scheduling or attendance coordination changed.",
+        ),
+        (
+            ("cogs/releases", "data/releases"),
+            ReleaseSection.NEW_FEATURES,
+            "Community patch-note presentation changed.",
+        ),
+        (
+            ("data/red_horizon", "services/knowledge", "autonomous_research"),
+            ReleaseSection.IMPROVEMENTS,
+            "The local Division 2 research library or current-game knowledge checks changed.",
+        ),
+    )
+    for fragments, section, description in areas:
+        if _matches(changed, fragments):
+            notes.append(ReleaseNote(section, description))
     if _matches(changed, ("src/rwi_bot/db/", "alembic/")):
         notes.append(
             ReleaseNote(
                 ReleaseSection.HIGH_IMPACT,
-                "ERIN's persistent data layer or database migrations changed.",
-            )
-        )
-    if _matches(
-        changed,
-        (
-            "src/rwi_bot/services/qa",
-            "services/knowledge",
-            "services/autonomous_research",
-            "services/video_inspection",
-            "src/rwi_bot/data/",
-            "ai/prompts",
-        ),
-    ):
-        notes.append(
-            ReleaseNote(
-                ReleaseSection.NEW_FEATURES,
-                "ERIN's game-intelligence, knowledge, or answer systems changed.",
-            )
-        )
-    if _matches(changed, ("src/rwi_bot/bot/", "src/rwi_bot/cogs/")):
-        notes.append(
-            ReleaseNote(
-                ReleaseSection.NEW_FEATURES,
-                "Discord commands, channels, or community interactions changed.",
-            )
-        )
-    if _matches(
-        changed,
-        ("src/rwi_bot/config", "preflight", "Dockerfile", "compose.yml", "scripts/"),
-    ):
-        notes.append(
-            ReleaseNote(
-                ReleaseSection.MAINTENANCE,
-                "Runtime configuration, health checks, or deployment tooling changed.",
+                "Persistent data structures changed.",
+                community_visible=False,
             )
         )
     if not notes:
         notes.append(
             ReleaseNote(
-                ReleaseSection.IMPROVEMENTS,
-                "ERIN was deployed with internal application improvements.",
+                ReleaseSection.MAINTENANCE, "Internal deployment changes.", community_visible=False
             )
         )
     return Release(

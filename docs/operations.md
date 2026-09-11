@@ -31,8 +31,9 @@ The provider may return source links either as inline annotations or under web-t
 metadata. Both forms are extracted; a nonzero web-tool count with no retained citations is
 therefore a useful signal that the search returned no usable source links.
 
-`RWI_COMMUNITY_LOADOUT_INDEXING_ENABLED` controls whether new and edited public forum
-starter posts are indexed. ERIN's server nickname is reconciled idempotently on each
+`RWI_COMMUNITY_LOADOUT_INDEXING_ENABLED` controls whether messages in designated public
+loadout channels and threads are indexed. See [V0.2.0 behavior and limits](v020.md).
+ERIN's server nickname is reconciled idempotently on each
 Discord connection and does not change the application ID, credentials, or permissions.
 
 `RWI_VIDEO_INSPECTION_ENABLED`, `RWI_VIDEO_MAX_DURATION_SECONDS`,

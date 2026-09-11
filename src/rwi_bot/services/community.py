@@ -5,7 +5,7 @@ from datetime import UTC, datetime
 from typing import Any, cast
 from uuid import UUID
 
-from sqlalchemy import delete, func, select
+from sqlalchemy import delete, func, select, update
 
 from rwi_bot.db.models import CommunityLoadout
 from rwi_bot.db.session import Database
@@ -31,6 +31,31 @@ class CommunityLoadoutRepository:
     def __init__(self, database: Database) -> None:
         self.database = database
 
+    async def deactivate_source(self, guild_id: int, message_id: int) -> None:
+        async with self.database.session() as session:
+            await session.execute(
+                update(CommunityLoadout)
+                .where(
+                    CommunityLoadout.guild_id == guild_id,
+                    CommunityLoadout.starter_message_id == message_id,
+                )
+                .values(active=False)
+            )
+
+    async def source_matches(self, guild_id: int, message_id: int, fingerprint: str) -> bool:
+        async with self.database.session() as session:
+            return (
+                await session.scalar(
+                    select(CommunityLoadout.id).where(
+                        CommunityLoadout.guild_id == guild_id,
+                        CommunityLoadout.starter_message_id == message_id,
+                        CommunityLoadout.source_fingerprint == fingerprint,
+                        CommunityLoadout.active.is_(True),
+                    )
+                )
+                is not None
+            )
+
     async def upsert(
         self,
         *,
@@ -46,9 +71,10 @@ class CommunityLoadoutRepository:
         game_version: str,
         submitted_at: datetime,
         verification_status: str = "community_submitted",
+        source_fingerprint: str | None = None,
     ) -> UUID:
         clean_title = " ".join(title.split())[:300]
-        clean_content = content.strip()[:2000]
+        clean_content = content.strip()[:6000]
         clean_tags = sorted({" ".join(tag.split())[:100] for tag in tags if tag.strip()})[:20]
         clean_version = " ".join(game_version.split())[:80]
         if not clean_title or not clean_content:
@@ -70,7 +96,7 @@ class CommunityLoadoutRepository:
             loadout = await session.scalar(
                 select(CommunityLoadout)
                 .where(CommunityLoadout.guild_id == guild_id)
-                .where(CommunityLoadout.thread_id == thread_id)
+                .where(CommunityLoadout.starter_message_id == starter_message_id)
                 .with_for_update()
             )
             if loadout is None:
@@ -107,6 +133,7 @@ class CommunityLoadoutRepository:
                 loadout.active = True
                 loadout.submitted_at = submitted_at
                 loadout.updated_at = now
+            loadout.source_fingerprint = source_fingerprint
             await session.flush()
             return loadout.id
 

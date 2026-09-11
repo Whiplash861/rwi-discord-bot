@@ -33,6 +33,7 @@ from rwi_bot.services.member_profiles import (
     is_profile_query,
     render_member_profile,
 )
+from rwi_bot.services.observation import creator_question, sensitive_erin_question, teaching_address
 from rwi_bot.services.rate_limit import MemberRateLimiter
 from rwi_bot.services.sources import hide_source_links, is_source_request, render_sources
 from rwi_bot.services.video_inspection import VideoInspectionError
@@ -84,8 +85,17 @@ class ConversationCog(commands.Cog):
             for attachment in getattr(message, "attachments", ())
             if video_service is not None and video_service.supports_attachment(attachment)
         ]
-        if message.author.bot or (not message.content.strip() and not video_attachments):
+        image_attachments = [
+            a
+            for a in getattr(message, "attachments", ())
+            if video_service is not None and video_service.supports_image(a)
+        ]
+        if message.author.bot or (
+            not message.content.strip() and not video_attachments and not image_attachments
+        ):
             return
+        if names.is_passive_general(message.channel):
+            return  # General chat is strictly read-only, including direct mentions/replies.
         is_dm = isinstance(message.channel, discord.DMChannel)
         if is_dm:
             member = await self._live_member(message.author.id)
@@ -101,12 +111,44 @@ class ConversationCog(commands.Cog):
                 or message.guild.id != self.bot.services.settings.discord_guild_id
             ):
                 return
-            if not self._is_ask_rwi_space(message.channel):
+            addressed = await self._addressed(message)
+            if not self._is_ask_rwi_space(message.channel) and not addressed:
+                return
+            if message.reference and not addressed:
+                return  # A reply to another player is not an instruction to ERIN.
+            channel = message.channel
+            if isinstance(channel, discord.TextChannel) and channel.name in (
+                names.ERIN_KNOWLEDGE,
+                names.TECHNICIAN_LAB,
+            ):
+                return
+            if getattr(channel, "nsfw", False) or (
+                isinstance(channel, discord.Thread) and getattr(channel.parent, "nsfw", False)
+            ):
                 return
 
             moderation = self.bot.get_cog("ModerationCog")
             if moderation is not None and await moderation.handle_message(message):  # type: ignore[attr-defined]
                 return
+
+        observation = self.bot.get_cog("KnowledgeObservationCog")
+        if observation is not None and await observation.maybe_record_endorsement(message):  # type: ignore[attr-defined]
+            return
+        if observation is not None and is_dm and await observation.handle_owner_review(message):  # type: ignore[attr-defined]
+            return
+        if creator_question(message.content):
+            await message.reply(
+                "Whiplash861 is my creator and the sole person responsible for my programming.",
+                mention_author=False,
+            )
+            return
+        if observation is not None and sensitive_erin_question(message.content):
+            retry_after = await self.rate_limiter.acquire(message.author.id)
+            if retry_after is not None:
+                return
+            response = await observation.route_sensitive(message)  # type: ignore[attr-defined]
+            await message.reply(response, mention_author=False)
+            return
 
         operations = self.bot.get_cog("OperationsCog")
         if operations is not None and await operations.maybe_handle_message(message):  # type: ignore[attr-defined]
@@ -116,12 +158,12 @@ class ConversationCog(commands.Cog):
         session_key = (message.author.id, destination.id)
         member_label = self._member_label(message.author.display_name)
         async with self._locks[session_key]:
-            if video_attachments:
+            if video_attachments or image_attachments:
                 assert video_service is not None
-                if len(video_attachments) > 1:
+                if len(video_attachments) + len(image_attachments) > 1:
                     await destination.send(
-                        "Send one gameplay recording at a time so I can preserve its sequence "
-                        "and give you a precise inspection."
+                        "Send one screenshot or gameplay recording at a time for a precise "
+                        "inspection."
                     )
                     return
                 retry_after = await self.rate_limiter.acquire(message.author.id)
@@ -133,8 +175,13 @@ class ConversationCog(commands.Cog):
                     return
                 try:
                     async with destination.typing():
-                        inspection = await video_service.inspect(
-                            video_attachments[0],
+                        inspect = (
+                            video_service.inspect
+                            if video_attachments
+                            else video_service.inspect_image
+                        )
+                        inspection = await inspect(
+                            (video_attachments or image_attachments)[0],
                             question=message.content,
                             user_id=message.author.id,
                         )
@@ -142,10 +189,16 @@ class ConversationCog(commands.Cog):
                     await destination.send(str(exc))
                     return
                 reply = (
-                    f"{inspection.text}\n\n"
-                    f"*Visual inspection: {inspection.sampled_frames} sampled frames across "
-                    f"{inspection.duration_seconds:.1f}s. Audio was not analyzed, and the raw "
-                    "recording was discarded after inspection.*"
+                    inspection.text
+                    if image_attachments
+                    else (
+                        f"{inspection.text}\n\n"
+                        f"*Visual inspection: {inspection.sampled_frames} sampled frames across "
+                        f"{inspection.start_seconds:.1f}-"
+                        f"{inspection.start_seconds + inspection.duration_seconds:.1f}s "
+                        "of your upload (45s maximum). Audio was not analyzed, and the raw "
+                        "recording was discarded after inspection.*"
+                    )
                 )
                 for chunk in split_discord_message(reply):
                     await destination.send(chunk)
@@ -405,12 +458,26 @@ class ConversationCog(commands.Cog):
                 return
 
             learning_turn = None
+            experienced = False
+            if observation is not None and not is_dm:
+                experienced = await observation.is_experienced(message.author.id)  # type: ignore[attr-defined]
             if not is_dm:
                 learning_turn = (
                     prior_turn
                     if prior_turn is not None and prior_turn.awaiting_user_input
                     else self._latest_public_answer(destination.id)
                 )
+                if (teaching_address(message.content) or experienced) and learning_turn is None:
+                    learning_turn = ConversationTurn(
+                        member=(
+                            "Member is teaching ERIN a Division 2 claim or appealing an "
+                            "earlier answer."
+                        ),
+                        assistant=(
+                            "No earlier answer available; check the complete claim independently."
+                        ),
+                        awaiting_user_input=True,
+                    )
             if learning_turn is not None:
                 if learning_turn.awaiting_user_input and is_teaching_meta(message.content):
                     await destination.send(
@@ -422,7 +489,9 @@ class ConversationCog(commands.Cog):
                     return
                 claim_proposal = infer_community_claim(
                     message.content,
-                    prompted=learning_turn.awaiting_user_input,
+                    prompted=learning_turn.awaiting_user_input
+                    or teaching_address(message.content)
+                    or experienced,
                 )
                 learning = self.bot.get_cog("CommunityLearningCog")
                 if claim_proposal is not None and learning is not None:
@@ -435,10 +504,19 @@ class ConversationCog(commands.Cog):
                     )
                     if claim is not None:
                         reply = (
-                            "Thanks—that is substantial enough to archive for review. I asked "
-                            "experienced members to verify it. I won't reuse it as fact unless "
-                            "they approve or qualify it, and bug or exploit techniques are "
-                            "excluded from recommendations."
+                            (
+                                "Thanks—I independently corroborated that contribution and "
+                                "saved it for future answers. "
+                                "I've also noted your reviewed contribution in your profile."
+                            )
+                            if claim.status in {"verified", "qualified"}
+                            else (
+                                "Thanks—that is substantial enough to archive for review. I asked "
+                                "experienced members to verify it. I won't reuse it as fact unless "
+                                "they approve or qualify it, and bug or exploit techniques are "
+                                "excluded from recommendations. You can appeal a "
+                                "correction with your test conditions and evidence."
+                            )
                         )
                         learning_turn.awaiting_user_input = False
                         await destination.send(reply)
@@ -505,6 +583,23 @@ class ConversationCog(commands.Cog):
         except (discord.NotFound, discord.Forbidden, discord.HTTPException):
             return None
 
+    async def _addressed(self, message: discord.Message) -> bool:
+        if self.bot.user is None:
+            return False
+        if any(user.id == self.bot.user.id for user in message.mentions):
+            return True
+        if re.match(r"^\s*(?:(?:hey|hi|hello)\s+)?erin\b[,!:]?", message.content, re.I):
+            return True
+        if message.reference and message.reference.message_id:
+            referenced = message.reference.resolved
+            if not isinstance(referenced, discord.Message):
+                try:
+                    referenced = await message.channel.fetch_message(message.reference.message_id)
+                except discord.HTTPException:
+                    return False
+            return referenced.author.id == self.bot.user.id
+        return False
+
     @staticmethod
     def _is_ask_rwi_space(channel: discord.abc.Messageable) -> bool:
         if isinstance(channel, discord.TextChannel):
@@ -520,6 +615,8 @@ class ConversationCog(commands.Cog):
             return message.channel
         if not isinstance(message.channel, discord.TextChannel):
             raise TypeError("RWI conversation destination must be a text channel or thread.")
+        if message.channel.name != names.ASK_RWI:
+            return message.channel
         title = f"{message.author.display_name}: {message.content.strip()}"
         title = " ".join(title.split())[:90]
         try:

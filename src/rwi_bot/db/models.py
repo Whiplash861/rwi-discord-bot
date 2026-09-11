@@ -227,10 +227,43 @@ class UserProfile(TimestampMixin, Base):
     learning_opt_out: Mapped[bool] = mapped_column(Boolean, default=False)
 
 
+class MemberObservation(UUIDPrimaryKeyMixin, TimestampMixin, Base):
+    __tablename__ = "member_observations"
+    __table_args__ = (UniqueConstraint("guild_id", "target_id", "fingerprint"),)
+    guild_id: Mapped[int] = mapped_column(BigInteger, nullable=False)
+    target_id: Mapped[int] = mapped_column(BigInteger, nullable=False, index=True)
+    source_message_id: Mapped[int] = mapped_column(BigInteger, nullable=False, index=True)
+    fingerprint: Mapped[str] = mapped_column(String(64), nullable=False)
+    label: Mapped[str] = mapped_column(String(80), nullable=False)
+    provenance: Mapped[str] = mapped_column(String(40), nullable=False)
+    status: Mapped[str] = mapped_column(String(40), nullable=False)
+    game_version: Mapped[str] = mapped_column(String(80), nullable=False)
+    evidence: Mapped[dict[str, Any]] = mapped_column(JSONB, default=dict, nullable=False)
+
+
+class MemberEndorsement(UUIDPrimaryKeyMixin, TimestampMixin, Base):
+    __tablename__ = "member_endorsements"
+    __table_args__ = (UniqueConstraint("guild_id", "sponsor_id", "target_id"),)
+    guild_id: Mapped[int] = mapped_column(BigInteger, nullable=False)
+    sponsor_id: Mapped[int] = mapped_column(BigInteger, nullable=False, index=True)
+    target_id: Mapped[int] = mapped_column(BigInteger, nullable=False, index=True)
+    note: Mapped[str] = mapped_column(String(500), nullable=False)
+    source_message_id: Mapped[int | None] = mapped_column(BigInteger)
+
+
+class MemberExperience(UUIDPrimaryKeyMixin, TimestampMixin, Base):
+    __tablename__ = "member_experience"
+    __table_args__ = (UniqueConstraint("guild_id", "target_id"),)
+    guild_id: Mapped[int] = mapped_column(BigInteger, nullable=False)
+    target_id: Mapped[int] = mapped_column(BigInteger, nullable=False, index=True)
+    reviewer_id: Mapped[int] = mapped_column(BigInteger, nullable=False)
+    verified: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
+    note: Mapped[str] = mapped_column(String(500), nullable=False)
+
+
 class CommunityLoadout(UUIDPrimaryKeyMixin, TimestampMixin, Base):
     __tablename__ = "community_loadouts"
     __table_args__ = (
-        UniqueConstraint("guild_id", "thread_id", name="uq_community_loadouts_guild_thread"),
         UniqueConstraint(
             "guild_id",
             "starter_message_id",
@@ -248,6 +281,7 @@ class CommunityLoadout(UUIDPrimaryKeyMixin, TimestampMixin, Base):
     forum_channel_id: Mapped[int] = mapped_column(BigInteger, nullable=False, index=True)
     thread_id: Mapped[int] = mapped_column(BigInteger, nullable=False)
     starter_message_id: Mapped[int] = mapped_column(BigInteger, nullable=False)
+    source_fingerprint: Mapped[str | None] = mapped_column(String(64))
     author_user_id: Mapped[int] = mapped_column(BigInteger, nullable=False, index=True)
     title: Mapped[str] = mapped_column(String(300), nullable=False)
     content: Mapped[str] = mapped_column(Text, nullable=False)

@@ -3,6 +3,8 @@ from __future__ import annotations
 from dataclasses import dataclass
 from uuid import UUID
 
+import structlog
+
 from rwi_bot.data.red_horizon import (
     GAME_VERSION,
     OFFICIAL_SOURCE,
@@ -11,6 +13,7 @@ from rwi_bot.data.red_horizon import (
 from rwi_bot.services.knowledge import (
     KnowledgeIdentityConflictError,
     KnowledgeRepository,
+    SourceMetadataConflictError,
 )
 
 
@@ -55,6 +58,12 @@ async def apply_red_horizon_seed(knowledge: KnowledgeRepository, *, actor_id: in
             skipped += 1
             continue
         try:
+            sources = tuple(
+                [
+                    await knowledge.reuse_source_metadata(source)
+                    for source in seed.sources or (OFFICIAL_SOURCE,)
+                ]
+            )
             entry_id = await knowledge.add_candidate(
                 subject=seed.subject,
                 entity_type=seed.entity_type,
@@ -66,10 +75,15 @@ async def apply_red_horizon_seed(knowledge: KnowledgeRepository, *, actor_id: in
                 game_version=GAME_VERSION,
                 confidence=seed.confidence,
                 status=seed.status,
-                sources=seed.sources or (OFFICIAL_SOURCE,),
+                sources=sources,
             )
         except KnowledgeIdentityConflictError:
             skipped += 1
+        except SourceMetadataConflictError:
+            structlog.get_logger("seeding").warning(
+                "seed_source_requires_review", subject=seed.subject
+            )
+            skipped += 1  # Never rewrite source trust, or take the entire bot offline.
         else:
             created.append(entry_id)
     return SeedResult(created_entry_ids=tuple(created), skipped_existing=skipped)

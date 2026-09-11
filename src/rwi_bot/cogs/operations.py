@@ -342,6 +342,8 @@ class OperationsCog(commands.Cog):
         await self.maybe_handle_message(message)
 
     async def maybe_handle_message(self, message: discord.Message) -> bool:
+        if names.is_passive_general(message.channel):
+            return False
         text = message.content.strip()
         user_id = message.author.id
         draft = self._drafts.get(user_id)

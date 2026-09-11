@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from typing import Any
+
 BOT_DISPLAY_NAME = "ERIN"
 BOT_EXPANDED_NAME = "Enhanced Reconnaissance, Intelligence, and Navigation"
 
@@ -21,10 +23,21 @@ ADMINISTRATION = "ADMINISTRATION"
 
 WELCOME = "welcome"
 GENERAL_CHAT = "general-chat"
+PASSIVE_GENERAL_CHANNELS = (GENERAL_CHAT, "general")
+
+
+def is_passive_general(channel: Any) -> bool:
+    """General text channels and their threads are observation-only."""
+    name = getattr(getattr(channel, "parent", None), "name", None) or getattr(channel, "name", "")
+    normalized = str(name).casefold().replace("_", "-")
+    return normalized in PASSIVE_GENERAL_CHANNELS or normalized.startswith("general-")
+
+
 ASK_RWI = "ask-rwi"
 COMMUNITY_BUILDS = "community-builds"
 COMMUNITY_LOADOUT_CHANNELS = (COMMUNITY_BUILDS, "community-loadouts")
 ERIN_PATCH_NOTES = "erin-patch-notes"
+GAME_UPDATES = "division-updates"
 GALLERY = "gallery"
 NSFW_CHAT = "nsfw-chat"
 XBOX_MATCHMAKING = "xbox-matchmaking"
@@ -44,6 +57,7 @@ ANNOTATIONS = "annotations"
 DISCIPLINARY_LOG = "disciplinary-log"
 WORKSHOP = "workshop"
 TECHNICIAN_LAB = "technician-lab"
+ERIN_KNOWLEDGE = "erin-knowledge"
 BOT_OPS = "rwi-bot-ops"
 
 PLATFORM_ROLES = (XBOX, PC, PS)

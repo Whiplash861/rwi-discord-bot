@@ -325,7 +325,8 @@ async def test_collect_builds_all_rotation_posts_from_dated_feeds_and_gated_web(
     assert "The Setup" in vendor_text
     assert "The Grudge" in vendor_text
     assert "Offensive System: Firearms" in dark_zone_text
-    assert snapshot.warnings == ()
+    assert any("Awaiting current reports" in warning for warning in snapshot.warnings)
+    assert "targeted_loot_nyc" in (await service.status()).missing_kinds
 
 
 @pytest.mark.asyncio
@@ -369,7 +370,7 @@ async def test_collect_reuses_still_valid_web_cache_between_research_windows(
     service = build_service(tmp_path, ai=ai)
 
     await service.collect(now=NOW)
-    second = await service.collect(now=NOW.replace(hour=13))
+    second = await service.collect(now=NOW.replace(minute=15))
 
     assert ai.research_current_rotations.await_count == 1
     assert second.web_researched is False

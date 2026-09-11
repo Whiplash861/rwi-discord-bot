@@ -193,6 +193,24 @@ class CommunityClaimRepository:
     def __init__(self, database: Database) -> None:
         self.database = database
 
+    async def withdraw_source(self, guild_id: int, message_id: int) -> bool:
+        async with self.database.session() as session:
+            result = await session.execute(
+                update(CommunityClaim)
+                .where(
+                    CommunityClaim.guild_id == guild_id,
+                    CommunityClaim.source_message_id == message_id,
+                    CommunityClaim.status.in_(["pending", "verified", "qualified"]),
+                )
+                .values(
+                    status="incorrect",
+                    review_note=(
+                        "Source edited or deleted; contribution withdrawn. Repost for fresh review."
+                    ),
+                )
+            )
+            return bool(_rowcount(result))
+
     async def create_pending(
         self,
         *,
@@ -386,8 +404,8 @@ def community_claim_context(hits: list[CommunityClaimHit]) -> str:
             f"Reviewed community claim ({claim.game_version}, status={claim.status}):",
             f"Claim: {claim.claim_text}",
         ]
-        if claim.status == CommunityClaimStatus.QUALIFIED.value and claim.review_note:
-            lines.append(f"Controlling reviewer qualification: {claim.review_note}")
+        if claim.review_note:
+            lines.append(f"Controlling reviewer qualification and evidence: {claim.review_note}")
         blocks.append("\n".join(lines))
     return "\n\n".join(blocks)
 

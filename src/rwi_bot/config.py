@@ -68,9 +68,9 @@ class Settings(BaseSettings):
     community_loadout_indexing_enabled: bool = True
 
     video_inspection_enabled: bool = True
-    video_max_duration_seconds: int = Field(default=30, ge=1, le=60)
+    video_max_duration_seconds: int = Field(default=45, ge=1, le=45)
     video_max_bytes: int = Field(default=50_000_000, ge=1_000_000, le=100_000_000)
-    video_sample_frames: int = Field(default=12, ge=4, le=20)
+    video_sample_frames: int = Field(default=18, ge=4, le=20)
     ffmpeg_binary: str = "ffmpeg"
     ffprobe_binary: str = "ffprobe"
 

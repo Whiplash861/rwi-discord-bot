@@ -103,6 +103,26 @@ class ReleaseNotesCog(commands.Cog):
         release: Release,
         snapshot: DeploymentSnapshot,
     ) -> bool:
+        if not any(note.community_visible for note in release.notes):
+            await self.bot.services.audit.record(
+                AuditRecord(
+                    event_type="release.published",
+                    actor_id=self.bot.user.id if self.bot.user else None,
+                    target_type="erin_release",
+                    target_id=release.release_id,
+                    reason="Internal deployment recorded without a public announcement",
+                    details={
+                        "channel_id": channel.id,
+                        "message_id": None,
+                        "update_number": release.update_number,
+                        "version": release.version,
+                        "deployment_fingerprint": snapshot.fingerprint,
+                        "module_hashes": snapshot.module_hashes,
+                        "public_announcement": False,
+                    },
+                )
+            )
+            return False
         markers = tuple(release_marker(release_id) for release_id in release.all_release_ids)
         existing = await self._find_existing(channel, markers)
         message = existing

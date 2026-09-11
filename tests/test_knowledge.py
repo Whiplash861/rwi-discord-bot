@@ -17,6 +17,8 @@ from rwi_bot.services.knowledge import (
     KnowledgeIdentityConflictError,
     KnowledgeRepository,
     KnowledgeRevisionConflictError,
+    SourceEvidence,
+    SourceMetadataConflictError,
     TicketRepository,
     TicketStateConflictError,
     knowledge_search_text,
@@ -54,6 +56,40 @@ class FakeDatabase:
     @asynccontextmanager
     async def session(self) -> Any:
         yield self.fake_session
+
+
+@pytest.mark.asyncio
+async def test_seed_reuses_source_metadata_without_overwriting_or_escalating_trust():
+    from rwi_bot.db.models import SourceType
+
+    session = AsyncMock()
+    source = SimpleNamespace(
+        active=True,
+        title="Existing title",
+        source_type="official",
+        publisher="Existing publisher",
+        content_hash=None,
+        trust_score=Decimal("0.90"),
+    )
+    session.scalar.return_value = source
+    repository = KnowledgeRepository(FakeDatabase(session))
+    proposed = SourceEvidence(
+        url="https://www.ubisoft.com/test",
+        title="New title",
+        source_type=SourceType.OFFICIAL,
+        trust_score=Decimal("0.98"),
+        publisher="Ubisoft",
+        note="Current per-claim observation",
+    )
+    resolved = await repository.reuse_source_metadata(proposed)
+    assert resolved.title == "Existing title"
+    assert resolved.trust_score == Decimal("0.90")
+    assert resolved.note == proposed.note
+    assert proposed.title == "New title"
+    session.execute.assert_not_awaited()
+    source.source_type = "community"
+    with pytest.raises(SourceMetadataConflictError):
+        await repository.reuse_source_metadata(proposed)
 
 
 @pytest.mark.asyncio

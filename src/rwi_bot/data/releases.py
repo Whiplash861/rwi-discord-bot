@@ -1027,4 +1027,109 @@ RELEASES: tuple[Release, ...] = (
             ),
         ),
     ),
+    Release(
+        release_id="erin-update-37",
+        update_number=37,
+        version="V0.2.0",
+        released_on=date(2026, 9, 11),
+        notes=(
+            ReleaseNote(
+                ReleaseSection.HIGH_IMPACT,
+                "Added reset-aware rotation collection: ERIN checks shortly after reset "
+                "and retries missing reports through the morning.",
+            ),
+            ReleaseNote(
+                ReleaseSection.IMPROVEMENTS,
+                "Daily coverage now tracks missing DC, NYC, Brooklyn and Escalation loot "
+                "separately from weekly missions, projects, Descent, DZ and vendors.",
+            ),
+            ReleaseNote(
+                ReleaseSection.FIXES,
+                "Rotation research failures now respect a retry interval, and Escalation "
+                "dates follow the reset day instead of midnight.",
+            ),
+            ReleaseNote(
+                ReleaseSection.NEW_FEATURES,
+                "Added #division-updates for important developer maintenance, fixes, "
+                "balance updates and major releases, with original announcement links and "
+                "no mass pings.",
+            ),
+            ReleaseNote(
+                ReleaseSection.IMPROVEMENTS,
+                "Developer announcements are dated and deduplicated; tentative fixes "
+                "remain distinct from resolved problems.",
+            ),
+            ReleaseNote(
+                ReleaseSection.NEW_FEATURES,
+                "General chat is now strictly read-only for ERIN, including mentions and "
+                "replies. Ask her questions in #ask-rwi or DMs.",
+            ),
+            ReleaseNote(
+                ReleaseSection.IMPROVEMENTS,
+                "Teaching and corrections now trigger independent evidence checks before "
+                "becoming reusable game knowledge.",
+            ),
+            ReleaseNote(
+                ReleaseSection.NEW_FEATURES,
+                "Reviewed gameplay contributions can add an experience note to your "
+                "personal profile; the note is not a blanket expertise rating.",
+            ),
+            ReleaseNote(
+                ReleaseSection.IMPROVEMENTS,
+                "Disagree with a correction? Explain your mode, test conditions and "
+                "evidence so ERIN can reconsider the context.",
+            ),
+            ReleaseNote(
+                ReleaseSection.IMPROVEMENTS,
+                "Expanded community loadout references to text posts, forum replies and "
+                "archived discussions, preserving each contributor's authorship.",
+            ),
+            ReleaseNote(
+                ReleaseSection.NEW_FEATURES,
+                "Added screenshot-based loadout transcription, while keeping member builds "
+                "separate from verified mechanics.",
+            ),
+            ReleaseNote(
+                ReleaseSection.IMPROVEMENTS,
+                "Screenshot inspection now combines a full view with overlapping detail "
+                "views to read small gear labels, talents and stat panels.",
+            ),
+            ReleaseNote(
+                ReleaseSection.HIGH_IMPACT,
+                "Raised video inspection to 45 seconds. Longer uploads use the first 45 "
+                "seconds, or a requested range such as 1:10-1:40, within the upload-size "
+                "limit.",
+            ),
+            ReleaseNote(
+                ReleaseSection.IMPROVEMENTS,
+                "Gameplay video inspection now uses more, larger frames and reports the "
+                "actual analyzed time window. Audio and unsampled moments are not treated "
+                "as observed.",
+            ),
+            ReleaseNote(
+                ReleaseSection.IMPROVEMENTS,
+                "Expanded current-game research to Central Park announcements, ARG leads "
+                "and community reactions, keeping predictions separate from confirmed "
+                "features.",
+            ),
+            ReleaseNote(
+                ReleaseSection.PRIVACY_SAFETY,
+                "Private media is discarded after inspection. Learning opt-outs and "
+                "resets cover shared learning, loadout indexing and private gameplay observations.",
+            ),
+            ReleaseNote(
+                ReleaseSection.IMPROVEMENTS,
+                "Patch notes now provide a fuller member-facing breakdown of additions, "
+                "changes and improvements.",
+            ),
+            ReleaseNote(
+                ReleaseSection.MAINTENANCE,
+                "Added private knowledge intake, creator-only awareness reviews and "
+                "sensitive-question routing. Private peer endorsements, self-reported roles "
+                "and repeated corroborated advice inform experience recognition without "
+                "granting permissions or bypassing evidence checks.",
+                community_visible=False,
+            ),
+        ),
+    ),
 )

@@ -177,6 +177,7 @@ async def test_learning_opt_out_prevents_claim_capture() -> None:
         services=SimpleNamespace(
             maintenance=SimpleNamespace(halted=False),
             profiles=SimpleNamespace(learning_opted_out=AsyncMock(return_value=True)),
+            settings=SimpleNamespace(discord_guild_id=1),
             community_claims=repository,
         )
     )

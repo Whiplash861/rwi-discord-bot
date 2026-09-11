@@ -38,11 +38,13 @@ def test_authored_release_catalog_is_unique_and_uses_requested_format() -> None:
     assert release.legacy_release_ids == ("erin-update-1-v1.22.333",)
 
     latest = RELEASES[-1]
-    assert latest.update_number == 36
-    assert latest.version == "V0.1.35"
+    assert latest.update_number == 37
+    assert latest.version == "V0.2.0"
     assert render_release_description(latest).startswith(
-        "V0.1.35\n\nSeptember 05, 2026\n\n__Patch Notes__"
+        "V0.2.0\n\nSeptember 11, 2026\n\n__Patch Notes__"
     )
+    assert len([n for n in latest.notes if n.community_visible]) >= 15
+    assert "creator-only" not in render_release_description(latest)
 
 
 def test_deployment_snapshot_changes_with_application_source(tmp_path) -> None:

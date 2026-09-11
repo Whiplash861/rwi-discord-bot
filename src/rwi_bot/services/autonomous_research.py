@@ -46,6 +46,7 @@ class AutonomousResearchOutcome:
     staged: int
     duplicates: int
     citations: tuple[SourceCitation, ...]
+    findings: tuple[GameResearchFinding, ...] = ()
 
 
 class AutonomyStateStore:
@@ -346,6 +347,7 @@ class AutonomousResearchService:
             staged=staged,
             duplicates=duplicates,
             citations=citations,
+            findings=tuple(report.findings),
         )
 
     def _auto_promotable(

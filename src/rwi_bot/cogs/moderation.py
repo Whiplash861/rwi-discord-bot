@@ -35,6 +35,8 @@ class ModerationCog(commands.Cog):
         await self.handle_message(message)
 
     async def handle_message(self, message: discord.Message) -> bool:
+        if names.is_passive_general(message.channel):
+            return False
         settings = self.bot.services.settings
         if (
             not settings.spam_detection_enabled

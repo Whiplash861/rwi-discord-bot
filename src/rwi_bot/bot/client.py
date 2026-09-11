@@ -5,6 +5,7 @@ from uuid import UUID
 
 import discord
 import structlog
+from discord import app_commands
 from discord.ext import commands
 from sqlalchemy import text
 
@@ -14,6 +15,11 @@ from rwi_bot.bot.server_blueprint import ServerReconciler
 from rwi_bot.bot.views import PlatformRoleView
 from rwi_bot.domain.schemas import AuditRecord
 from rwi_bot.services.maintenance import ResumeCheck
+
+
+class ErinCommandTree(app_commands.CommandTree[commands.Bot]):
+    async def interaction_check(self, interaction: discord.Interaction) -> bool:
+        return not names.is_passive_general(interaction.channel)
 
 
 class RwiBot(commands.Bot):
@@ -27,6 +33,7 @@ class RwiBot(commands.Bot):
         intents.dm_messages = True
         super().__init__(
             command_prefix=commands.when_mentioned,
+            tree_cls=ErinCommandTree,
             intents=intents,
             application_id=services.settings.discord_application_id,
             allowed_mentions=discord.AllowedMentions(
@@ -48,6 +55,7 @@ class RwiBot(commands.Bot):
         )
         from rwi_bot.cogs.conversation import ConversationCog
         from rwi_bot.cogs.moderation import ModerationCog
+        from rwi_bot.cogs.observation import KnowledgeObservationCog
         from rwi_bot.cogs.onboarding import OnboardingCog
         from rwi_bot.cogs.operations import OperationAlertRoleView, OperationsCog
         from rwi_bot.cogs.privacy import PrivacyCog
@@ -69,6 +77,7 @@ class RwiBot(commands.Bot):
         await self.add_cog(ModerationCog(self))
         await self.add_cog(CommunityLoadoutsCog(self))
         await self.add_cog(CommunityLearningCog(self))
+        await self.add_cog(KnowledgeObservationCog(self))
         await self.add_cog(operations)
         await self.add_cog(ConversationCog(self))
         await self.add_cog(PrivacyCog(self))
@@ -89,6 +98,13 @@ class RwiBot(commands.Bot):
             return
         await self.ensure_server_identity(guild)
         await self.set_operating_presence()
+        observation = self.get_cog("KnowledgeObservationCog")
+        if observation is not None:
+            try:
+                await observation.ensure_space()  # type: ignore[attr-defined]
+                observation.schedule_start()  # type: ignore[attr-defined]
+            except Exception:
+                self.log.exception("knowledge_observation_start_failed")
         if self.services.settings.auto_bootstrap_server and not self._auto_bootstrap_complete:
             try:
                 report = await ServerReconciler(guild).reconcile()
@@ -141,6 +157,10 @@ class RwiBot(commands.Bot):
             releases.schedule_publish()  # type: ignore[attr-defined]
         autonomy = self.get_cog("AutonomyCog")
         if autonomy is not None:
+            try:
+                await autonomy.ensure_announcement_space()  # type: ignore[attr-defined]
+            except Exception:
+                self.log.exception("announcement_channel_unavailable")
             autonomy.schedule_start()  # type: ignore[attr-defined]
         rotations = self.get_cog("RotationsCog")
         if rotations is not None:

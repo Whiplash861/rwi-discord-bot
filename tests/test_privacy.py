@@ -59,6 +59,9 @@ async def test_private_state_reset_preserves_opt_out_and_anonymizes_links() -> N
     session = AsyncMock()
     session.get.return_value = profile
     session.execute.side_effect = [
+        SimpleNamespace(rowcount=1),  # Private observations
+        SimpleNamespace(rowcount=1),  # Private endorsements
+        SimpleNamespace(rowcount=1),  # Private experience reviews
         SimpleNamespace(rowcount=2),
         SimpleNamespace(rowcount=3),
         SimpleNamespace(rowcount=4),

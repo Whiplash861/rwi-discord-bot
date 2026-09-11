@@ -86,6 +86,14 @@ CATEGORY_CHANNELS: dict[str, tuple[ChannelSpec, ...]] = {
     ),
     names.ALLIANCE_HUB: (
         ChannelSpec(
+            names.GAME_UPDATES,
+            ChannelKind.TEXT,
+            "Important official Division 2 updates, maintenance and fixes. No mass pings.",
+            access_roles=(names.AGENT, names.ROGUE_AGENT),
+            bot_access=True,
+            read_only=True,
+        ),
+        ChannelSpec(
             names.ERIN_PATCH_NOTES,
             ChannelKind.TEXT,
             "Read-only release history for ERIN features, fixes, safety changes, and operations.",
@@ -96,7 +104,8 @@ CATEGORY_CHANNELS: dict[str, tuple[ChannelSpec, ...]] = {
         ChannelSpec(
             names.GENERAL_CHAT,
             ChannelKind.TEXT,
-            "Alliance conversation. Images, links, video, and files are welcome.",
+            "Alliance conversation. ERIN reads only; ask her in #ask-rwi or DMs. "
+            "Game-related observations respect /privacy learning and /privacy reset.",
             access_roles=(names.AGENT, names.ROGUE_AGENT),
             bot_access=True,
         ),
@@ -253,6 +262,14 @@ CATEGORY_CHANNELS: dict[str, tuple[ChannelSpec, ...]] = {
             names.TECHNICIAN_LAB,
             ChannelKind.TEXT,
             "RWI production, debugging, tests, knowledge changes, and unresolved tickets.",
+            access_roles=(names.DIVISION_COMMANDER, names.TECHNICIAN),
+            bot_access=True,
+        ),
+        ChannelSpec(
+            names.ERIN_KNOWLEDGE,
+            ChannelKind.TEXT,
+            "Share Division 2 facts for quiet corroboration. Include mode, conditions and sources. "
+            "Reply with evidence to appeal a finding; do not post personal data or secrets.",
             access_roles=(names.DIVISION_COMMANDER, names.TECHNICIAN),
             bot_access=True,
         ),
@@ -647,6 +664,16 @@ class ServerReconciler:
                 create_public_threads=True,
                 send_messages_in_threads=True,
             )
+            if spec.name in names.PASSIVE_GENERAL_CHANNELS:
+                overwrites[bot_member].update(
+                    send_messages=False,
+                    send_messages_in_threads=False,
+                    create_public_threads=False,
+                    create_private_threads=False,
+                    add_reactions=False,
+                    manage_messages=False,
+                    manage_threads=False,
+                )
         return overwrites
 
     async def _create_channel(

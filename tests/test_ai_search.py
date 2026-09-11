@@ -349,7 +349,7 @@ async def test_autonomous_research_uses_a_short_bounded_official_pass(
     assert responses.kwargs["reasoning"] == {"effort": "low"}
     assert "text" not in responses.kwargs
     assert responses.kwargs["tools"] == [
-        {"type": "web_search", "filters": {"allowed_domains": ["ubisoft.com"]}}
+        {"type": "web_search", "filters": {"allowed_domains": ["ubisoft.com", "x.com"]}}
     ]
     assert usage.records[0]["operation"] == "autonomous_game_research_official"
 
@@ -429,7 +429,7 @@ async def test_malformed_web_research_is_repaired_without_a_second_web_search(
     assert result.report.change_detected is False
     assert len(responses.calls) == 2
     assert responses.calls[0]["tools"] == [
-        {"type": "web_search", "filters": {"allowed_domains": ["ubisoft.com"]}}
+        {"type": "web_search", "filters": {"allowed_domains": ["ubisoft.com", "x.com"]}}
     ]
     assert "tools" not in responses.calls[1]
     assert responses.calls[1]["text"] == {"format": {"type": "json_object"}}

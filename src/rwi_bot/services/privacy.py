@@ -12,6 +12,9 @@ from rwi_bot.db.models import (
     CommunityLoadout,
     ConversationSession,
     Feedback,
+    MemberEndorsement,
+    MemberExperience,
+    MemberObservation,
     UnansweredTicket,
     UserProfile,
 )
@@ -172,6 +175,21 @@ class ProfileRepository:
                 profile.learning_opt_out = opted_out
             if not opted_out:
                 return LearningPreferenceResult()
+            await session.execute(
+                delete(MemberObservation).where(MemberObservation.target_id == user_id)
+            )
+            await session.execute(
+                delete(MemberEndorsement).where(
+                    (MemberEndorsement.sponsor_id == user_id)
+                    | (MemberEndorsement.target_id == user_id)
+                )
+            )
+            await session.execute(
+                delete(MemberExperience).where(
+                    (MemberExperience.target_id == user_id)
+                    | (MemberExperience.reviewer_id == user_id)
+                )
+            )
             loadout_result = await session.execute(
                 delete(CommunityLoadout).where(CommunityLoadout.author_user_id == user_id)
             )
@@ -194,6 +212,24 @@ class ProfileRepository:
     async def export_data(self, user_id: int) -> dict[str, Any]:
         async with self.database.session() as session:
             profile = await session.get(UserProfile, user_id)
+            endorsements = list(
+                await session.scalars(
+                    select(MemberEndorsement).where(
+                        (MemberEndorsement.sponsor_id == user_id)
+                        | (MemberEndorsement.target_id == user_id)
+                    )
+                )
+            )
+            experience = list(
+                await session.scalars(
+                    select(MemberExperience).where(MemberExperience.target_id == user_id)
+                )
+            )
+            observations = list(
+                await session.scalars(
+                    select(MemberObservation).where(MemberObservation.target_id == user_id)
+                )
+            )
             conversations = list(
                 await session.scalars(
                     select(ConversationSession)
@@ -223,6 +259,34 @@ class ProfileRepository:
                 )
             )
         return {
+            "private_gameplay_observations": [
+                {
+                    "label": o.label,
+                    "provenance": o.provenance,
+                    "status": o.status,
+                    "evidence": o.evidence,
+                    "created_at": o.created_at.isoformat(),
+                }
+                for o in observations
+            ],
+            "private_experience_endorsements": [
+                {
+                    "sponsor_id": e.sponsor_id,
+                    "target_id": e.target_id,
+                    "note": e.note,
+                    "created_at": e.created_at.isoformat(),
+                }
+                for e in endorsements
+            ],
+            "private_experience_reviews": [
+                {
+                    "verified": e.verified,
+                    "reviewer_id": e.reviewer_id,
+                    "note": e.note,
+                    "updated_at": e.updated_at.isoformat(),
+                }
+                for e in experience
+            ],
             "profile": (
                 None
                 if profile is None
@@ -298,6 +362,21 @@ class ProfileRepository:
 
     async def reset_private_state(self, user_id: int) -> PrivacyResetResult:
         async with self.database.session() as session:
+            await session.execute(
+                delete(MemberObservation).where(MemberObservation.target_id == user_id)
+            )
+            await session.execute(
+                delete(MemberEndorsement).where(
+                    (MemberEndorsement.sponsor_id == user_id)
+                    | (MemberEndorsement.target_id == user_id)
+                )
+            )
+            await session.execute(
+                delete(MemberExperience).where(
+                    (MemberExperience.target_id == user_id)
+                    | (MemberExperience.reviewer_id == user_id)
+                )
+            )
             profile = await session.get(UserProfile, user_id, with_for_update=True)
             opted_out = bool(profile.learning_opt_out) if profile is not None else False
 

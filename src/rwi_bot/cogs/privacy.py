@@ -35,6 +35,8 @@ class PrivacyCog(commands.Cog):
             "cache material and removes your requester attribution from new review tickets. "
             "It also prevents ERIN from indexing your Community Builds submissions or "
             "archiving your public factual follow-ups as community claims. "
+            "It also removes private experience endorsements given by or about you, "
+            "and gameplay observations about you. "
             "It does not prevent a question you ask from being processed to answer you.\n\n"
             f"{render_member_profile(profile)}",
             ephemeral=True,

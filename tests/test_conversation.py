@@ -225,7 +225,7 @@ def test_any_public_participant_can_build_on_the_latest_erin_answer() -> None:
 
 @pytest.mark.asyncio
 async def test_archived_member_answer_stops_before_qa_creates_another_ticket() -> None:
-    claim = SimpleNamespace(id=uuid4())
+    claim = SimpleNamespace(id=uuid4(), status="pending")
     learning = SimpleNamespace(submit_candidate=AsyncMock(return_value=claim))
     qa = SimpleNamespace(answer=AsyncMock())
     services = SimpleNamespace(
@@ -236,7 +236,7 @@ async def test_archived_member_answer_stops_before_qa_creates_another_ticket() -
     def get_cog(name: str) -> object | None:
         return learning if name == "CommunityLearningCog" else None
 
-    bot = SimpleNamespace(services=services, get_cog=get_cog)
+    bot = SimpleNamespace(services=services, get_cog=get_cog, user=None)
     cog = ConversationCog(cast(Any, bot))
     destination = SimpleNamespace(id=99, send=AsyncMock())
     cog._destination = AsyncMock(return_value=destination)  # type: ignore[method-assign]
@@ -259,6 +259,7 @@ async def test_archived_member_answer_stops_before_qa_creates_another_ticket() -
         ),
         channel=SimpleNamespace(id=99),
         guild=SimpleNamespace(id=1),
+        reference=None,
     )
 
     await cog.on_message(cast(Any, message))
@@ -291,6 +292,7 @@ async def test_member_declining_to_answer_escalates_the_original_question_once()
         services=services,
         get_cog=lambda _: None,
         log=SimpleNamespace(info=Mock()),
+        user=None,
     )
     cog = ConversationCog(cast(Any, bot))
     destination = SimpleNamespace(id=99, send=AsyncMock())
@@ -313,6 +315,7 @@ async def test_member_declining_to_answer_escalates_the_original_question_once()
         content="I don't know.",
         channel=SimpleNamespace(id=99),
         guild=SimpleNamespace(id=1),
+        reference=None,
     )
 
     await cog.on_message(cast(Any, message))

@@ -3,7 +3,7 @@ from __future__ import annotations
 import hashlib
 import json
 import re
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from datetime import UTC, datetime, timedelta
 from decimal import Decimal
 from typing import Any, cast
@@ -422,6 +422,26 @@ class KnowledgeRepository:
             except IntegrityError as exc:
                 raise KnowledgeIdentityConflictError from exc
         return entry_id
+
+    async def reuse_source_metadata(self, evidence: SourceEvidence) -> SourceEvidence:
+        """Reuse an exact existing URL without changing source trust or its provenance."""
+        async with self.database.session() as session:
+            source = await session.scalar(select(Source).where(Source.url == evidence.url))
+        if source is None:
+            return evidence
+        if (
+            not source.active
+            or source.source_type != evidence.source_type.value
+            or (evidence.content_hash is not None and evidence.content_hash != source.content_hash)
+        ):
+            raise SourceMetadataConflictError
+        return replace(
+            evidence,
+            title=source.title,
+            publisher=source.publisher,
+            trust_score=Decimal(source.trust_score),
+            content_hash=source.content_hash,
+        )
 
     @staticmethod
     def _check_source_metadata(source: Source, evidence: SourceEvidence) -> None:

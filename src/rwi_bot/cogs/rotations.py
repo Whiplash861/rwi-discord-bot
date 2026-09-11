@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import asyncio
 from dataclasses import dataclass
+from datetime import UTC, datetime, timedelta
 
 import discord
 import structlog
@@ -27,9 +28,6 @@ class RotationsCog(commands.Cog):
         self.bot = bot
         self.log = structlog.get_logger("rotations")
         self._lock = asyncio.Lock()
-        self.refresh_rotation_posts.change_interval(
-            minutes=bot.services.settings.rotation_refresh_minutes
-        )
 
     async def cog_unload(self) -> None:
         self.refresh_rotation_posts.cancel()
@@ -117,9 +115,25 @@ class RotationsCog(commands.Cog):
                 summary=state.last_summary,
             )
 
-    @tasks.loop(minutes=60, reconnect=True)
+    @tasks.loop(minutes=5, reconnect=True)
     async def refresh_rotation_posts(self) -> None:
         if self.bot.services.maintenance.halted:
+            return
+        state = await self.bot.services.rotations.status()
+        now = datetime.now(UTC)
+        reset = now.replace(hour=8, minute=0, second=0, microsecond=0)
+        if reset > now:
+            reset -= timedelta(days=1)
+        interval = (
+            15
+            if now - reset < timedelta(hours=6)
+            else self.bot.services.settings.rotation_refresh_minutes
+        )
+        if (
+            state.last_refresh_at
+            and state.last_refresh_at >= reset
+            and now - state.last_refresh_at < timedelta(minutes=interval)
+        ):
             return
         try:
             await self.refresh_now()

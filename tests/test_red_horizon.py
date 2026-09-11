@@ -21,6 +21,9 @@ from rwi_bot.services.seeding import apply_red_horizon_seed, preview_red_horizon
 
 
 class FakeKnowledgeRepository:
+    async def reuse_source_metadata(self, evidence):
+        return evidence
+
     def __init__(self, existing_subjects: set[str] | None = None) -> None:
         self.existing_subjects = existing_subjects or set()
         self.identities: set[tuple[str, str, str]] = set()
@@ -56,7 +59,7 @@ def test_red_horizon_seed_catalog_is_unique_and_current() -> None:
     }
 
     expected = (
-        63
+        67
         + len(RED_HORIZON_SKILL_TABLES)
         + len(RAID_AND_DZ_RECORDS)
         + len(COMPLETE_ENCOUNTER_RECORDS)
@@ -192,7 +195,7 @@ async def test_seed_preview_and_apply_are_create_only_and_idempotent() -> None:
     result = await apply_red_horizon_seed(repository, actor_id=42)  # type: ignore[arg-type]
     second = await apply_red_horizon_seed(repository, actor_id=42)  # type: ignore[arg-type]
 
-    expected = 149 + len(RAID_AND_DZ_RECORDS) + len(COMPLETE_ENCOUNTER_RECORDS)
+    expected = 153 + len(RAID_AND_DZ_RECORDS) + len(COMPLETE_ENCOUNTER_RECORDS)
     assert preview.total == expected
     assert preview.existing == 2
     assert preview.missing == expected - 2

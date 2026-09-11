@@ -1,6 +1,8 @@
 from __future__ import annotations
 
 import asyncio
+import shutil
+import subprocess
 from pathlib import Path
 from types import SimpleNamespace
 from typing import Any, cast
@@ -12,6 +14,7 @@ from rwi_bot.services.video_inspection import (
     VideoInspectionError,
     VideoInspectionService,
     VideoProbe,
+    inspection_window,
 )
 
 
@@ -37,12 +40,89 @@ def _service() -> VideoInspectionService:
         ai=cast(Any, SimpleNamespace()),
         audit=cast(Any, SimpleNamespace(record=AsyncMock())),
         enabled=True,
-        maximum_duration_seconds=30,
+        maximum_duration_seconds=45,
         maximum_bytes=1_000_000,
         sample_frames=4,
         ffmpeg_binary="ffmpeg",
         ffprobe_binary="ffprobe",
     )
+
+
+@pytest.mark.skipif(
+    not shutil.which("ffmpeg"), reason="real media decoder runs in Docker validation"
+)
+@pytest.mark.asyncio
+async def test_real_decoder_inspects_screenshot_and_clips_long_recording(tmp_path):
+    screenshot = tmp_path / "fixture.png"
+    video = tmp_path / "fixture.mp4"
+    await asyncio.to_thread(
+        subprocess.run,
+        [
+            "ffmpeg",
+            "-v",
+            "error",
+            "-f",
+            "lavfi",
+            "-i",
+            "color=blue:s=320x180",
+            "-frames:v",
+            "1",
+            "-threads",
+            "1",
+            str(screenshot),
+        ],
+        check=True,
+    )
+    await asyncio.to_thread(
+        subprocess.run,
+        [
+            "ffmpeg",
+            "-v",
+            "error",
+            "-f",
+            "lavfi",
+            "-i",
+            "color=red:s=320x180:r=4",
+            "-t",
+            "90",
+            "-c:v",
+            "libx264",
+            "-threads",
+            "1",
+            str(video),
+        ],
+        check=True,
+    )
+    service = _service()
+    service.sample_frames = 18
+    service.ai = SimpleNamespace(
+        inspect_video_frames=AsyncMock(
+            return_value=SimpleNamespace(text="Complete fixture analysis.", complete=True)
+        )
+    )
+
+    class Attachment:
+        def __init__(self, path):
+            self.path = path
+            self.filename = path.name
+            self.size = path.stat().st_size
+            self.content_type = "image/png" if path.suffix == ".png" else "video/mp4"
+
+        async def read(self, *, use_cached=True):
+            return self.path.read_bytes()
+
+    image = await service.inspect_image(
+        Attachment(screenshot), question="Inspect the stats", user_id=1
+    )
+    assert image.sampled_frames == 5
+    assert image.media_kind == "screenshot"
+    clip = await service.inspect(Attachment(video), question="inspect 1:00-1:30", user_id=1)
+    assert clip.start_seconds == 60
+    assert clip.duration_seconds == 30
+    assert 2 <= clip.sampled_frames <= 18
+    args = service.ai.inspect_video_frames.await_args.kwargs
+    assert min(args["timestamps"]) == 60
+    assert max(args["timestamps"]) < 90
 
 
 def test_video_detection_accepts_common_console_and_pc_formats() -> None:
@@ -70,15 +150,29 @@ async def test_probe_reads_verified_media_duration() -> None:
     assert probe == VideoProbe(duration_seconds=29.75, width=1920, height=1080)
 
 
-@pytest.mark.asyncio
-async def test_video_over_30_seconds_is_rejected_before_ai_call() -> None:
-    service = _service()
-    service._probe = AsyncMock(  # type: ignore[method-assign]
-        return_value=VideoProbe(duration_seconds=31.0, width=1920, height=1080)
-    )
+@pytest.mark.parametrize(
+    "question,duration,expected",
+    [
+        ("What happened?", 300, (0, 45)),
+        ("What happened?", 31, (0, 31)),
+        ("Inspect 1:10-1:40", 180, (70, 30)),
+        ("Inspect 20s to 90s", 180, (20, 45)),
+        ("Inspect 10 to 40 seconds", 180, (10, 30)),
+        ("Starting at 1:10", 80, (70, 10)),
+        ("I have 30-40 crit damage", 60, (0, 45)),
+    ],
+)
+def test_clip_window_is_bounded(question, duration, expected) -> None:
+    assert inspection_window(question, duration) == expected
 
-    with pytest.raises(VideoInspectionError, match="up to 30 seconds"):
-        await service.inspect(FakeAttachment(), question="What happened?", user_id=42)
+
+@pytest.mark.parametrize(
+    "question,duration",
+    [("1:10-1:00", 80), ("2:00-2:10", 45), ("1:80-2:90", 400), ("", float("nan"))],
+)
+def test_invalid_clip_range_is_rejected(question, duration) -> None:
+    with pytest.raises(VideoInspectionError):
+        inspection_window(question, duration)
 
 
 @pytest.mark.asyncio
@@ -101,8 +195,10 @@ async def test_successful_inspection_discards_media_and_records_no_filename() ->
         output_dir: Path,
         *,
         duration: float,
+        start: float,
     ) -> list[Path]:
         assert duration == 8.0
+        assert start == 0
         paths = [output_dir / "frame-001.jpg", output_dir / "frame-002.jpg"]
         await asyncio.gather(*(asyncio.to_thread(path.write_bytes, b"jpeg") for path in paths))
         return paths
@@ -121,4 +217,4 @@ async def test_successful_inspection_discards_media_and_records_no_filename() ->
     assert record.details["raw_media_retained"] is False
     assert "filename" not in record.details
     call = ai.inspect_video_frames.await_args.kwargs
-    assert call["timestamps"] == (0.0, 8.0)
+    assert call["timestamps"] == (0.0, 2.0)

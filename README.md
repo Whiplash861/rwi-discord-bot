@@ -81,7 +81,9 @@ running result across Weapon Damage, Total Weapon Damage, the shared active HSD/
 bucket, DTA or DTH, DTOC, team effects in their verified categories, and independent
 amplifiers.
 
-Members can attach one gameplay recording up to 30 seconds in a DM or `#ask-rwi` request.
+Members can attach a screenshot or gameplay recording in a DM or `#ask-rwi` request.
+ERIN inspects at most 45 seconds: the first 45 of a longer upload, or a requested window
+such as `1:10-1:40`. Uploads remain limited to 50 MB (screenshots: 20 MB).
 ERIN verifies the real media stream and duration, samples ordered high-resolution frames,
 and analyzes visible HUD, loadout, combat, and mechanic changes with timestamp context.
 She labels inference, does not claim to hear audio, never stores the upload or filename,
@@ -96,6 +98,19 @@ community, creator, forum, and player findings remain candidates for Technician 
 Verified season transitions update the answer freshness boundary and invalidate older
 answer caches. Staff can inspect this state with `/rwi research-status` or request a full
 sweep with `/rwi research-now`; maintenance mode stops all autonomous work.
+
+V0.2.0 adds important developer announcements in read-only `#division-updates`, with
+dated original links and no mass mentions. General chat is strictly read-only for ERIN,
+including mentions and threads. She privately distinguishes explicit self-reported roles,
+peer endorsements, and repeated independently corroborated advice. Labels do not grant
+permissions or bypass evidence gates. `/privacy learning` and `/privacy reset` cover these
+observations; `/experience-review` is available only to authorized reviewers.
+
+Private `#erin-knowledge` accepts admin/Technician gameplay submissions and appeals.
+Current corroborated input is incorporated silently; unclear input receives a focused
+clarification request. A bounded awareness sweep rechecks existing entries and asks the
+configured creator in DMs about unresolved or contradicted information. These are review
+requests, not automatic overwrites. See [V0.2.0 operations](docs/v020.md) for limits.
 
 ERIN maintains a read-only `ROTATIONS` category with current targeted loot,
 Escalation requisitions and missions, weekly activities, Descent talent-pool timing,

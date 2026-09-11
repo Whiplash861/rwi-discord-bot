@@ -42,6 +42,8 @@ class RedditMegathread(BaseModel):
 class RotationCacheState(BaseModel):
     last_refresh_at: datetime | None = None
     last_web_research_at: datetime | None = None
+    last_web_attempt_at: datetime | None = None
+    missing_kinds: list[str] = Field(default_factory=list)
     last_status: str = "never_run"
     last_summary: str = "Rotation intelligence has not run yet."
     consecutive_failures: int = 0
@@ -233,7 +235,9 @@ class RotationService:
                 warnings.append("The structured Escalation feed was unavailable.")
             else:
                 try:
-                    escalation = _parse_escalation(direct_results[0], current.date())
+                    escalation = _parse_escalation(
+                        direct_results[0], (current - timedelta(hours=8)).date()
+                    )
                 except (TypeError, ValueError, KeyError):
                     warnings.append("The structured Escalation feed was invalid or out of date.")
             if isinstance(direct_results[1], BaseException):
@@ -279,13 +283,15 @@ class RotationService:
             reddit_context = _reddit_megathread_context(trusted_posts)
 
             web_researched = force_web or _web_research_due(
-                state.last_web_research_at,
+                state.last_web_attempt_at or state.last_web_research_at,
                 current,
                 hours=self.web_refresh_hours,
                 calendar=calendar,
+                missing=bool(state.missing_kinds),
             )
             used_cached_web = False
             if web_researched:
+                state.last_web_attempt_at = current
                 try:
                     result = await self.ai.research_current_rotations(
                         current_game_version=self.current_game_version(),
@@ -335,6 +341,24 @@ class RotationService:
                 tuple(state.web_citations),
                 today=current.date(),
             )
+            expected = {
+                "targeted_loot_dc",
+                "targeted_loot_nyc",
+                "targeted_loot_brooklyn",
+                "invaded_missions",
+                "legendary_project",
+                "descent_pool",
+                "classified_assignment",
+                "dark_zone_mode",
+                "vendor_stock",
+            }
+            state.missing_kinds = sorted(expected - {item.kind for item in accepted_items})
+            if vendor_feed is not None and "vendor_stock" in state.missing_kinds:
+                state.missing_kinds.remove("vendor_stock")
+            if escalation is None:
+                state.missing_kinds.append("escalation_loot_and_missions")
+            if state.missing_kinds:
+                warnings.append("Awaiting current reports for: " + ", ".join(state.missing_kinds))
             publications = _build_publications(
                 current,
                 escalation=escalation,
@@ -1436,6 +1460,7 @@ def _web_research_due(
     *,
     hours: int,
     calendar: tuple[CalendarEvent, ...],
+    missing: bool = False,
 ) -> bool:
     if previous is None:
         return True
@@ -1445,6 +1470,10 @@ def _web_research_due(
         daily_reset -= timedelta(days=1)
     if previous_utc < daily_reset <= now:
         return True
+    # Source posts often arrive after reset. Retry through the morning, without
+    # hammering a failing API or spending the member-answer budget reserve.
+    if missing and now - daily_reset < timedelta(hours=6):
+        return now - previous_utc >= timedelta(minutes=45)
     descent = next((event for event in calendar if event.name == "Descent Playlist Rotation"), None)
     if descent is not None and descent.cycle_seed is not None and descent.cycle_duration:
         if now >= descent.cycle_seed:
